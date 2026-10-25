@@ -1,0 +1,17 @@
+services:
+  navidrome:
+    image: deluan/navidrome:0.64.2
+    container_name: vibemusic-navidrome
+    ports:
+      - "127.0.0.1:4534:4533"
+    env_file: .env
+    environment:
+      ND_SCANNER_SCHEDULE: "0"
+      ND_ENABLEINSIGHTSCOLLECTOR: "false"
+      ND_LOGLEVEL: info
+    volumes:
+      - navidrome-data:/data
+      - ./music:/music:ro
+
+volumes:
+  navidrome-data:
