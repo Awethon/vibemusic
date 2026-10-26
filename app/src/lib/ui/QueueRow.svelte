@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { Entry } from '../player/queue.ts';
-	import { player } from '../player/player.svelte.ts';
+	import { trackById } from '../player/player.svelte.ts';
 	import { queueRowMenu } from './actions.ts';
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
 	import { openMenu } from './menu.svelte.ts';
 
 	let { entry, queuedIndex, sourceIndex }: { entry: Entry; queuedIndex?: number; sourceIndex?: number } = $props();
-	const track = $derived(player.tracks[entry.trackId]);
+	const track = $derived(trackById(entry.trackId));
 </script>
 
 <li

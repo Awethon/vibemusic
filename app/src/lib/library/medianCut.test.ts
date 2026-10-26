@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { medianCut } from './palette.ts';
+import { medianCut } from './medianCut.ts';
 
 const image = (colors: [number, number, number, number][]) => {
 	const pixels: number[] = [];

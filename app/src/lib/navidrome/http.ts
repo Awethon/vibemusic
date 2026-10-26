@@ -1,4 +1,4 @@
-import { NavidromeError, SessionExpiredError, subsonicUrl, type Credentials } from './credentials.ts';
+import { appendParams, NavidromeError, SessionExpiredError, subsonicUrl, type Credentials, type SubsonicParams } from './credentials.ts';
 
 export type NativePage<T> = { items: T[]; total: number };
 
@@ -52,8 +52,12 @@ export class NavidromeHttp {
 		return items;
 	}
 
-	async subsonic<T = Record<string, unknown>>(method: string, params: Record<string, string | number | string[]> = {}): Promise<T> {
-		const response = await fetch(subsonicUrl(this.credentials, method, { ...params, f: 'json' }));
+	async subsonic<T = Record<string, unknown>>(method: string, params: SubsonicParams = {}): Promise<T> {
+		const response = await fetch(subsonicUrl(this.credentials, method, { f: 'json' }), {
+			method: 'POST',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			body: appendParams(new URLSearchParams(), params)
+		});
 		if (!response.ok) throw new NavidromeError(`Subsonic ${method}: ${response.status}`);
 		const body = (await response.json())['subsonic-response'];
 		if (body?.status !== 'ok') {

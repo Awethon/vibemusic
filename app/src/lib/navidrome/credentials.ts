@@ -29,15 +29,21 @@ export function subsonicAuthParams(credentials: Credentials): URLSearchParams {
 	});
 }
 
-export function subsonicUrl(credentials: Credentials, method: string, params: Record<string, string | number | string[]> = {}): string {
-	const query = subsonicAuthParams(credentials);
+export type SubsonicParams = Record<string, string | number | string[]>;
+
+export function appendParams(target: URLSearchParams, params: SubsonicParams) {
 	for (const [name, value] of Object.entries(params)) {
-		if (Array.isArray(value)) value.forEach((item) => query.append(name, item));
-		else query.set(name, String(value));
+		if (Array.isArray(value)) value.forEach((item) => target.append(name, item));
+		else target.set(name, String(value));
 	}
-	return `/rest/${method}?${query}`;
+	return target;
 }
+
+export const subsonicUrl = (credentials: Credentials, method: string, params: SubsonicParams = {}) => `/rest/${method}?${appendParams(subsonicAuthParams(credentials), params)}`;
 
 export const streamUrl = (credentials: Credentials, trackId: string) => subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
 
-export const coverUrl = (credentials: Credentials, albumId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `al-${albumId}`, size });
+export const coverAlbumOverrides = new Map<string, string>();
+
+export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>
+	subsonicUrl(credentials, 'getCoverArt', { id: `al-${coverAlbumOverrides.get(albumId) ?? albumId}`, size });

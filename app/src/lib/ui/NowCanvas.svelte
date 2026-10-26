@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { albumById } from '../library/queries.ts';
-	import { currentTrack, player } from '../player/player.svelte.ts';
+	import { currentTrack, playerQueue } from '../player/player.svelte.ts';
 	import { LYRICS, QUEUE } from '../tuning.ts';
 	import Cover from './Cover.svelte';
 	import Icon from './Icon.svelte';
@@ -17,10 +17,10 @@
 	const album = live(() => (track ? albumById(track.albumId) : Promise.resolve(null)), null);
 	const rows = $derived.by(() => {
 		const limit = QUEUE.fullScreenUpNextCount;
-		const queued = player.queue.userQueue.slice(0, limit).map((entry, index) => ({ entry, queuedIndex: index as number | undefined, sourceIndex: undefined as number | undefined }));
-		const upcoming = player.queue.sourceQueue
-			.slice(player.queue.sourceIndex + 1, player.queue.sourceIndex + 1 + limit)
-			.map((entry, index) => ({ entry, queuedIndex: undefined as number | undefined, sourceIndex: player.queue.sourceIndex + 1 + index }));
+		const queued = playerQueue().userQueue.slice(0, limit).map((entry, index) => ({ entry, queuedIndex: index as number | undefined, sourceIndex: undefined as number | undefined }));
+		const upcoming = playerQueue().sourceQueue
+			.slice(playerQueue().sourceIndex + 1, playerQueue().sourceIndex + 1 + limit)
+			.map((entry, index) => ({ entry, queuedIndex: undefined as number | undefined, sourceIndex: playerQueue().sourceIndex + 1 + index }));
 		return [...queued, ...upcoming].slice(0, limit);
 	});
 

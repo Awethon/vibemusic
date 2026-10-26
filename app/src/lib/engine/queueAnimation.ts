@@ -1,5 +1,5 @@
 import { flushSync } from 'svelte';
-import { player } from '../player/player.svelte.ts';
+import { playerQueue } from '../player/player.svelte.ts';
 import { EASING, QUEUE_MOTION } from '../tuning.ts';
 import { ui } from '../ui/state.svelte.ts';
 import { bodyHasClass, prefersReducedMotion } from './dom.ts';
@@ -144,13 +144,13 @@ export function animateQueueChange(applyChange: () => void, options: { movedEntr
 		return;
 	}
 	const before = snapshotQueueRows();
-	const entryIdBefore = player.queue.currentEntryId;
+	const entryIdBefore = playerQueue().currentEntryId;
 	const nowPlayingBlocks = captureNowPlayingBlocks();
 	applyChange();
 	flushSync();
 	clearDragStyles();
 	const after = snapshotQueueRows();
-	const playedEntryId = player.queue.currentEntryId !== entryIdBefore ? player.queue.currentEntryId : null;
+	const playedEntryId = playerQueue().currentEntryId !== entryIdBefore ? playerQueue().currentEntryId : null;
 	animateLeavingRows(before, after, playedEntryId, options.skipRow);
 	animateRemainingRows(before, after, options.movedEntryId);
 	if (playedEntryId !== null) crossfadeNowPlaying(nowPlayingBlocks);

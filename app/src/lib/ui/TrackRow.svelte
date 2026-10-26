@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Playlist, Track } from '../library/queries.ts';
-	import { player, playTrackInList } from '../player/player.svelte.ts';
+	import { playTrackInList, playerQueue } from '../player/player.svelte.ts';
 	import { trackMenu } from './actions.ts';
 	import { clock } from './format.ts';
 	import { openMenu } from './menu.svelte.ts';
@@ -21,7 +21,7 @@
 
 <div
 	class="trk"
-	class:playing={track.id === player.queue.currentTrackId}
+	class:playing={track.id === playerQueue().currentTrackId}
 	data-id={track.id}
 	role="button"
 	tabindex="-1"

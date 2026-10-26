@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { showPanelTab } from '../engine/panel.ts';
-	import { currentTrack, player } from '../player/player.svelte.ts';
+	import { currentTrack, playerQueue, totalDuration } from '../player/player.svelte.ts';
 	import * as queue from '../player/queue.ts';
 	import { LYRICS, PANEL, QUEUE } from '../tuning.ts';
 	import Cover from './Cover.svelte';
@@ -15,14 +15,12 @@
 	import TrackLinks from './TrackLinks.svelte';
 
 	const track = $derived(currentTrack());
-	const sourceRows = $derived(player.queue.sourceQueue.slice(player.queue.sourceIndex + 1, player.queue.sourceIndex + 1 + QUEUE.visibleRowCap));
-	const sourceRemaining = $derived(Math.max(0, player.queue.sourceQueue.length - player.queue.sourceIndex - 1));
-	const queuedRows = $derived(player.queue.userQueue.slice(0, QUEUE.visibleRowCap));
-	const total = $derived(queue.upNextCount(player.queue));
+	const sourceRows = $derived(playerQueue().sourceQueue.slice(playerQueue().sourceIndex + 1, playerQueue().sourceIndex + 1 + QUEUE.visibleRowCap));
+	const sourceRemaining = $derived(Math.max(0, playerQueue().sourceQueue.length - playerQueue().sourceIndex - 1));
+	const queuedRows = $derived(playerQueue().userQueue.slice(0, QUEUE.visibleRowCap));
+	const total = $derived(queue.upNextCount(playerQueue()));
 	const hiddenCount = $derived(sourceRemaining - sourceRows.length);
-	const remainingDuration = $derived(
-		player.queue.sourceQueue.slice(player.queue.sourceIndex + 1).reduce((sum, entry) => sum + (player.tracks[entry.trackId]?.duration ?? 0), 0)
-	);
+	const remainingDuration = $derived(hiddenCount > 0 ? totalDuration(playerQueue().sourceQueue.slice(playerQueue().sourceIndex + 1)) : 0);
 
 	let tabs = $state<HTMLElement | null>(null);
 	let ink = $state('');
@@ -40,7 +38,7 @@
 </script>
 
 <aside id="panel" aria-label="Now playing and queue">
-	<header class="pn-head"><span class="eyebrow">{player.queue.sourceName ? `Playing from ${player.queue.sourceName}` : 'Now playing'}</span></header>
+	<header class="pn-head"><span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span></header>
 	<div class="pn-now">
 		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={160} eager /></button>
 		<div class="pn-meta">
@@ -64,9 +62,9 @@
 					</ol>
 				</div>
 			{/if}
-			{#if sourceRows.length}<p class="eyebrow q-head-row" id="qSourceHead">Next from <span>{player.queue.sourceName || 'this list'}</span></p>{/if}
+			{#if sourceRows.length}<p class="eyebrow q-head-row" id="qSourceHead">Next from <span>{playerQueue().sourceName || 'this list'}</span></p>{/if}
 			<ol class="qlist" id="qList" data-kind="source" onpointerdown={beginPress} onpointermove={followPointer} onpointerup={endPress} onpointercancel={endPress}>
-				{#each sourceRows as entry, index (entry.entryId)}<QueueRow {entry} sourceIndex={player.queue.sourceIndex + 1 + index} />{/each}
+				{#each sourceRows as entry, index (entry.entryId)}<QueueRow {entry} sourceIndex={playerQueue().sourceIndex + 1 + index} />{/each}
 			</ol>
 			{#if !sourceRows.length && !queuedRows.length}<p class="q-empty">Nothing up next. Right-click any track to add it.</p>{/if}
 			{#if hiddenCount > 0}<p class="q-more">and {formatCount(hiddenCount)} more · {longDuration(remainingDuration)} in total</p>{/if}

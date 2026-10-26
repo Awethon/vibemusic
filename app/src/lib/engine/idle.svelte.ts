@@ -1,4 +1,4 @@
-import { player } from '../player/player.svelte.ts';
+import { player, playerQueue } from '../player/player.svelte.ts';
 import { IDLE } from '../tuning.ts';
 import { anyMenuOpen } from '../ui/menu.svelte.ts';
 import { ui } from '../ui/state.svelte.ts';
@@ -39,7 +39,7 @@ function enterIdleOrRest() {
 }
 
 function checkIdle() {
-	if (idle.isIdle || idle.isResting || !player.queue.currentTrackId || !player.playing) return;
+	if (idle.isIdle || idle.isResting || !playerQueue().currentTrackId || !player.playing) return;
 	if (somethingKeepsUiAwake() || performance.now() - lastActivityAt <= idleDelayMs) return;
 	enterIdleOrRest();
 }

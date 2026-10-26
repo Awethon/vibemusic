@@ -30,3 +30,16 @@ export async function fetchLibrary(http: NavidromeHttp): Promise<LibrarySnapshot
 	);
 	return { version, albums, songs, playlists, playlistTracks };
 }
+
+type RawSnapshot = { version: string; albums: unknown[]; songs: unknown[]; playlists: unknown[]; playlistTracks: Record<string, unknown[]> };
+
+export async function fetchSnapshotFile(url: string): Promise<LibrarySnapshot> {
+	const raw = (await (await fetch(url)).json()) as RawSnapshot;
+	return {
+		version: raw.version,
+		albums: nativeAlbum.array().parse(raw.albums),
+		songs: nativeSong.array().parse(raw.songs),
+		playlists: nativePlaylist.array().parse(raw.playlists),
+		playlistTracks: new Map(Object.entries(raw.playlistTracks).map(([id, tracks]) => [id, nativePlaylistTrack.array().parse(tracks)]))
+	};
+}

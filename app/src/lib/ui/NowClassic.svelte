@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { currentTrack, player } from '../player/player.svelte.ts';
+	import { currentTrack, playerQueue } from '../player/player.svelte.ts';
 	import { LYRICS } from '../tuning.ts';
 	import Cover from './Cover.svelte';
 	import Icon from './Icon.svelte';
@@ -13,7 +13,7 @@
 
 <section id="classic" aria-label="Now playing">
 	<header class="cl-head">
-		<span class="eyebrow">{player.queue.sourceName ? `Playing from ${player.queue.sourceName}` : 'Now playing'}</span>
+		<span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>
 		<button class="icon-btn" type="button" aria-label="Exit full screen" onclick={() => setFullScreen(false)}><Icon name="collapse" /></button>
 	</header>
 	<div class="cl-stage">

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -59,7 +59,9 @@ create table playlist (
 );
 create table playlist_track (playlist_id text not null, position integer not null, track_id text not null, primary key (playlist_id, position)) without rowid;
 create table palette (album_id text primary key, colors text not null) without rowid;
+create table search_key (kind text not null, text text not null, ref text not null);
 create virtual table search using fts5 (kind unindexed, ref unindexed, text, tokenize = 'trigram remove_diacritics 1');
+create index search_key_prefix on search_key (kind, text);
 `;
 
 export const normalizeForSearch = (text: string) => text.toLowerCase().replaceAll('ё', 'е').normalize('NFKC');

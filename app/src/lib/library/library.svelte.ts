@@ -3,20 +3,26 @@ import { navidrome, renewToken, requireCredentials, sessionExpired } from '../se
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { fetchLibraryVersion } from './fetch.ts';
 import LibraryWorker from './library.worker.ts?worker';
-import type { SqlParam, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
+import type { SqlParam, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
+import { coverAlbumOverrides } from '../navidrome/credentials.ts';
 import type { LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
 type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync' };
 
-export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string }>({
+export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null }>({
 	status: 'idle',
 	meta: null,
 	revision: 0,
 	leader: false,
-	error: ''
+	error: '',
+	openMs: 0,
+	timings: null
 });
+
+const SYNTHETIC_LIBRARY = { version: 'synthetic-1', snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
+const syntheticLibrary = import.meta.env.DEV && new URLSearchParams(location.search).get('lib') === 'synthetic';
 
 let worker: Worker | null = null;
 let channel: BroadcastChannel | null = null;
@@ -63,6 +69,7 @@ async function syncNow() {
 	if (!library.meta) library.status = 'syncing';
 	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()) });
 	renewToken(result.token);
+	library.timings = result.timings;
 	loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
 }
@@ -105,16 +112,32 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 	}
 }
 
+async function startSyntheticLibrary() {
+	const covers = (await (await fetch(SYNTHETIC_LIBRARY.coversUrl)).json()) as Record<string, string>;
+	for (const [albumId, coverAlbumId] of Object.entries(covers)) coverAlbumOverrides.set(albumId, coverAlbumId);
+	if (library.meta?.version === SYNTHETIC_LIBRARY.version) return;
+	library.status = 'syncing';
+	const result = await call({ kind: 'loadFile', url: SYNTHETIC_LIBRARY.snapshotUrl });
+	library.timings = result.timings;
+	loaded(result.meta);
+}
+
 export async function startLibrary() {
 	if (worker) return;
-	const { userId } = requireCredentials();
+	const userId = syntheticLibrary ? 'synthetic' : requireCredentials().userId;
 	library.status = 'loading';
 	worker = new LibraryWorker();
 	worker.addEventListener('message', onWorkerReply);
 	channel = new BroadcastChannel(`vibemusic-library-${userId}`);
 	channel.addEventListener('message', onChannelMessage);
 	try {
+		const openStarted = performance.now();
 		loaded(await call({ kind: 'open', userId }));
+		library.openMs = performance.now() - openStarted;
+		if (syntheticLibrary) {
+			await startSyntheticLibrary();
+			return;
+		}
 		if (!library.meta) library.status = 'syncing';
 	} catch (error) {
 		failed(error);
@@ -131,8 +154,13 @@ export async function resyncLibrary() {
 	else channel?.postMessage({ kind: 'resync' } satisfies ChannelMessage);
 }
 
-export function query<Row>(sql: string, params: SqlParam[] = []): Promise<Row[]> {
-	return call({ kind: 'query', sql, params }) as Promise<Row[]>;
+export async function query<Row>(sql: string, params: SqlParam[] = []): Promise<Row[]> {
+	const { columns, rows } = await call({ kind: 'query', sql, params });
+	return rows.map((row) => {
+		const record: Record<string, SqlParam> = {};
+		for (let index = 0; index < columns.length; index++) record[columns[index]] = row[index];
+		return record as Row;
+	});
 }
 
 export async function patchLibrary(sql: string, params: SqlParam[]) {

@@ -1,8 +1,8 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { query, resyncLibrary } from '../library/library.svelte.ts';
-import { albumTracks, artistTracks, ownPlaylists, playlistTracks, type Album, type Artist, type Playlist, type Track } from '../library/queries.ts';
-import { player } from '../player/player.svelte.ts';
+import { albumTracks, artistTracks, ownPlaylists, playlistTracks, type AlbumSummary, type Artist, type Playlist, type Track } from '../library/queries.ts';
+import { trackById } from '../player/player.svelte.ts';
 import { navidrome, requireCredentials } from '../session.svelte.ts';
 import { plural } from './format.ts';
 import type { MenuItem } from './menu.svelte.ts';
@@ -68,7 +68,7 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 	return entries;
 }
 
-export async function albumMenu(album: Album): Promise<MenuItem[]> {
+export async function albumMenu(album: AlbumSummary): Promise<MenuItem[]> {
 	const tracks = () => albumTracks(album.id);
 	return collectionEntries(tracks, album.songCount, album.name, `album:${album.id}`, 'Open album', () => openAlbum(album.id), [
 		{ label: 'Go to artist', run: () => openArtist(album.artistId) },
@@ -85,7 +85,7 @@ export function playlistMenu(playlist: Playlist): MenuItem[] {
 }
 
 export function queueRowMenu(row: HTMLElement): MenuItem[] {
-	const track = player.tracks[row.dataset.id ?? ''];
+	const track = trackById(row.dataset.id ?? '');
 	let entries: MenuItem[];
 	if (row.dataset.uq !== undefined) {
 		const queuedIndex = Number(row.dataset.uq);

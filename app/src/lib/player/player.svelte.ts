@@ -16,9 +16,12 @@ const SCROBBLE_AFTER_SECONDS = 240;
 const SOURCE_NAME_KEY = 'vibemusic.queue.source';
 const VOLUME_KEY = 'vibemusic.volume';
 
+const queueState = queue.emptyQueue();
+const trackCache = new Map<string, Track>();
+
 export const player = $state({
-	queue: queue.emptyQueue(),
-	tracks: {} as Record<string, Track>,
+	queueRevision: 0,
+	trackRevision: 0,
 	playing: false,
 	buffering: false,
 	position: 0,
@@ -28,10 +31,31 @@ export const player = $state({
 	error: ''
 });
 
-export const currentTrack = (): Track | null => player.tracks[player.queue.currentTrackId] ?? null;
+export function playerQueue(): Readonly<queue.QueueState> {
+	void player.queueRevision;
+	return queueState;
+}
+
+export function trackById(trackId: string): Track | undefined {
+	void player.trackRevision;
+	return trackCache.get(trackId);
+}
+
+export function totalDuration(entries: readonly queue.Entry[]): number {
+	void player.trackRevision;
+	let seconds = 0;
+	for (const entry of entries) seconds += trackCache.get(entry.trackId)?.duration ?? 0;
+	return seconds;
+}
+
+export const currentTrack = (): Track | null => trackById(playerQueue().currentTrackId) ?? null;
+
+function queueChanged() {
+	player.queueRevision += 1;
+}
 
 const engine = new AudioEngine({
-	ended: () => apply(queue.playNext(player.queue)),
+	ended: () => apply(queue.playNext(queueState)),
 	failed: (message) => {
 		player.error = message;
 	},
@@ -45,7 +69,13 @@ let listenedSeconds = 0;
 let scrobbled = false;
 
 function remember(tracks: Track[]) {
-	for (const track of tracks) player.tracks[track.id] = track;
+	let added = false;
+	for (const track of tracks) {
+		if (trackCache.get(track.id) === track) continue;
+		trackCache.set(track.id, track);
+		added = true;
+	}
+	if (added) player.trackRevision += 1;
 }
 
 function refresh() {
@@ -61,12 +91,12 @@ function applyLevel() {
 }
 
 function prepareNext() {
-	const next = queue.nextEntry(player.queue);
+	const next = queue.nextEntry(queueState);
 	engine.prepare(next?.trackId ?? null, next ? streamUrl(requireCredentials(), next.trackId) : null);
 }
 
 async function startCurrent(autoplay = true, startAt = 0) {
-	const trackId = player.queue.currentTrackId;
+	const trackId = queueState.currentTrackId;
 	if (!trackId) return;
 	player.error = '';
 	listenedSeconds = 0;
@@ -78,6 +108,7 @@ async function startCurrent(autoplay = true, startAt = 0) {
 }
 
 function apply(effect: queue.QueueEffect) {
+	queueChanged();
 	if (effect === 'play') void startCurrent();
 	else if (effect === 'restart') engine.seek(0);
 	else if (effect === 'stop') engine.stop();
@@ -91,12 +122,12 @@ function scheduleSave() {
 }
 
 async function saveQueue() {
-	if (!player.queue.currentTrackId) return;
+	if (!queueState.currentTrackId) return;
 	lastSavedAt = Date.now();
-	const { trackIds } = queue.savedOrder(player.queue);
+	const { trackIds } = queue.savedOrder(queueState);
 	try {
-		localStorage.setItem(SOURCE_NAME_KEY, player.queue.sourceName);
-		await navidrome().subsonic('savePlayQueue', { id: trackIds, current: player.queue.currentTrackId, position: Math.round(engine.position * 1000) });
+		localStorage.setItem(SOURCE_NAME_KEY, queueState.sourceName);
+		await navidrome().subsonic('savePlayQueue', { id: trackIds, current: queueState.currentTrackId, position: Math.round(engine.position * 1000) });
 	} catch {
 		return;
 	}
@@ -140,18 +171,19 @@ export function startPlayer() {
 }
 
 export async function restoreSavedQueue() {
-	if (player.queue.currentTrackId) return;
+	if (queueState.currentTrackId) return;
 	type SavedQueue = { playQueue?: { entry?: { id: string }[]; current?: string; position?: number } };
 	try {
 		const saved = (await navidrome().subsonic<SavedQueue>('getPlayQueue')).playQueue;
 		const ids = saved?.entry?.map((entry) => entry.id) ?? [];
 		if (!ids.length) return;
 		const tracks = await tracksByIds(ids);
-		if (!tracks.length || player.queue.currentTrackId) return;
+		if (!tracks.length || queueState.currentTrackId) return;
 		remember(tracks);
 		const known = tracks.map((track) => track.id);
 		const currentIndex = Math.max(0, known.indexOf(saved?.current ?? ''));
-		queue.restoreQueue(player.queue, known, currentIndex, localStorage.getItem(SOURCE_NAME_KEY) ?? '');
+		queue.restoreQueue(queueState, known, currentIndex, localStorage.getItem(SOURCE_NAME_KEY) ?? '');
+		queueChanged();
 		await startCurrent(false, (saved?.position ?? 0) / 1000);
 	} catch {
 		return;
@@ -161,25 +193,25 @@ export async function restoreSavedQueue() {
 export function playTracks(tracks: Track[], startIndex: number, sourceName: string, listKey: string) {
 	remember(tracks);
 	rememberPlayedList(listKey);
-	apply(queue.playList(player.queue, tracks.map((track) => track.id), startIndex, sourceName, listKey));
+	apply(queue.playList(queueState, tracks.map((track) => track.id), startIndex, sourceName, listKey));
 }
 
 export function isPlayingList(listKey: string) {
-	return player.playing && player.queue.sourceKey === listKey && !!listKey;
+	return player.playing && queueState.sourceKey === listKey && !!listKey;
 }
 
 export function togglePlayList(tracks: Track[], sourceName: string, listKey: string) {
-	if (player.queue.sourceKey === listKey && listKey && tracks.some((track) => track.id === player.queue.currentTrackId)) togglePlay();
+	if (queueState.sourceKey === listKey && listKey && tracks.some((track) => track.id === queueState.currentTrackId)) togglePlay();
 	else playTracks(tracks, 0, sourceName, listKey);
 }
 
 export function playTrackInList(tracks: Track[], index: number, sourceName: string, listKey: string) {
-	if (tracks[index]?.id === player.queue.currentTrackId && player.queue.sourceKey === listKey) togglePlay();
+	if (tracks[index]?.id === queueState.currentTrackId && queueState.sourceKey === listKey) togglePlay();
 	else playTracks(tracks, index, sourceName, listKey);
 }
 
 export function togglePlay() {
-	if (!player.queue.currentTrackId) return;
+	if (!queueState.currentTrackId) return;
 	if (engine.playing) {
 		engine.pause();
 		void saveQueue();
@@ -188,11 +220,11 @@ export function togglePlay() {
 }
 
 export function playNextTrack() {
-	apply(queue.playNext(player.queue));
+	apply(queue.playNext(queueState));
 }
 
 export function playPreviousTrack() {
-	apply(queue.playPrevious(player.queue, engine.position, PLAYBACK.restartInsteadOfPreviousAfterSeconds));
+	apply(queue.playPrevious(queueState, engine.position, PLAYBACK.restartInsteadOfPreviousAfterSeconds));
 }
 
 export function seekTo(seconds: number) {
@@ -217,19 +249,20 @@ export function toggleMute() {
 
 export function queueNext(tracks: Track[], sourceName: string) {
 	remember(tracks);
-	apply(queue.queueTracksNext(player.queue, tracks.map((track) => track.id), sourceName));
+	apply(queue.queueTracksNext(queueState, tracks.map((track) => track.id), sourceName));
 }
 
 export function queueLast(tracks: Track[], sourceName: string) {
 	remember(tracks);
-	apply(queue.queueTracksLast(player.queue, tracks.map((track) => track.id), sourceName));
+	apply(queue.queueTracksLast(queueState, tracks.map((track) => track.id), sourceName));
 }
 
-export const playQueuedAt = (index: number) => apply(queue.playQueuedAt(player.queue, index));
-export const playSourceNow = (index: number) => apply(queue.playSourceNow(player.queue, index));
+export const playQueuedAt = (index: number) => apply(queue.playQueuedAt(queueState, index));
+export const playSourceNow = (index: number) => apply(queue.playSourceNow(queueState, index));
 
 export function editQueue(edit: (state: queue.QueueState) => void) {
-	edit(player.queue);
+	edit(queueState);
+	queueChanged();
 	prepareNext();
 	scheduleSave();
 }
@@ -238,7 +271,11 @@ export async function toggleLike(track: Track) {
 	const starred = !track.starred;
 	await navidrome().subsonic(starred ? 'star' : 'unstar', { id: track.id });
 	await patchLibrary('update track set starred = ? where id = ?', [starred ? 1 : 0, track.id]);
-	for (const cached of Object.values(player.tracks)) if (cached.id === track.id) cached.starred = starred;
+	const cached = trackCache.get(track.id);
+	if (cached) {
+		trackCache.set(track.id, { ...cached, starred });
+		player.trackRevision += 1;
+	}
 }
 
 export const sampleAudio = (nowMs: number) => engine.sample(nowMs);

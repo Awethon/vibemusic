@@ -17,6 +17,8 @@ export type Album = {
 	starred: boolean;
 };
 
+export type AlbumSummary = Pick<Album, 'id' | 'name' | 'artistId' | 'artist' | 'year' | 'songCount'>;
+
 export type Track = {
 	id: string;
 	albumId: string;
@@ -118,9 +120,12 @@ const ARTIST_ORDER: Record<ArtistSort, string> = {
 	az: 'artist.name_order'
 };
 
-export function albumWall(sort: AlbumSort, filters: Filters) {
+export function albumWall(sort: AlbumSort, filters: Filters): Promise<AlbumSummary[]> {
 	const filter = albumFilterSql(filters);
-	return albums(`select ${ALBUM_COLUMNS}, album.artist_order as artistOrder, album.name_order as nameOrder from album where ${filter.sql} order by ${ALBUM_ORDER[sort]}`, filter.params);
+	return query<AlbumSummary>(
+		`select album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.song_count as songCount from album where ${filter.sql} order by ${ALBUM_ORDER[sort]}`,
+		filter.params
+	);
 }
 
 export function artistList(sort: ArtistSort, filters: Filters) {
@@ -179,12 +184,16 @@ export const playlistTracks = (playlistId: string) =>
 		[playlistId]
 	);
 
-export const tracksByIds = async (ids: string[]) => {
-	if (!ids.length) return [];
-	const found = await tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(ids)})`, ids);
-	const byId = new Map(found.map((track) => [track.id, track]));
-	return ids.map((id) => byId.get(id)).filter((track): track is Track => !!track);
-};
+const ID_CHUNK = 5000;
+
+async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+	const byId = new Map<string, T>();
+	for (let start = 0; start < ids.length; start += ID_CHUNK) for (const row of await load(ids.slice(start, start + ID_CHUNK))) byId.set(row.id, row);
+	return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
+}
+
+export const tracksByIds = (ids: string[]) =>
+	inChunks(ids, (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
 
 export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from playlist order by name collate nocase`);
 
@@ -192,46 +201,55 @@ export const playlistById = async (id: string) => (await playlists(`select ${PLA
 
 export const ownPlaylists = (ownerId: string) => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'own' and owner_id = ? order by name collate nocase`, [ownerId]);
 
-export const albumsByIds = async (ids: string[]) => {
-	if (!ids.length) return [];
-	const found = await albums(`select ${ALBUM_COLUMNS} from album where id in (${placeholders(ids)})`, ids);
-	const byId = new Map(found.map((album) => [album.id, album]));
-	return ids.map((id) => byId.get(id)).filter((album): album is Album => !!album);
-};
+export const albumsByIds = (ids: string[]) => inChunks(ids, (chunk) => albums(`select ${ALBUM_COLUMNS} from album where id in (${placeholders(chunk)})`, chunk));
 
 export const recentlyPlayedAlbums = (limit: number) =>
 	albums(`select ${ALBUM_COLUMNS} from album where play_date != '' order by play_date desc limit ?`, [limit]);
+
+const PREFIX_END = '\uffff';
+
+async function matchingRefs(kind: string, needle: string, limit: number): Promise<string[]> {
+	const prefixed = await query<{ ref: string }>('select ref from search_key where kind = ? and text >= ? and text < ? limit ?', [kind, needle, needle + PREFIX_END, limit]);
+	const refs = prefixed.map((row) => row.ref);
+	if (refs.length >= limit) return refs;
+	const useIndex = [...needle].length >= 3;
+	const remaining = limit - refs.length;
+	const substring = useIndex
+		? await query<{ ref: string }>('select ref from search where kind = ? and search match ? and instr(text, ?) != 1 limit ?', [kind, `"${needle.replaceAll('"', '""')}"`, needle, remaining])
+		: await query<{ ref: string }>(`select ref from search_key where kind = ? and text like ? escape '\\' and instr(text, ?) != 1 limit ?`, [
+				kind,
+				`%${needle.replace(/[\\%_]/g, (character) => '\\' + character)}%`,
+				needle,
+				remaining
+			]);
+	return [...refs, ...substring.map((row) => row.ref)];
+}
+
+async function inOrder<T extends { id: string }>(ids: string[], load: (sql: string, params: SqlParam[]) => Promise<T[]>, sql: string): Promise<T[]> {
+	if (!ids.length) return [];
+	const rows = await load(sql.replace('$ids', placeholders(ids)), ids);
+	const byId = new Map(rows.map((row) => [row.id, row]));
+	return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
+}
 
 export type SearchResults = { artists: Artist[]; albums: Album[]; playlists: Playlist[]; tracks: Track[] };
 
 export async function search(text: string, limits: { artists: number; albums: number; playlists: number; tracks: number }): Promise<SearchResults> {
 	const needle = normalizeForSearch(text.trim());
 	if (!needle) return { artists: [], albums: [], playlists: [], tracks: [] };
-	const useIndex = [...needle].length >= 3;
-	const matcher = useIndex ? `search match ?` : `search.text like ? escape '\\'`;
-	const pattern = useIndex ? `"${needle.replaceAll('"', '""')}"` : `%${needle.replace(/[\\%_]/g, (character) => '\\' + character)}%`;
-	const matches = (kind: string, limit: number) =>
-		query<{ ref: string }>(`select ref from search where kind = ? and ${matcher} order by instr(text, ?) != 1, length(text) limit ?`, [kind, pattern, needle, limit]).then((rows) =>
-			rows.map((row) => row.ref)
-		);
 	const [artistIds, albumIds, playlistIds, trackIds] = await Promise.all([
-		matches('artist', limits.artists),
-		matches('album', limits.albums),
-		matches('playlist', limits.playlists),
-		matches('track', limits.tracks)
+		matchingRefs('artist', needle, limits.artists),
+		matchingRefs('album', needle, limits.albums),
+		matchingRefs('playlist', needle, limits.playlists),
+		matchingRefs('track', needle, limits.tracks)
 	]);
-	const byIds = async <T extends { id: string }>(ids: string[], load: (sql: string, params: SqlParam[]) => Promise<T[]>, sql: string) => {
-		if (!ids.length) return [];
-		const rows = await load(sql.replace('$ids', placeholders(ids)), ids);
-		const byId = new Map(rows.map((row) => [row.id, row]));
-		return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
-	};
-	return {
-		artists: await byIds(artistIds, artists, `select ${ARTIST_COLUMNS} from artist where id in ($ids)`),
-		albums: await albumsByIds(albumIds),
-		playlists: await byIds(playlistIds, playlists, `select ${PLAYLIST_COLUMNS} from playlist where id in ($ids)`),
-		tracks: await tracksByIds(trackIds)
-	};
+	const [foundArtists, foundAlbums, foundPlaylists, foundTracks] = await Promise.all([
+		inOrder(artistIds, artists, `select ${ARTIST_COLUMNS} from artist where id in ($ids)`),
+		albumsByIds(albumIds),
+		inOrder(playlistIds, playlists, `select ${PLAYLIST_COLUMNS} from playlist where id in ($ids)`),
+		tracksByIds(trackIds)
+	]);
+	return { artists: foundArtists, albums: foundAlbums, playlists: foundPlaylists, tracks: foundTracks };
 }
 
 export async function savedPalette(albumId: string): Promise<string[] | null> {

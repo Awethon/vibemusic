@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { Album } from '../library/queries.ts';
+	import type { AlbumSummary } from '../library/queries.ts';
 	import { currentTrack } from '../player/player.svelte.ts';
 	import { albumMenu } from './actions.ts';
 	import Cover from './Cover.svelte';
 	import { openMenu } from './menu.svelte.ts';
 
-	let { album, subtitle }: { album: Album; subtitle?: string } = $props();
+	let { album, subtitle }: { album: AlbumSummary; subtitle?: string } = $props();
 	const playing = $derived(currentTrack()?.albumId === album.id);
 </script>
 

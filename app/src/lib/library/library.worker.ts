@@ -3,8 +3,9 @@ import { NavidromeHttp } from '../navidrome/http.ts';
 import { SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { buildLibrary, readMeta } from './build.ts';
-import { fetchLibrary } from './fetch.ts';
-import type { WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
+import { fetchLibrary, fetchSnapshotFile } from './fetch.ts';
+import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
+import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
 
 let sqlite: Sqlite3Static;
 let db: Database | null = null;
@@ -29,6 +30,11 @@ async function readSnapshot(): Promise<Uint8Array | null> {
 
 async function writeSnapshot(database: Database) {
 	const bytes = sqlite.capi.sqlite3_js_db_export(database);
+	await writeBytes(bytes);
+	return bytes.byteLength;
+}
+
+async function writeBytes(bytes: Uint8Array<ArrayBuffer>) {
 	const directory = await navigator.storage.getDirectory();
 	const file = await directory.getFileHandle(snapshotName(), { create: true });
 	const writable = await file.createWritable();
@@ -82,6 +88,17 @@ function scheduleSnapshotWrite() {
 	}, LIBRARY_SYNC.snapshotWriteDelayMs);
 }
 
+async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ meta: LibraryMeta; timings: SyncTimings }> {
+	const buildStarted = performance.now();
+	const database = new sqlite.oo1.DB();
+	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString());
+	carryPalettes(db, database);
+	replaceDatabase(database);
+	const writeStarted = performance.now();
+	const snapshotBytes = await writeSnapshot(database);
+	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes } };
+}
+
 function requireDatabase(): Database {
 	if (!db) throw new Error('Library not loaded');
 	return db;
@@ -98,16 +115,20 @@ async function handle(request: WorkerRequest): Promise<WorkerResults[keyof Worke
 		case 'sync': {
 			let token = request.credentials.token;
 			const http = new NavidromeHttp(request.credentials, (renewed) => (token = renewed));
+			const started = performance.now();
 			const snapshot = await fetchLibrary(http);
-			const database = new sqlite.oo1.DB();
-			const meta = buildLibrary(database, snapshot, userId, new Date().toISOString());
-			carryPalettes(db, database);
-			replaceDatabase(database);
-			await writeSnapshot(database);
-			return { meta, token };
+			return { ...(await install(snapshot, performance.now() - started)), token };
 		}
-		case 'query':
-			return requireDatabase().selectObjects(request.sql, request.params) as WorkerResults['query'];
+		case 'loadFile': {
+			const started = performance.now();
+			const snapshot = await fetchSnapshotFile(request.url);
+			return install(snapshot, performance.now() - started);
+		}
+		case 'query': {
+			const columns: string[] = [];
+			const rows = requireDatabase().exec({ sql: request.sql, bind: request.params, rowMode: 'array', returnValue: 'resultRows', columnNames: columns });
+			return { columns, rows } as WorkerResults['query'];
+		}
 		case 'run': {
 			const database = requireDatabase();
 			database.exec({ sql: request.sql, bind: request.params });

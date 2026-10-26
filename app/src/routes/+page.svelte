@@ -5,7 +5,7 @@
 	import { alphabetEntriesFor } from '#lib/engine/layout.svelte.ts';
 	import { history } from '#lib/history.svelte.ts';
 	import { library } from '#lib/library/library.svelte.ts';
-	import { albumsByIds, albumWall, allPlaylists, artistById, artistStrip, playlistById, type Album, type AlbumSort, type Playlist } from '#lib/library/queries.ts';
+	import { albumsByIds, albumWall, allPlaylists, artistById, artistStrip, playlistById, type AlbumSort, type AlbumSummary, type Playlist } from '#lib/library/queries.ts';
 	import { HOME, SHELVES } from '#lib/tuning.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import Filters from '#lib/ui/Filters.svelte';
@@ -27,7 +27,7 @@
 		['newest', 'Newest']
 	] as const satisfies readonly (readonly [AlbumSort, string])[];
 
-	const bucketBySort: Partial<Record<AlbumSort, (album: Album) => string>> = {
+	const bucketBySort: Partial<Record<AlbumSort, (album: AlbumSummary) => string>> = {
 		byArtist: (album) => alphabetBucket(withoutLeadingThe(album.artist)),
 		az: (album) => alphabetBucket(album.name),
 		newest: (album) => decadeLabel(album.year)

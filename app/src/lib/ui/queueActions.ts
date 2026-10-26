@@ -1,7 +1,7 @@
 import { animateQueueChange } from '../engine/queueAnimation.ts';
 import type { Track } from '../library/queries.ts';
 import * as queue from '../player/queue.ts';
-import { editQueue, player, playQueuedAt, playSourceNow, playTracks, queueLast, queueNext } from '../player/player.svelte.ts';
+import { editQueue, playQueuedAt, playSourceNow, playTracks, queueLast, queueNext, playerQueue } from '../player/player.svelte.ts';
 import { formatCount } from './format.ts';
 import { showToast } from './state.svelte.ts';
 
@@ -11,7 +11,7 @@ export function playListAnimated(tracks: Track[], startIndex: number, sourceName
 
 export function playNextFromMenu(tracks: Track[], sourceName: string) {
 	if (!tracks.length) return;
-	if (!player.queue.currentTrackId) {
+	if (!playerQueue().currentTrackId) {
 		playTracks(tracks, 0, sourceName, '');
 		return;
 	}
@@ -21,7 +21,7 @@ export function playNextFromMenu(tracks: Track[], sourceName: string) {
 
 export function addToQueueFromMenu(tracks: Track[], sourceName: string) {
 	if (!tracks.length) return;
-	if (!player.queue.currentTrackId) {
+	if (!playerQueue().currentTrackId) {
 		playTracks(tracks, 0, sourceName, '');
 		return;
 	}
@@ -39,7 +39,7 @@ export function playUpNextRow(row: HTMLElement) {
 }
 
 export function moveQueuedToTop(queuedIndex: number) {
-	const movedEntryId = player.queue.userQueue[queuedIndex]?.entryId;
+	const movedEntryId = playerQueue().userQueue[queuedIndex]?.entryId;
 	animateQueueChange(() => editQueue((state) => queue.moveQueuedToTop(state, queuedIndex)), { movedEntryId });
 }
 
@@ -51,15 +51,15 @@ export function clearQueued() {
 }
 
 export function playSourceTrackNext(sourceIndex: number) {
-	const movedEntryId = player.queue.sourceQueue[sourceIndex]?.entryId;
+	const movedEntryId = playerQueue().sourceQueue[sourceIndex]?.entryId;
 	animateQueueChange(() => editQueue((state) => queue.moveSourceToPlayNext(state, sourceIndex)), { movedEntryId });
 }
 
 export const removeFromSource = (sourceIndex: number) => animateQueueChange(() => editQueue((state) => queue.removeSourceAt(state, sourceIndex)));
 
 export function reorderUpNextRows(fromUserQueue: boolean, fromPosition: number, toPosition: number) {
-	const list = fromUserQueue ? player.queue.userQueue : player.queue.sourceQueue;
-	const movedEntryId = list[(fromUserQueue ? 0 : player.queue.sourceIndex + 1) + fromPosition]?.entryId;
+	const list = fromUserQueue ? playerQueue().userQueue : playerQueue().sourceQueue;
+	const movedEntryId = list[(fromUserQueue ? 0 : playerQueue().sourceIndex + 1) + fromPosition]?.entryId;
 	animateQueueChange(() => editQueue((state) => queue.reorderUpNext(state, fromUserQueue, fromPosition, toPosition)), { movedEntryId });
 	if (fromPosition !== toPosition) showToast('Queue reordered');
 }

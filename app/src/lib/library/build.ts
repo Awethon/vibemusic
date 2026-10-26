@@ -83,11 +83,13 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 			}
 			const id = genrePlaylistId(genre);
 			insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, trackIds.length, duration, '']).stepReset();
+			insertSearch.bind(['playlist', id, normalizeForSearch(genre)]).stepReset();
 			trackIds.forEach((trackId, position) => insertPlaylistTrack.bind([id, position, trackId]).stepReset());
 		}
 		insertPlaylist.finalize();
 		insertPlaylistTrack.finalize();
 		insertSearch.finalize();
+		db.exec('insert into search_key select kind, text, ref from search');
 	});
 
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
