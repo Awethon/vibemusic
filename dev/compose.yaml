@@ -9,6 +9,7 @@ services:
       ND_SCANNER_SCHEDULE: "0"
       ND_ENABLEINSIGHTSCOLLECTOR: "false"
       ND_LOGLEVEL: info
+      ND_AGENTS: "apple-music,deezer,lastfm,listenbrainz"
     volumes:
       - navidrome-data:/data
       - ./music:/music:ro
