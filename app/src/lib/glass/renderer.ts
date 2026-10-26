@@ -9,8 +9,8 @@ type Program = { program: WebGLProgram; u: Record<string, WebGLUniformLocation |
 
 const TINT: [number, number, number] = [0.04, 0.045, 0.06];
 
-export function createGlassRenderer(canvas: HTMLCanvasElement) {
-	const gl = canvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true, depth: false, stencil: false });
+export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolean) {
+	const gl = canvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true, depth: false, stencil: false, preserveDrawingBuffer: keepFrame });
 	if (!gl) return null;
 	const context = gl;
 
@@ -164,7 +164,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement) {
 		}
 		context.uniform4f(u.uBounds, bounds.x * dpr, bounds.y * dpr, (bounds.x + bounds.width) * dpr, (bounds.y + bounds.height) * dpr);
 		const light = lightVector(params);
-		context.uniform1f(u.uMerge, params.merge * dpr);
+		context.uniform1f(u.uMerge, 0);
 		context.uniform1f(u.uThick, params.thick * dpr);
 		context.uniform1f(u.uIor, params.ior);
 		context.uniform1f(u.uDisp, params.disp);

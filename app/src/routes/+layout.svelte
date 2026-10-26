@@ -194,8 +194,9 @@
 	<NowClassic />
 	<Ambient />
 	<Panel />
-	<GlassLayer />
+	<GlassLayer level="player" />
 	<Capsule />
+	<GlassLayer level="popups" />
 	<SettingsPopover />
 	<FilterPopover />
 	<ContextMenu />

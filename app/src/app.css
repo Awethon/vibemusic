@@ -1302,7 +1302,8 @@ img.img-broken { visibility: hidden; }
 .first-sync li span { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
 .first-sync .fs-stage { margin: 26px 0 0; color: var(--ink-3); font-size: 13px; }
 
-#glass { position: fixed; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+.glass-layer { position: fixed; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; }
+#glass-popups { z-index: 7; }
 body.glass-on #capsule, body.glass-on .pop, body.glass-on .menu { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
 
 .glass-tuner { display: grid; grid-template-columns: minmax(380px, 520px) minmax(0, 1fr); gap: 48px; align-items: start; }

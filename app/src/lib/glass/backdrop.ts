@@ -1,6 +1,8 @@
 import type { Region } from './renderer.ts';
 
-export const GLASS_ABOVE = '#glass, #dock, .pop, .menu, #palette, #toast, #connection-note, .row-lift';
+const ALWAYS_ABOVE = '.pop, .menu, #palette, #toast, #connection-note, .row-lift';
+export const ABOVE_PLAYER_GLASS = `#glass-player, #glass-popups, #dock, ${ALWAYS_ABOVE}`;
+export const ABOVE_POPUP_GLASS = `#glass-popups, ${ALWAYS_ABOVE}`;
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
@@ -71,7 +73,7 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	}
 }
 
-export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, field: HTMLCanvasElement | null) {
+export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, field: HTMLCanvasElement | null, above: string) {
 	const canvas = context.canvas;
 	const width = Math.max(1, Math.round(region.width * dpr));
 	const height = Math.max(1, Math.round(region.height * dpr));
@@ -93,7 +95,7 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 	}
 
 	const visit = (element: Element, opacity: number) => {
-		if (element instanceof SVGElement || element.matches(GLASS_ABOVE) || element.id === 'field') return;
+		if (element instanceof SVGElement || element.matches(above) || element.id === 'field') return;
 		const style = getComputedStyle(element);
 		if (style.display === 'none' || style.visibility === 'hidden') return;
 		const alpha = opacity * Number(style.opacity);

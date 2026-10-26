@@ -91,8 +91,7 @@ export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 			slider('curve', 'Edge curvature', 1, 6, 0.1, '', '1 straight chamfer · 2 round · 4+ square shoulder'),
 			slider('cut', 'Edge cut', -0.7, 0.9, 0.01, '', 'below 0 a raised wall at the outline · above 0 a shallow cap'),
 			slider('body', 'Body', 0, 1, 0.01, '', '0 extruded like a glass rod · 1 an oval dome'),
-			slider('lens', 'Dome', 0, 1.5, 0.05, '', 'extra curvature that magnifies'),
-			slider('merge', 'Liquid merge', 0, 90, 1, 'px', 'how eagerly two surfaces fuse when they meet')
+			slider('lens', 'Dome', 0, 1.5, 0.05, '', 'extra curvature that magnifies')
 		]
 	},
 	{
@@ -122,12 +121,19 @@ export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 	}
 ];
 
-const LAB_SLIDERS: { key: GlassKey; min: number; step: number }[] = [
-	...GROUPS.flatMap((group) => group.controls).filter((control): control is GlassSlider => !('toggle' in control)),
-	{ key: 'tilt', min: 0, step: 0.05 },
-	{ key: 'settle', min: 0.2, step: 0.05 }
-];
-const LAB_FIELDS = [...LAB_SLIDERS, { key: 'flip' as GlassKey, min: -1, step: 2 }];
+const SLIDERS = new Map(
+	GROUPS.flatMap((group) => group.controls)
+		.filter((control): control is GlassSlider => !('toggle' in control))
+		.map((control) => [control.key, { key: control.key, min: control.min, step: control.step }])
+);
+const LAB_ONLY: Partial<Record<GlassKey, { key: GlassKey; min: number; step: number }>> = {
+	merge: { key: 'merge', min: 0, step: 1 },
+	tilt: { key: 'tilt', min: 0, step: 0.05 },
+	settle: { key: 'settle', min: 0.2, step: 0.05 },
+	flip: { key: 'flip', min: -1, step: 2 }
+};
+const LAB_ORDER: GlassKey[] = ['thick', 'bevel', 'curve', 'cut', 'body', 'lens', 'merge', 'ior', 'disp', 'frost', 'light', 'elev', 'spec', 'refl', 'studio', 'rim', 'irid', 'tintA', 'shadow', 'caustic', 'tilt', 'settle', 'flip'];
+const LAB_FIELDS = LAB_ORDER.map((key) => SLIDERS.get(key) ?? LAB_ONLY[key]!);
 const LAB_LINK_VERSION = 1;
 const LAB_SHAPE_GROUP = 3;
 
