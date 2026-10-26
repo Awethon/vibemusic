@@ -134,15 +134,10 @@
 	}
 
 	function onkeydown(event: KeyboardEvent) {
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-			event.preventDefault();
-			ui.searchOpen = !ui.searchOpen;
-			if (!ui.searchOpen) previewPalette(null);
-			return;
-		}
 		if (event.key === 'Escape' && handleEscape()) return;
 		if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen) return;
-		if (event.code === 'Space') togglePlay();
+		if (event.key === '/') ui.searchOpen = true;
+		else if (event.code === 'Space') togglePlay();
 		else if (event.shiftKey && event.key === 'ArrowRight') playNextTrack();
 		else if (event.shiftKey && event.key === 'ArrowLeft') playPreviousTrack();
 		else if (event.altKey && event.key === 'ArrowRight') seekBy(PLAYBACK.seekStepSeconds);
