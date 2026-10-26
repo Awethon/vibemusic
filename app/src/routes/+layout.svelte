@@ -17,11 +17,13 @@
 	import { installResizeRelayout } from '#lib/engine/layout.svelte.ts';
 	import { isPreviewingPalette, previewPalette, updatePalettePageHold } from '#lib/engine/palette.ts';
 	import { setRailExpanded } from '#lib/engine/rail.ts';
+	import { history, seedHistory } from '#lib/history.svelte.ts';
 	import { library, startLibrary } from '#lib/library/library.svelte.ts';
+	import { recentlyPlayedAlbums } from '#lib/library/queries.ts';
 	import { loadLyricsFor } from '#lib/player/lyricsState.svelte.ts';
 	import { currentTrack, player, playNextTrack, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, togglePlay } from '#lib/player/player.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { PLAYBACK } from '#lib/tuning.ts';
+	import { HISTORY, PLAYBACK } from '#lib/tuning.ts';
 	import AlphabetNav from '#lib/ui/AlphabetNav.svelte';
 	import Ambient from '#lib/ui/Ambient.svelte';
 	import Background from '#lib/ui/Background.svelte';
@@ -68,6 +70,7 @@
 		if (library.status !== 'ready' || restored) return;
 		restored = true;
 		void restoreSavedQueue();
+		if (!history.items.length) void recentlyPlayedAlbums(HISTORY.maxLength).then((albums) => seedHistory(albums.map((album) => album.id)));
 	});
 
 	$effect(() => {
