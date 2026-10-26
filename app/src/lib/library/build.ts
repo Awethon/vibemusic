@@ -3,6 +3,16 @@ import { LIBRARY_RULES } from '../tuning.ts';
 import { normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
 
+const albumCreditsOf = (album: LibrarySnapshot['albums'][number]) => {
+	const credited = album.participants.filter((artist) => artist.id && artist.name);
+	if (!credited.length) return album.albumArtistId ? [{ id: album.albumArtistId, name: album.albumArtist, order: album.orderAlbumArtistName || album.albumArtist.toLowerCase() }] : [];
+	return credited.map((artist) => ({
+		id: artist.id,
+		name: artist.name,
+		order: credited.length === 1 && album.orderAlbumArtistName ? album.orderAlbumArtistName : artist.name.toLowerCase()
+	}));
+};
+
 const albumGenresOf = (album: LibrarySnapshot['albums'][number]) => {
 	const names = album.genres.map((genre) => genre.name).filter(Boolean);
 	return names.length ? [...new Set(names)] : album.genre ? [album.genre] : [];
@@ -20,6 +30,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 	db.transaction(() => {
 		const insertAlbum = db.prepare('insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
 		const insertAlbumGenre = db.prepare('insert or ignore into album_genre values (?,?)');
+		const insertAlbumCredit = db.prepare('insert or ignore into album_credit values (?,?,?,?,?)');
 		const insertSearch = db.prepare('insert into search values (?,?,?)');
 		for (const album of snapshot.albums) {
 			const genres = genresByAlbum.get(album.id) ?? [];
@@ -27,17 +38,20 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 				.bind([album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(genres), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0])
 				.stepReset();
 			for (const genre of genres) insertAlbumGenre.bind([genre, album.id]).stepReset();
+			albumCreditsOf(album).forEach((credit, position) => insertAlbumCredit.bind([credit.id, album.id, position, credit.name, credit.order]).stepReset());
 			insertSearch.bind(['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]).stepReset();
 		}
 		insertAlbum.finalize();
 		insertAlbumGenre.finalize();
+		insertAlbumCredit.finalize();
 
 		db.exec(`
 			insert into artist
-			select artist_id, artist, min(artist_order), count(*), sum(song_count),
-				coalesce(min(nullif(year, 0)), 0),
-				(select id from album newest where newest.artist_id = album.artist_id order by year desc, created desc limit 1)
-			from album where artist_id != '' group by artist_id
+			select credit.artist_id, min(credit.name), min(credit.name_order), count(*), sum(album.song_count),
+				coalesce(min(nullif(album.year, 0)), 0),
+				(select newest.id from album_credit newest_credit join album newest on newest.id = newest_credit.album_id
+					where newest_credit.artist_id = credit.artist_id order by newest.year desc, newest.created desc limit 1)
+			from album_credit credit join album on album.id = credit.album_id group by credit.artist_id
 		`);
 		for (const artist of db.selectObjects('select id, name from artist')) {
 			insertSearch.bind(['artist', artist.id as string, normalizeForSearch(artist.name as string)]).stepReset();

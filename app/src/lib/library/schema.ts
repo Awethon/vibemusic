@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -20,6 +20,8 @@ create table album (
 	starred integer not null
 );
 create index album_artist on album (artist_id, year desc);
+create table album_credit (artist_id text not null, album_id text not null, position integer not null, name text not null, name_order text not null, primary key (artist_id, album_id)) without rowid;
+create index album_credit_album on album_credit (album_id);
 create table album_genre (genre text not null, album_id text not null, primary key (genre, album_id)) without rowid;
 create table artist (
 	id text primary key,

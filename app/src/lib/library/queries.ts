@@ -15,6 +15,7 @@ export type Album = {
 	playCount: number;
 	playDate: string;
 	starred: boolean;
+	credits: { id: string; name: string }[];
 };
 
 export type AlbumSummary = Pick<Album, 'id' | 'name' | 'artistId' | 'artist' | 'year' | 'songCount'>;
@@ -67,24 +68,25 @@ export type Filters = { genres: string[]; decades: number[] };
 
 export const NO_FILTERS: Filters = { genres: [], decades: [] };
 
-type Raw<T> = Omit<T, 'genres' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
+type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; credits?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
 
 const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.genres, album.song_count as songCount,
-	album.duration, album.created, album.play_count as playCount, album.play_date as playDate, album.starred`;
+	album.duration, album.created, album.play_count as playCount, album.play_date as playDate, album.starred,
+	(select json_group_array(json_object('id', artist_id, 'name', name)) from (select artist_id, name from album_credit where album_credit.album_id = album.id order by position)) as credits`;
 
 const TRACK_COLUMNS = `track.id, track.album_id as albumId, album.name as album, track.title, track.artist, track.artist_id as artistId,
 	album.artist_id as albumArtistId, track.track_no as trackNo, track.disc_no as discNo, track.duration, track.starred`;
 
 const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount, artist.track_count as trackCount, artist.first_year as firstYear,
 	artist.newest_album_id as newestAlbumId,
-	(select json_group_array(id) from (select id from album where album.artist_id = artist.id order by year desc, created desc limit 4)) as coverAlbumIds`;
+	(select json_group_array(id) from (select id from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) order by year desc, created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
 	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image, playlist.readonly, playlist.artist_id as artistId,
 	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 4)) as mosaicAlbumIds`;
 
-const toAlbum = (row: Raw<Album>): Album => ({ ...row, genres: JSON.parse(row.genres ?? '[]'), starred: row.starred === 1 });
+const toAlbum = (row: Raw<Album>): Album => ({ ...row, genres: JSON.parse(row.genres ?? '[]'), credits: JSON.parse(row.credits ?? '[]'), starred: row.starred === 1 });
 const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1 });
 const toArtist = (row: Raw<Artist>): Artist => ({ ...row, coverAlbumIds: JSON.parse(row.coverAlbumIds ?? '[]') });
 const toPlaylist = (row: Raw<Playlist>): Playlist => ({ ...row, readonly: row.readonly === 1, mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]') });
@@ -133,7 +135,7 @@ export function albumWall(sort: AlbumSort, filters: Filters): Promise<AlbumSumma
 
 export function artistList(sort: ArtistSort, filters: Filters) {
 	const filter = albumFilterSql(filters);
-	const where = filter.sql === '1' ? '' : `where exists (select 1 from album where album.artist_id = artist.id and ${filter.sql})`;
+	const where = filter.sql === '1' ? '' : `where exists (select 1 from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) and ${filter.sql})`;
 	return artists(`select ${ARTIST_COLUMNS}, artist.name_order as nameOrder from artist ${where} order by ${ARTIST_ORDER[sort]}`, filter.params);
 }
 
@@ -141,7 +143,7 @@ export function artistStrip(filters: Filters, limit: number) {
 	const filter = albumFilterSql(filters);
 	return artists(
 		`select ${ARTIST_COLUMNS.replace('artist.album_count as albumCount', 'count(album.id) as albumCount')}
-		from artist join album on album.artist_id = artist.id where ${filter.sql}
+		from artist join album_credit on album_credit.artist_id = artist.id join album on album.id = album_credit.album_id where ${filter.sql}
 		group by artist.id order by count(album.id) desc, artist.track_count desc, artist.name_order limit ?`,
 		[...filter.params, limit]
 	);
@@ -157,7 +159,7 @@ export async function decadeCounts(): Promise<{ decade: number; albums: number }
 
 export const albumById = async (id: string) => (await albums(`select ${ALBUM_COLUMNS} from album where id = ?`, [id]))[0] ?? null;
 
-export const albumsByArtist = (artistId: string) => albums(`select ${ALBUM_COLUMNS} from album where artist_id = ? order by year desc, created desc`, [artistId]);
+export const albumsByArtist = (artistId: string) => albums(`select ${ALBUM_COLUMNS} from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = ?) order by year desc, created desc`, [artistId]);
 
 export const artistById = async (id: string) => (await artists(`select ${ARTIST_COLUMNS} from artist where id = ?`, [id]))[0] ?? null;
 
@@ -166,7 +168,7 @@ export const albumTracks = (albumId: string) =>
 
 export const artistTracks = (artistId: string) =>
 	tracks(
-		`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where album.artist_id = ?
+		`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = ?)
 		order by album.year desc, album.created desc, album.id, track.disc_no, track.track_no`,
 		[artistId]
 	);

@@ -20,7 +20,11 @@ export const nativeAlbum = z.object({
 	updatedAt: optionalDate,
 	playCount: optionalNumber,
 	playDate: optionalDate,
-	starred: z.boolean().nullish().transform((value) => value ?? false)
+	starred: z.boolean().nullish().transform((value) => value ?? false),
+	participants: z
+		.object({ albumartist: z.array(z.object({ id: z.string(), name: z.string() })).nullish() })
+		.nullish()
+		.transform((value) => value?.albumartist ?? [])
 });
 
 export const nativeSong = z.object({

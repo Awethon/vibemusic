@@ -30,7 +30,7 @@
 		<div class="album-side">
 			<Cover albumId={album.value.id} size={700} eager />
 			<h1 class="display">{album.value.name}</h1>
-			<p class="sub"><a href={resolve('/artist/[id]', { id: album.value.artistId })}>{album.value.artist}</a>{album.value.year ? ` · ${album.value.year}` : ''}</p>
+			<p class="sub">{#if album.value.credits.length > 1}{#each album.value.credits as credit, index (credit.id)}{#if index}{index === album.value.credits.length - 1 ? ' & ' : ', '}{/if}<a href={resolve('/artist/[id]', { id: credit.id })}>{credit.name}</a>{/each}{:else}<a href={resolve('/artist/[id]', { id: album.value.artistId })}>{album.value.artist}</a>{/if}{album.value.year ? ` · ${album.value.year}` : ''}</p>
 			<p class="genres">
 				{plural(album.value.songCount, 'track')} · {longDuration(album.value.duration)}{#if album.value.genres.length}{' · '}{#each album.value.genres as genre, index (genre)}{#if index}, {/if}<a href={resolve('/')} onclick={() => showGenre(genre)}>{genre}</a>{/each}{/if}
 			</p>
