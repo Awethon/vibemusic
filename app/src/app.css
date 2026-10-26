@@ -1,4 +1,8 @@
 :root {
+	--safe-t: env(safe-area-inset-top, 0px);
+	--safe-r: env(safe-area-inset-right, 0px);
+	--safe-b: env(safe-area-inset-bottom, 0px);
+	--safe-l: env(safe-area-inset-left, 0px);
 	--rail-w: 196px;
 	--panel-w: 0px;
 	--rail-p: 1;
@@ -79,9 +83,9 @@ body.now-open #chrome { opacity: 0; pointer-events: none; transform: scale(0.985
 
 #rail {
 	position: absolute;
-	top: 16px;
-	left: 12px;
-	bottom: 16px;
+	top: calc(16px + var(--safe-t));
+	left: calc(12px + var(--safe-l));
+	bottom: calc(16px + var(--safe-b));
 	width: var(--rail-w);
 	padding: 22px 0 14px;
 	display: flex;
@@ -180,9 +184,9 @@ body.panel-open { --panel-w: 376px; }
 
 #main {
 	position: absolute;
-	top: 0;
-	left: calc(var(--rail-w) + 28px);
-	right: var(--panel-w);
+	top: var(--safe-t);
+	left: calc(var(--rail-w) + 28px + var(--safe-l));
+	right: calc(var(--panel-w) + var(--safe-r));
 	bottom: 0;
 	overflow-y: auto;
 	overflow-x: hidden;
@@ -540,9 +544,9 @@ body.now-open.idle #now { opacity: 0; }
 
 #ambient {
 	position: fixed;
-	left: clamp(48px, 6vw, 110px);
-	bottom: clamp(48px, 9vh, 110px);
-	right: 48px;
+	left: calc(clamp(48px, 6vw, 110px) + var(--safe-l));
+	bottom: calc(clamp(48px, 9vh, 110px) + var(--safe-b));
+	right: calc(48px + var(--safe-r));
 	z-index: 4;
 	display: flex;
 	align-items: flex-end;
@@ -752,8 +756,8 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 #az {
 	position: absolute;
 	top: 44px;
-	right: calc(var(--panel-w) + 10px);
-	bottom: 118px;
+	right: calc(var(--panel-w) + 10px + var(--safe-r));
+	bottom: calc(118px + var(--safe-b));
 	width: 30px;
 	z-index: 3;
 	display: none;
@@ -794,9 +798,9 @@ body.has-az #az { display: flex; }
 
 #dock {
 	position: fixed;
-	left: calc(var(--rail-w) + 28px);
-	right: var(--panel-w);
-	bottom: 16px;
+	left: calc(var(--rail-w) + 28px + var(--safe-l));
+	right: calc(var(--panel-w) + var(--safe-r));
+	bottom: calc(16px + var(--safe-b));
 	z-index: 6;
 	display: flex;
 	justify-content: center;
@@ -875,9 +879,9 @@ body.now-open #dock { left: 0; right: 0; padding: 0 28px; }
 
 #panel {
 	position: fixed;
-	top: 16px;
-	right: 16px;
-	bottom: 16px;
+	top: calc(16px + var(--safe-t));
+	right: calc(16px + var(--safe-r));
+	bottom: calc(16px + var(--safe-b));
 	width: 360px;
 	z-index: 5;
 	display: flex;
@@ -1285,7 +1289,7 @@ body.no-select, body.no-select * { -webkit-user-select: none !important; user-se
 .gc-mark { position: absolute; right: calc(var(--gc-u) * 40); bottom: calc(var(--gc-u) * 38); font-family: var(--display); font-weight: 500; font-size: calc(var(--gc-u) * 26); letter-spacing: -0.04em; }
 .gc-mark span { font-weight: 300; color: var(--gc-accent); }
 
-#connection-note { position: fixed; top: 18px; left: 50%; z-index: 12; display: flex; white-space: nowrap; max-width: calc(100vw - 32px); align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: rgba(20, 18, 24, 0.94); box-shadow: 0 0 0 1px rgba(246, 243, 238, 0.08), 0 14px 34px -16px rgba(0, 0, 0, 0.9); color: var(--ink-2); font-size: 13px; transform: translateX(-50%); animation: connection-note-in 0.3s var(--ease); }
+#connection-note { position: fixed; top: calc(18px + var(--safe-t)); left: 50%; z-index: 12; display: flex; white-space: nowrap; max-width: calc(100vw - 32px); align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: rgba(20, 18, 24, 0.94); box-shadow: 0 0 0 1px rgba(246, 243, 238, 0.08), 0 14px 34px -16px rgba(0, 0, 0, 0.9); color: var(--ink-2); font-size: 13px; transform: translateX(-50%); animation: connection-note-in 0.3s var(--ease); }
 #connection-note .cn-dot { width: 7px; height: 7px; border-radius: 50%; background: #f0a35e; }
 #connection-note button { padding: 5px 12px; border-radius: 999px; background: rgba(246, 243, 238, 0.1); color: var(--ink); font-weight: 600; font-size: 12.5px; }
 #connection-note button:hover { background: rgba(246, 243, 238, 0.18); }
