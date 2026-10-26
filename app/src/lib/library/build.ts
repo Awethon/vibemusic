@@ -8,6 +8,10 @@ const albumGenresOf = (album: LibrarySnapshot['albums'][number]) => {
 	return names.length ? [...new Set(names)] : album.genre ? [album.genre] : [];
 };
 
+const ARTIST_PLAYLIST_PREFIX = 'This is ';
+
+const artistIdByName = (db: Database, name: string) => String(db.selectValue('select id from artist where name = ? collate nocase limit 1', [name]) ?? '');
+
 export const genrePlaylistId = (genre: string) => 'genre-' + genre.toLowerCase().replace(/[^a-z0-9а-яё]+/g, '-');
 
 export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: string, syncedAt: string): LibraryMeta {
@@ -48,12 +52,14 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 		}
 		insertTrack.finalize();
 
-		const insertPlaylist = db.prepare('insert into playlist values (?,?,?,?,?,?,?,?,?,?,?)');
+		const insertPlaylist = db.prepare('insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)');
 		const insertPlaylistTrack = db.prepare('insert into playlist_track values (?,?,?)');
 		for (const playlist of snapshot.playlists) {
 			const tracks = snapshot.playlistTracks.get(playlist.id) ?? [];
+			const artistId = playlist.sync && playlist.name.startsWith(ARTIST_PLAYLIST_PREFIX) ? artistIdByName(db, playlist.name.slice(ARTIST_PLAYLIST_PREFIX.length)) : '';
+			const kind = playlist.rules ? 'smart' : artistId ? 'artist' : 'own';
 			insertPlaylist
-				.bind([playlist.id, playlist.name, playlist.rules ? 'smart' : 'own', playlist.ownerId, '', 0, tracks.length, playlist.duration, playlist.evaluatedAt || playlist.updatedAt, playlist.uploadedImage, playlist.sync ? 1 : 0])
+				.bind([playlist.id, playlist.name, kind, playlist.ownerId, '', 0, tracks.length, playlist.duration, playlist.evaluatedAt || playlist.updatedAt, playlist.uploadedImage, playlist.sync ? 1 : 0, artistId])
 				.stepReset();
 			tracks.forEach((track, position) => insertPlaylistTrack.bind([playlist.id, position, track.mediaFileId]).stepReset());
 			insertSearch.bind(['playlist', playlist.id, normalizeForSearch(playlist.name)]).stepReset();
@@ -82,7 +88,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 				}
 			}
 			const id = genrePlaylistId(genre);
-			insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, trackIds.length, duration, '', '', 1]).stepReset();
+			insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, trackIds.length, duration, '', '', 1, '']).stepReset();
 			insertSearch.bind(['playlist', id, normalizeForSearch(genre)]).stepReset();
 			trackIds.forEach((trackId, position) => insertPlaylistTrack.bind([id, position, trackId]).stepReset());
 		}

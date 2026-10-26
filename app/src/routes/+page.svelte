@@ -48,7 +48,7 @@
 	}, []);
 
 	const homePlaylists = $derived.by(() => {
-		const byKind: Record<string, Playlist[]> = { own: [], smart: [], genre: [] };
+		const byKind: Record<string, Playlist[]> = { own: [], smart: [], genre: [], artist: [] };
 		for (const playlist of playlists.value) byKind[playlist.kind].push(playlist);
 		const mixed: Playlist[] = [];
 		while (mixed.length < playlists.value.length) {

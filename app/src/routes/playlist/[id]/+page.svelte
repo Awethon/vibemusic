@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { fixedRowMeasure } from '#lib/engine/geometry.ts';
 	import { playlistById, playlistTracks } from '#lib/library/queries.ts';
@@ -23,6 +24,7 @@
 		const current = playlist.value;
 		if (current?.kind === 'smart') return `Updates automatically${current.updated ? ` · refreshed ${relativeTime(current.updated)}` : ''}`;
 		if (current?.kind === 'genre') return `Built from your ${current.genre} albums · updates automatically`;
+		if (current?.kind === 'artist') return 'Their most popular tracks you own · updated weekly';
 		return '';
 	});
 </script>
@@ -34,6 +36,7 @@
 			<div>
 				<p class="eyebrow">{playlistKindLabel(playlist.value)}</p>
 				<h1 class="display">{playlist.value.name}</h1>
+				{#if playlist.value.kind === 'artist'}<p class="sub"><a href={resolve('/artist/[id]', { id: playlist.value.artistId })}>{playlist.value.name.replace(/^This is /, '')}</a></p>{/if}
 				{#if updateLine}<p class="sub smart-line"><Icon name="smart" /><span>{updateLine}</span></p>{/if}
 				<p class="genres">{plural(tracks.value.length, 'track')} · {longDuration(duration)}</p>
 				<div style:margin-top="20px"><PlayButton tracks={tracks.value} sourceName={playlist.value.name} listKey="playlist:{id}" /></div>

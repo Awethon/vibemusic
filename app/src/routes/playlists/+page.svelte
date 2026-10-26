@@ -6,7 +6,7 @@
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 
-	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists' };
+	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists', artist: 'Artist playlists' };
 	const playlists = live(allPlaylists, []);
 
 	const blocks = $derived.by(() => {

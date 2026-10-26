@@ -43,7 +43,7 @@ export type Artist = {
 	coverAlbumIds: string[];
 };
 
-export type PlaylistKind = 'own' | 'smart' | 'genre';
+export type PlaylistKind = 'own' | 'smart' | 'genre' | 'artist';
 
 export type Playlist = {
 	id: string;
@@ -57,6 +57,7 @@ export type Playlist = {
 	updated: string;
 	image: string;
 	readonly: boolean;
+	artistId: string;
 	mosaicAlbumIds: string[];
 };
 
@@ -79,7 +80,7 @@ const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount
 	(select json_group_array(id) from (select id from album where album.artist_id = artist.id order by year desc, created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
-	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image, playlist.readonly,
+	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image, playlist.readonly, playlist.artist_id as artistId,
 	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 4)) as mosaicAlbumIds`;
 
@@ -188,7 +189,9 @@ async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: s
 export const tracksByIds = (ids: string[]) =>
 	inChunks(ids, (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
 
-export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from playlist order by name collate nocase`);
+export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind != 'artist' order by name collate nocase`);
+
+export const artistPlaylist = async (artistId: string) => (await playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'artist' and artist_id = ? limit 1`, [artistId]))[0] ?? null;
 
 export const playlistById = async (id: string) => (await playlists(`select ${PLAYLIST_COLUMNS} from playlist where id = ?`, [id]))[0] ?? null;
 

@@ -1270,3 +1270,12 @@ body.no-select, body.no-select * { -webkit-user-select: none !important; user-se
 .artist-intro .ghost { padding: 4px 0 0; }
 .mosaic.image, .mini-mosaic.image { grid-template-columns: 1fr; }
 .pal-art .mini-mosaic { width: 36px; height: 36px; border-radius: 7px; }
+
+.popular-block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; }
+.popular-block.with-playlist { grid-template-columns: minmax(0, 1fr) 240px; }
+.this-is-card { padding-top: 64px; display: flex; flex-direction: column; gap: 4px; }
+.this-is-card .mosaic { border-radius: 14px; transition: transform 0.4s var(--ease); }
+.this-is-card a:hover .mosaic { transform: translateY(-4px); }
+.this-is-card .t { margin-top: 12px; font-weight: 600; font-size: 14px; text-shadow: var(--shadow-text); }
+.this-is-card .s { color: var(--ink-3); font-size: 12.5px; }
+.this-is-card .btn { align-self: flex-start; margin-top: 14px; height: 36px; padding: 0 16px 0 12px; font-size: 13px; }
