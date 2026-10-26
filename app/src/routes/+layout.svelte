@@ -6,6 +6,7 @@
 	import '@fontsource/unbounded/300.css';
 	import '@fontsource/unbounded/400.css';
 	import '@fontsource/unbounded/500.css';
+	import '@fontsource/unbounded/700.css';
 	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { untrack } from 'svelte';
