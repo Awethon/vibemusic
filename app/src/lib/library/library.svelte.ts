@@ -61,7 +61,7 @@ function failed(error: unknown) {
 
 async function syncNow() {
 	if (!library.meta) library.status = 'syncing';
-	const result = await call({ kind: 'sync', credentials: requireCredentials() });
+	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()) });
 	renewToken(result.token);
 	loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
@@ -110,9 +110,9 @@ export async function startLibrary() {
 	const { userId } = requireCredentials();
 	library.status = 'loading';
 	worker = new LibraryWorker();
-	worker.onmessage = onWorkerReply;
+	worker.addEventListener('message', onWorkerReply);
 	channel = new BroadcastChannel(`vibemusic-library-${userId}`);
-	channel.onmessage = onChannelMessage;
+	channel.addEventListener('message', onChannelMessage);
 	try {
 		loaded(await call({ kind: 'open', userId }));
 		if (!library.meta) library.status = 'syncing';

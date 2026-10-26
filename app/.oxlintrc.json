@@ -1,5 +1,15 @@
 {
-	"categories": { "correctness": "error", "suspicious": "warn" },
-	"rules": { "unicorn/require-post-message-target-origin": "off" },
-	"ignorePatterns": [".svelte-kit", "build", "node_modules"]
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"rules": {
+		"unicorn/require-post-message-target-origin": "off",
+		"unicorn/consistent-function-scoping": "off"
+	},
+	"ignorePatterns": [
+		".svelte-kit",
+		"build",
+		"node_modules"
+	]
 }
