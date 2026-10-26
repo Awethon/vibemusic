@@ -607,7 +607,7 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 .pop, .menu {
 	position: fixed;
 	z-index: 8;
-	background: rgba(16, 15, 21, 0.86);
+	background: rgba(16, 15, 21, 0.95);
 	border: 1px solid var(--line-2);
 	border-radius: 16px;
 	backdrop-filter: blur(24px) saturate(1.3);
