@@ -1,7 +1,9 @@
+import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import type { Region } from './renderer.ts';
 
 const ALWAYS_ABOVE = '.pop, .menu, #palette, #toast, #connection-note, .row-lift';
-export const ABOVE_PLAYER_GLASS = `#glass-player, #glass-popups, #dock, ${ALWAYS_ABOVE}`;
+export const ABOVE_RAIL_GLASS = `#glass-rail, #chrome, #chrome ~ *, ${ALWAYS_ABOVE}`;
+export const ABOVE_PLAYER_GLASS = `#glass-player, #glass-popups, #panel, #dock, ${ALWAYS_ABOVE}`;
 export const ABOVE_POPUP_GLASS = `#glass-popups, ${ALWAYS_ABOVE}`;
 
 type Box = { left: number; top: number; right: number; bottom: number };
@@ -73,6 +75,20 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	}
 }
 
+function paintScrim(context: CanvasRenderingContext2D) {
+	const across = context.createLinearGradient(0, 0, innerWidth, 0);
+	across.addColorStop(0, 'rgba(6, 5, 9, 0.5)');
+	across.addColorStop(Math.min(360 / innerWidth, 0.6), 'rgba(6, 5, 9, 0.12)');
+	across.addColorStop(0.6, 'rgba(6, 5, 9, 0)');
+	context.fillStyle = across;
+	context.fillRect(0, 0, innerWidth, innerHeight);
+	const down = context.createLinearGradient(0, 0, 0, innerHeight);
+	down.addColorStop(0.55, 'rgba(6, 5, 9, 0)');
+	down.addColorStop(1, 'rgba(6, 5, 9, 0.4)');
+	context.fillStyle = down;
+	context.fillRect(0, 0, innerWidth, innerHeight);
+}
+
 export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, above: string) {
 	const canvas = context.canvas;
 	const width = Math.max(1, Math.round(region.width * dpr));
@@ -86,6 +102,10 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 	context.globalAlpha = 1;
 	context.fillStyle = PAGE_COLOR;
 	context.fillRect(region.x, region.y, region.width, region.height);
+	if (fieldSnapshot.canvas) {
+		context.imageSmoothingQuality = 'high';
+		context.drawImage(fieldSnapshot.canvas, 0, 0, innerWidth, innerHeight);
+	}
 
 	const visit = (element: Element, opacity: number) => {
 		if (element instanceof SVGElement || element.matches(above) || element.id === 'field') return;
@@ -98,6 +118,11 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 		if (clips && !intersects(rect, box)) return;
 		context.save();
 		context.globalAlpha = alpha;
+		if (element.id === 'scrim') {
+			paintScrim(context);
+			context.restore();
+			return;
+		}
 		const radius = radiusOf(style, rect);
 		if (rect.width && rect.height && intersects(rect, box)) {
 			if (parseColor(style.backgroundColor) > 0) {

@@ -55,7 +55,7 @@
 	<p class="pop-title">Background</p>
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
 	<p class="pop-title">Glass</p>
-	<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}><span>Liquid glass<small>Refracting glass for the player and menus</small></span><span class="switch"></span></button>
+	<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}><span>Liquid glass<small>Refracting glass for the player, panels and menus</small></span><span class="switch"></span></button>
 	<button
 		type="button"
 		class="set-row"

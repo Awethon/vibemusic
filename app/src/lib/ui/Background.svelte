@@ -5,6 +5,7 @@
 	import { audioLive, currentTrack, sampleAudio } from '../player/player.svelte.ts';
 	import { FIELD, PALETTE } from '../tuning.ts';
 	import { createField, type Field } from '../visual/field.ts';
+	import { copyField } from '../visual/fieldSnapshot.ts';
 	import { accentFromPalette, blendAccent, type Rgb } from './accent.ts';
 	import { ui } from './state.svelte.ts';
 
@@ -53,6 +54,7 @@
 			if (reducedMotion.matches && now - lastDraw <= FIELD.reducedMotionFrameIntervalMs) return;
 			lastDraw = now;
 			field.frame(now, features, { intensity, ripples: ui.ripples ? 1 : 0 });
+			if (canvas && document.body.classList.contains('glass-on')) copyField(canvas, now);
 		};
 		const start = () => {
 			if (frame) return;

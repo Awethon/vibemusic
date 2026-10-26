@@ -1,11 +1,13 @@
-import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, paintBackdrop } from './backdrop.ts';
+import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
 import type { GlassParams } from './params.ts';
+import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
 
-export type GlassLevel = 'player' | 'popups';
+export type GlassLevel = 'rail' | 'player' | 'popups';
 
 const LEVELS: Record<GlassLevel, { surfaces: string; above: string }> = {
-	player: { surfaces: '#capsule', above: ABOVE_PLAYER_GLASS },
+	rail: { surfaces: '#rail', above: ABOVE_RAIL_GLASS },
+	player: { surfaces: '#capsule, #panel', above: ABOVE_PLAYER_GLASS },
 	popups: { surfaces: '.pop.open, .menu.open', above: ABOVE_POPUP_GLASS }
 };
 
@@ -21,10 +23,11 @@ function surfaces(selector: string): GlassShape[] {
 	const shapes: GlassShape[] = [];
 	for (const element of document.querySelectorAll(selector)) {
 		const rect = element.getBoundingClientRect();
-		if (rect.width < 2 || rect.height < 2) continue;
-		const alpha = effectiveOpacity(element);
+		if (rect.width < 2 || rect.height < 2 || rect.right <= 0 || rect.bottom <= 0 || rect.left >= innerWidth || rect.top >= innerHeight) continue;
+		const backing = element.id === 'rail' ? getComputedStyle(element, '::before') : getComputedStyle(element);
+		const alpha = effectiveOpacity(element) * Number(backing.opacity);
 		if (alpha < 0.02) continue;
-		const radius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
+		const radius = parseFloat(backing.borderTopLeftRadius) || 0;
 		shapes.push({ x: rect.left, y: rect.top, width: rect.width, height: rect.height, radius, alpha });
 	}
 	return shapes;
@@ -54,6 +57,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	let lastShapes = '';
 	let lastRegion = '';
 	let lastParams = '';
+	let fieldVersion = -1;
 	let frame = 0;
 
 	const markDirty = () => {
@@ -130,7 +134,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		}
 		const region = regionAround(shapes, current);
 		const regionKey = `${region.x},${region.y},${region.width},${region.height}`;
-		const repaint = pageDirty || regionKey !== lastRegion || pageAnimating();
+		const repaint = pageDirty || regionKey !== lastRegion || fieldVersion !== fieldSnapshot.version || pageAnimating();
 		const shapesKey = JSON.stringify(shapes);
 		if (!repaint && shapesKey === lastShapes && paramsKey === lastParams) return;
 		if (repaint) {
@@ -138,6 +142,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 			gl.setScene(paint.canvas);
 			pageDirty = false;
 			lastRegion = regionKey;
+			fieldVersion = fieldSnapshot.version;
 		}
 		gl.render(current, shapes, region, region, dpr);
 		if (level === 'player') dispatchEvent(new Event(PLAYER_RENDERED));

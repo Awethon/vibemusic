@@ -53,7 +53,7 @@
 			<div>
 				<p class="eyebrow">Settings</p>
 				<h1 class="display">Liquid glass</h1>
-				<p class="sub">Real refracting glass for the player bar, pop-ups and menus. Changes apply as you move the sliders and are kept in this browser.</p>
+				<p class="sub">Real refracting glass for the player bar, side panels, pop-ups and menus. Changes apply as you move the sliders and are kept in this browser.</p>
 			</div>
 		</div>
 		<button type="button" class="set-row gt-switch" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}>

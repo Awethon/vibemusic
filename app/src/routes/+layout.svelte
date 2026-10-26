@@ -165,6 +165,7 @@
 <svelte:window {onkeydown} />
 
 <Background />
+<GlassLayer level="rail" />
 {#if !signedIn}
 	<Login />
 {:else}
@@ -193,8 +194,8 @@
 	<NowCanvas />
 	<NowClassic />
 	<Ambient />
-	<Panel />
 	<GlassLayer level="player" />
+	<Panel />
 	<Capsule />
 	<GlassLayer level="popups" />
 	<SettingsPopover />
