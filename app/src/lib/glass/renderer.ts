@@ -193,11 +193,12 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.activeTexture(context.TEXTURE0);
 	}
 
-	function dispose() {
+	function dispose(loseContext: boolean) {
 		release(blur?.h ?? null);
 		release(blur?.v ?? null);
 		context.deleteTexture(scene);
-		context.getExtension('WEBGL_lose_context')?.loseContext();
+		for (const { program } of Object.values(programs)) context.deleteProgram(program);
+		if (loseContext) context.getExtension('WEBGL_lose_context')?.loseContext();
 	}
 
 	return { resize, setScene, render, clear, dispose };

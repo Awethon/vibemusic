@@ -1,6 +1,6 @@
 import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, paintBackdrop } from './backdrop.ts';
 import type { GlassParams } from './params.ts';
-import { createGlassRenderer, type GlassShape, type Region } from './renderer.ts';
+import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
 
 export type GlassLevel = 'player' | 'popups';
 
@@ -45,10 +45,12 @@ const inside = (node: Node, selector: string) => (node instanceof Element ? node
 
 export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, params: () => GlassParams): (() => void) | null {
 	const { surfaces: selector, above } = LEVELS[level];
-	const renderer = createGlassRenderer(canvas, level === 'player');
-	if (!renderer) return null;
-	const backdrop = document.createElement('canvas').getContext('2d', { willReadFrequently: false });
-	if (!backdrop) return null;
+	const newBackdrop = () => document.createElement('canvas').getContext('2d');
+	let renderer = createGlassRenderer(canvas, level === 'player');
+	let backdrop = newBackdrop();
+	if (!renderer || !backdrop) return null;
+	let lost = false;
+	let broken = false;
 	const field = document.getElementById('field') as HTMLCanvasElement | null;
 	let dpr = 0;
 	let pageDirty = true;
@@ -61,6 +63,30 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	const markDirty = () => {
 		pageDirty = true;
 	};
+	const rebuild = () => {
+		renderer?.dispose(false);
+		renderer = createGlassRenderer(canvas, level === 'player');
+		backdrop = newBackdrop();
+		broken = false;
+		dpr = 0;
+		pageDirty = true;
+		lastShapes = '';
+		lastRegion = '';
+	};
+	const onVisibility = () => {
+		if (document.visibilityState === 'visible' && !lost) rebuild();
+	};
+	const onLost = (event: Event) => {
+		event.preventDefault();
+		lost = true;
+	};
+	const onRestored = () => {
+		lost = false;
+		rebuild();
+	};
+	document.addEventListener('visibilitychange', onVisibility);
+	canvas.addEventListener('webglcontextlost', onLost);
+	canvas.addEventListener('webglcontextrestored', onRestored);
 	const observer = new MutationObserver((records) => {
 		if (records.some((record) => !inside(record.target, above))) pageDirty = true;
 	});
@@ -74,10 +100,20 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 
 	const tick = (now: number) => {
 		frame = requestAnimationFrame(tick);
+		if (broken) rebuild();
+		if (lost || !renderer || !backdrop) return;
+		try {
+			draw(now, renderer, backdrop);
+		} catch {
+			broken = true;
+		}
+	};
+
+	const draw = (now: number, gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
 		const ratio = Math.min(devicePixelRatio || 1, 2);
 		if (ratio !== dpr || canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
 			dpr = ratio;
-			renderer.resize(innerWidth, innerHeight, dpr);
+			gl.resize(innerWidth, innerHeight, dpr);
 			pageDirty = true;
 			lastShapes = '';
 		}
@@ -86,7 +122,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		const paramsKey = JSON.stringify(current);
 		if (!shapes.length) {
 			if (lastShapes) {
-				renderer.clear();
+				gl.clear();
 				if (level === 'player') dispatchEvent(new Event(PLAYER_RENDERED));
 			}
 			lastShapes = '';
@@ -102,12 +138,12 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		const shapesKey = JSON.stringify(shapes);
 		if (!repaint && shapesKey === lastShapes && paramsKey === lastParams) return;
 		if (repaint) {
-			paintBackdrop(backdrop, region, dpr, field, above);
-			renderer.setScene(backdrop.canvas);
+			paintBackdrop(paint, region, dpr, field, above);
+			gl.setScene(paint.canvas);
 			pageDirty = false;
 			lastRegion = regionKey;
 		}
-		renderer.render(current, shapes, region, region, dpr);
+		gl.render(current, shapes, region, region, dpr);
 		if (level === 'player') dispatchEvent(new Event(PLAYER_RENDERED));
 		lastShapes = shapesKey;
 		lastParams = paramsKey;
@@ -121,7 +157,10 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		removeEventListener('load', markDirty, true);
 		removeEventListener('resize', markDirty);
 		removeEventListener(PLAYER_RENDERED, markDirty);
-		renderer.clear();
-		renderer.dispose();
+		document.removeEventListener('visibilitychange', onVisibility);
+		canvas.removeEventListener('webglcontextlost', onLost);
+		canvas.removeEventListener('webglcontextrestored', onRestored);
+		renderer?.clear();
+		renderer?.dispose(true);
 	};
 }
