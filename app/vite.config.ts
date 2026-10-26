@@ -14,6 +14,7 @@ export default defineConfig({
 			adapter: adapter({ fallback: 'index.html' })
 		})
 	],
+	define: { NAVIDROME_TARGET: JSON.stringify(navidrome) },
 	server: { port: 5190, strictPort: true, proxy: proxied },
 	preview: { port: 5191, strictPort: true, proxy: proxied },
 	optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
