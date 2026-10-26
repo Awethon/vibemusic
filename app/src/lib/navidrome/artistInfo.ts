@@ -25,8 +25,8 @@ async function fetchArtistInfo(artistId: string, artistName: string): Promise<Ar
 	]);
 	return {
 		biography: plainBiography(info.artistInfo2?.biography ?? ''),
-		similarArtistIds: (info.artistInfo2?.similarArtist ?? []).map((artist) => artist.id),
-		topTrackIds: (top.topSongs?.song ?? []).map((song) => song.id)
+		similarArtistIds: [...new Set((info.artistInfo2?.similarArtist ?? []).map((artist) => artist.id))].filter((id) => id !== artistId),
+		topTrackIds: [...new Set((top.topSongs?.song ?? []).map((song) => song.id))]
 	};
 }
 
