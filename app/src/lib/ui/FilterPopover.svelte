@@ -9,7 +9,7 @@
 	const genres = live(genreCounts, []);
 	const decades = live(decadeCounts, []);
 	let element = $state<HTMLElement | null>(null);
-	let position = $state({ left: 0, top: 0 });
+	let position = $state({ left: 0, top: 0, above: false });
 
 	const options = $derived.by(() => {
 		const total = library.meta?.albums ?? 0;
@@ -18,13 +18,37 @@
 	});
 	const selected = $derived(ui.filterPopover?.kind === 'genre' ? (ui.filters.genres[0] ?? '') : String(ui.filters.decades[0] ?? ''));
 
-	$effect(() => {
-		const anchor = ui.filterPopover;
-		if (!anchor || !element) return;
-		const size = element.getBoundingClientRect();
+	function place() {
+		const kind = ui.filterPopover?.kind;
+		const button = kind ? document.querySelector(`.fbtn[data-filter="${kind}"]`) : null;
+		if (!button || !element) return;
+		const bar = (button.closest('.toolbar') ?? button).getBoundingClientRect();
+		const anchor = button.getBoundingClientRect();
+		const width = element.offsetWidth;
+		const height = element.offsetHeight;
+		const below = bar.bottom + POPOVER.filterGapPx;
+		const above = below + height > innerHeight - POPOVER.filterBottomReservePx && bar.top - POPOVER.filterGapPx - height >= POPOVER.edgeMarginPx;
 		position = {
-			left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - size.width - POPOVER.edgeMarginPx)),
-			top: Math.min(anchor.top + POPOVER.filterGapPx, innerHeight - size.height - POPOVER.filterBottomReservePx)
+			left: Math.max(Math.min(bar.left, anchor.left), Math.min(anchor.left, bar.right - width)),
+			top: above ? bar.top - POPOVER.filterGapPx - height : below,
+			above
+		};
+	}
+
+	$effect(() => {
+		if (!ui.filterPopover || !element) return;
+		place();
+		let frame = 0;
+		const follow = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(place);
+		};
+		addEventListener('scroll', follow, true);
+		addEventListener('resize', follow);
+		return () => {
+			cancelAnimationFrame(frame);
+			removeEventListener('scroll', follow, true);
+			removeEventListener('resize', follow);
 		};
 	});
 
@@ -37,7 +61,7 @@
 
 <svelte:window onpointerdown={(event) => ui.filterPopover && !element?.contains(event.target as Node) && !(event.target as Element).closest('.fbtn') && (ui.filterPopover = null)} />
 
-<div id="filterPop" class="pop" class:open={!!ui.filterPopover} role="dialog" aria-label="Filter" bind:this={element} style:left="{position.left}px" style:top="{position.top}px">
+<div id="filterPop" class="pop" class:open={!!ui.filterPopover} class:above={position.above} role="dialog" aria-label="Filter" bind:this={element} style:left="{position.left}px" style:top="{position.top}px">
 	{#if ui.filterPopover}
 		<p class="pop-title">{ui.filterPopover.kind === 'genre' ? 'Genre' : 'Decade'}</p>
 		<div class="fopts">

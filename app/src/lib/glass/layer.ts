@@ -8,7 +8,7 @@ export type GlassLevel = 'rail' | 'player' | 'popups';
 const LEVELS: Record<GlassLevel, { surfaces: string; above: string }> = {
 	rail: { surfaces: '#rail', above: ABOVE_RAIL_GLASS },
 	player: { surfaces: '#capsule, #panel', above: ABOVE_PLAYER_GLASS },
-	popups: { surfaces: '.pop.open, .menu.open', above: ABOVE_POPUP_GLASS }
+	popups: { surfaces: '.pop.open', above: ABOVE_POPUP_GLASS }
 };
 
 const PLAYER_RENDERED = 'vibemusic:glass-player-rendered';
