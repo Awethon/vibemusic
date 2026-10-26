@@ -10,7 +10,7 @@ import type { LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
-type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync' };
+type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync' } | { kind: 'need-snapshot' };
 
 export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null }>({
 	status: 'idle',
@@ -107,6 +107,10 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 		}
 	} else if (message.kind === 'resync') {
 		if (library.leader) await checkForChanges(true);
+	} else if (message.kind === 'need-snapshot') {
+		if (!library.leader || !library.meta) return;
+		await call({ kind: 'persist' });
+		channel?.postMessage({ kind: 'snapshot', version: library.meta.version } satisfies ChannelMessage);
 	} else {
 		await call({ kind: 'run', sql: message.sql, params: message.params, persist: library.leader });
 		library.revision += 1;
@@ -139,7 +143,10 @@ export async function startLibrary() {
 			await startSyntheticLibrary();
 			return;
 		}
-		if (!library.meta) library.status = 'syncing';
+		if (!library.meta) {
+			library.status = 'syncing';
+			channel.postMessage({ kind: 'need-snapshot' } satisfies ChannelMessage);
+		}
 	} catch (error) {
 		failed(error);
 	}

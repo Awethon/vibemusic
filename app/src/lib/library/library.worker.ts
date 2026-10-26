@@ -142,6 +142,8 @@ async function handle(request: WorkerRequest): Promise<WorkerResults[keyof Worke
 			const rows = requireDatabase().exec({ sql: request.sql, bind: request.params, rowMode: 'array', returnValue: 'resultRows', columnNames: columns });
 			return { columns, rows } as WorkerResults['query'];
 		}
+		case 'persist':
+			return writeSnapshot(requireDatabase());
 		case 'run': {
 			const database = requireDatabase();
 			database.exec({ sql: request.sql, bind: request.params });

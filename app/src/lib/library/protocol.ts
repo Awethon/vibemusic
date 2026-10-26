@@ -10,6 +10,7 @@ export type WorkerRequest =
 	| { kind: 'reload' }
 	| { kind: 'sync'; credentials: Credentials }
 	| { kind: 'loadFile'; url: string }
+	| { kind: 'persist' }
 	| { kind: 'query'; sql: string; params: SqlParam[] }
 	| { kind: 'run'; sql: string; params: SqlParam[]; persist: boolean };
 
@@ -20,6 +21,7 @@ export type WorkerResults = {
 	loadFile: { meta: LibraryMeta; timings: SyncTimings };
 	query: { columns: string[]; rows: SqlParam[][] };
 	run: number;
+	persist: number;
 };
 
 export type WorkerEnvelope = { id: number; request: WorkerRequest };
