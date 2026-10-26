@@ -1268,3 +1268,5 @@ body.no-select, body.no-select * { -webkit-user-select: none !important; user-se
 .bio { margin: 16px 0 0; max-width: 72ch; color: var(--ink-2); font-size: 14px; line-height: 1.6; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: var(--shadow-text); -webkit-user-select: text; user-select: text; }
 .bio.open { display: block; }
 .artist-intro .ghost { padding: 4px 0 0; }
+.mosaic.image, .mini-mosaic.image { grid-template-columns: 1fr; }
+.pal-art .mini-mosaic { width: 36px; height: 36px; border-radius: 7px; }

@@ -55,7 +55,7 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 		{ label: 'Go to artist', run: () => openArtist(track.albumArtistId || track.artistId) },
 		...(await addToPlaylistEntries(async () => [track]))
 	];
-	if (playlist?.kind === 'own' && playlist.ownerId === requireCredentials().userId) {
+	if (playlist?.kind === 'own' && !playlist.readonly && playlist.ownerId === requireCredentials().userId) {
 		entries.push(SEPARATOR, {
 			label: 'Remove from this playlist',
 			run: async () => {

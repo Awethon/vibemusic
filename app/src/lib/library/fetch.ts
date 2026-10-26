@@ -12,7 +12,7 @@ export async function fetchPlaylists(http: NavidromeHttp): Promise<NativePlaylis
 
 export async function fetchLibraryVersion(http: NavidromeHttp, playlists?: NativePlaylist[]): Promise<string> {
 	const [status, lists] = await Promise.all([http.subsonic<ScanStatus>('getScanStatus'), playlists ?? fetchPlaylists(http)]);
-	const playlistSignature = lists.map((playlist) => (playlist.rules ? playlist.id : `${playlist.id}:${playlist.updatedAt}:${playlist.songCount}`)).join(',');
+	const playlistSignature = lists.map((playlist) => (playlist.rules ? `${playlist.id}:${playlist.uploadedImage}` : `${playlist.id}:${playlist.updatedAt}:${playlist.songCount}:${playlist.uploadedImage}`)).join(',');
 	return `${status.scanStatus.lastScan ?? ''}|${playlistSignature}`;
 }
 

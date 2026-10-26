@@ -55,6 +55,8 @@ export type Playlist = {
 	songCount: number;
 	duration: number;
 	updated: string;
+	image: string;
+	readonly: boolean;
 	mosaicAlbumIds: string[];
 };
 
@@ -64,7 +66,7 @@ export type Filters = { genres: string[]; decades: number[] };
 
 export const NO_FILTERS: Filters = { genres: [], decades: [] };
 
-type Raw<T> = Omit<T, 'genres' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds'> & { genres?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string };
+type Raw<T> = Omit<T, 'genres' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
 
 const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.genres, album.song_count as songCount,
 	album.duration, album.created, album.play_count as playCount, album.play_date as playDate, album.starred`;
@@ -77,14 +79,14 @@ const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount
 	(select json_group_array(id) from (select id from album where album.artist_id = artist.id order by year desc, created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
-	playlist.song_count as songCount, playlist.duration, playlist.updated,
+	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image, playlist.readonly,
 	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 4)) as mosaicAlbumIds`;
 
 const toAlbum = (row: Raw<Album>): Album => ({ ...row, genres: JSON.parse(row.genres ?? '[]'), starred: row.starred === 1 });
 const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1 });
 const toArtist = (row: Raw<Artist>): Artist => ({ ...row, coverAlbumIds: JSON.parse(row.coverAlbumIds ?? '[]') });
-const toPlaylist = (row: Raw<Playlist>): Playlist => ({ ...row, mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]') });
+const toPlaylist = (row: Raw<Playlist>): Playlist => ({ ...row, readonly: row.readonly === 1, mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]') });
 
 const albums = async (sql: string, params: SqlParam[] = []) => (await query<Raw<Album>>(sql, params)).map(toAlbum);
 const tracks = async (sql: string, params: SqlParam[] = []) => (await query<Raw<Track>>(sql, params)).map(toTrack);
@@ -190,7 +192,7 @@ export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from pla
 
 export const playlistById = async (id: string) => (await playlists(`select ${PLAYLIST_COLUMNS} from playlist where id = ?`, [id]))[0] ?? null;
 
-export const ownPlaylists = (ownerId: string) => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'own' and owner_id = ? order by name collate nocase`, [ownerId]);
+export const ownPlaylists = (ownerId: string) => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'own' and owner_id = ? and readonly = 0 order by name collate nocase`, [ownerId]);
 
 export const albumsByIds = (ids: string[]) => inChunks(ids, (chunk) => albums(`select ${ALBUM_COLUMNS} from album where id in (${placeholders(chunk)})`, chunk));
 

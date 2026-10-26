@@ -8,6 +8,7 @@
 	import Cover from './Cover.svelte';
 	import { plural } from './format.ts';
 	import Icon from './Icon.svelte';
+	import PlaylistMosaic from './PlaylistMosaic.svelte';
 	import { playlistKindLabel } from './playlistText.ts';
 	import { ui } from './state.svelte.ts';
 
@@ -127,7 +128,7 @@
 							<div><b>{result.item.name}</b><small>Album · {result.item.artist}{result.item.year ? ` · ${result.item.year}` : ''}</small></div>
 							<em>Open</em>
 						{:else if result.kind === 'playlist'}
-							<Cover albumId={result.item.mosaicAlbumIds[0]} size={80} />
+							<span class="pal-art"><PlaylistMosaic playlist={result.item} mini /></span>
 							<div><b>{result.item.name}</b><small>{playlistKindLabel(result.item)} · {plural(result.item.songCount, 'track')}</small></div>
 							<em>Open</em>
 						{:else}

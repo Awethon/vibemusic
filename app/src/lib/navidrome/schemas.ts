@@ -47,7 +47,9 @@ export const nativePlaylist = z.object({
 	duration: optionalNumber,
 	updatedAt: optionalDate,
 	evaluatedAt: optionalDate,
-	rules: z.unknown().nullish().transform((value) => value ?? null)
+	rules: z.unknown().nullish().transform((value) => value ?? null),
+	uploadedImage: optionalString,
+	sync: z.boolean().nullish().transform((value) => value ?? false)
 });
 
 export const nativePlaylistTrack = z.object({
