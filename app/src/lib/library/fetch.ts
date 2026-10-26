@@ -17,18 +17,34 @@ export async function fetchLibraryVersion(http: NavidromeHttp, playlists?: Nativ
 }
 
 export async function fetchLibrary(http: NavidromeHttp): Promise<LibrarySnapshot> {
-	const playlists = await fetchPlaylists(http);
+	const steps: Record<string, number> = {};
+	const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
+		const started = performance.now();
+		try {
+			return await work();
+		} finally {
+			steps[step] = Math.round(performance.now() - started);
+		}
+	};
+	const playlists = await timed('playlists', () => fetchPlaylists(http));
 	const [version, albums, songs] = await Promise.all([
-		fetchLibraryVersion(http, playlists),
-		http.nativeAll('album?_sort=name&_order=ASC', PAGE_SIZE).then((items) => nativeAlbum.array().parse(items)),
-		http.nativeAll('song?_sort=album&_order=ASC', PAGE_SIZE).then((items) => nativeSong.array().parse(items))
+		timed('scan status', () => fetchLibraryVersion(http, playlists)),
+		timed('albums', async () => nativeAlbum.array().parse(await http.nativeAll('album?_sort=name&_order=ASC', PAGE_SIZE))),
+		timed('songs', async () => nativeSong.array().parse(await http.nativeAll('song?_sort=album&_order=ASC', PAGE_SIZE)))
 	]);
-	const playlistTracks = new Map(
-		await Promise.all(
-			playlists.map(async (playlist) => [playlist.id, nativePlaylistTrack.array().parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, PAGE_SIZE))] as const)
-		)
+	const playlistTracks = await timed(
+		'playlist tracks',
+		async () =>
+			new Map(
+				await Promise.all(
+					playlists.map(
+						async (playlist) =>
+							[playlist.id, await timed(`playlist ${playlist.name}`, async () => nativePlaylistTrack.array().parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, PAGE_SIZE)))] as const
+					)
+				)
+			)
 	);
-	return { version, albums, songs, playlists, playlistTracks };
+	return { version, albums, songs, playlists, playlistTracks, steps };
 }
 
 type RawSnapshot = { version: string; albums: unknown[]; songs: unknown[]; playlists: unknown[]; playlistTracks: Record<string, unknown[]> };

@@ -23,6 +23,14 @@
 		position = { left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - width - POPOVER.edgeMarginPx)), bottom: innerHeight - anchor.top + POPOVER.anchorGapPx };
 	});
 
+	const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+	const slowestSteps = (steps: Record<string, number>) =>
+		Object.entries(steps)
+			.toSorted((a, b) => b[1] - a[1])
+			.slice(0, 3)
+			.map(([step, ms]) => `${step} ${seconds(ms)}`)
+			.join(' · ');
+
 	function chooseStyle(style: FullScreenStyle) {
 		setFullScreenStyle(style);
 		applyFullScreenStyleClass();
@@ -47,6 +55,7 @@
 	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary()}>
 		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
 	</button>
+	{#if library.timings}<p class="set-foot">Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(library.timings.fetchMs)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}</p>{/if}
 	{#if library.error}<p class="set-foot">{library.error}</p>{/if}
 	<button type="button" class="set-row" onclick={signOut}><span>Sign out<small>{session.credentials?.username ?? ''}</small></span></button>
 	<p class="set-foot">Field renderer · {ui.fieldRenderer || 'none'}</p>

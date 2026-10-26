@@ -3,6 +3,7 @@ import { NavidromeHttp } from '../navidrome/http.ts';
 import { SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { buildLibrary, readMeta } from './build.ts';
+import { SCHEMA_VERSION } from './schema.ts';
 import { fetchLibrary, fetchSnapshotFile } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
@@ -16,7 +17,7 @@ const ready = sqlite3InitModule().then((module) => {
 	sqlite = module;
 });
 
-const snapshotName = () => `library-${userId}.sqlite`;
+const snapshotName = () => `library-${userId}-v${SCHEMA_VERSION}.sqlite`;
 
 async function readSnapshot(): Promise<Uint8Array | null> {
 	try {
@@ -40,6 +41,17 @@ async function writeBytes(bytes: Uint8Array<ArrayBuffer>) {
 	const writable = await file.createWritable();
 	await writable.write(bytes);
 	await writable.close();
+}
+
+async function removeOutdatedSnapshots() {
+	try {
+		const directory = await navigator.storage.getDirectory();
+		for await (const name of directory.keys()) {
+			if (name.startsWith(`library-${userId}`) && name !== snapshotName()) await directory.removeEntry(name);
+		}
+	} catch {
+		return;
+	}
 }
 
 function databaseFrom(bytes: Uint8Array): Database {
@@ -96,7 +108,7 @@ async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ me
 	replaceDatabase(database);
 	const writeStarted = performance.now();
 	const snapshotBytes = await writeSnapshot(database);
-	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes } };
+	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes, steps: snapshot.steps ?? {} } };
 }
 
 function requireDatabase(): Database {
@@ -109,6 +121,7 @@ async function handle(request: WorkerRequest): Promise<WorkerResults[keyof Worke
 	switch (request.kind) {
 		case 'open':
 			userId = request.userId;
+			void removeOutdatedSnapshots();
 			return loadSnapshot();
 		case 'reload':
 			return loadSnapshot();

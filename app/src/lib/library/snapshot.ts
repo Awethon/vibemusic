@@ -6,6 +6,7 @@ export type LibrarySnapshot = {
 	songs: NativeSong[];
 	playlists: NativePlaylist[];
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
+	steps?: Record<string, number>;
 };
 
 export type LibraryMeta = {

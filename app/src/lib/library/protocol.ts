@@ -3,7 +3,7 @@ import type { LibraryMeta } from './snapshot.ts';
 
 export type SqlParam = string | number | null;
 
-export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number };
+export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number; steps: Record<string, number> };
 
 export type WorkerRequest =
 	| { kind: 'open'; userId: string }

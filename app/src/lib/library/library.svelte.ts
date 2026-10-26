@@ -5,6 +5,7 @@ import { fetchLibraryVersion } from './fetch.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import { coverAlbumOverrides } from '../navidrome/credentials.ts';
+import { SCHEMA_VERSION } from './schema.ts';
 import type { LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
@@ -128,7 +129,7 @@ export async function startLibrary() {
 	library.status = 'loading';
 	worker = new LibraryWorker();
 	worker.addEventListener('message', onWorkerReply);
-	channel = new BroadcastChannel(`vibemusic-library-${userId}`);
+	channel = new BroadcastChannel(`vibemusic-library-${userId}-v${SCHEMA_VERSION}`);
 	channel.addEventListener('message', onChannelMessage);
 	try {
 		const openStarted = performance.now();
@@ -143,7 +144,7 @@ export async function startLibrary() {
 		failed(error);
 	}
 	void navigator.storage.persist?.();
-	void navigator.locks.request(`vibemusic-library-leader-${userId}`, () => {
+	void navigator.locks.request(`vibemusic-library-leader-${userId}-v${SCHEMA_VERSION}`, () => {
 		lead();
 		return new Promise(() => {});
 	});
