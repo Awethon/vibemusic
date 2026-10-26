@@ -65,11 +65,11 @@ kbd { font-family: var(--ui); font-size: 11px; color: var(--ink-3); border: 1px 
 
 body.idle #scrim { opacity: 0.25; }
 
-#chrome, #now, #classic, #dock, #panel { transition: opacity 1.1s var(--ease), transform 1.1s var(--ease); }
+#chrome, #now, #classic, #capsule, #panel { transition: opacity 1.1s var(--ease), transform 1.1s var(--ease); }
 
-body.idle #chrome, body.idle #now, body.idle #classic, body.idle #dock, body.idle #panel { opacity: 0; }
+body.idle #chrome, body.idle #now, body.idle #classic, body.idle #capsule, body.idle #panel { opacity: 0; }
 
-body.idle #dock { transform: translateY(12px); }
+body.idle #capsule { transform: translateY(12px); }
 
 body.idle, body.idle * { cursor: none !important; }
 
@@ -193,7 +193,7 @@ body.panel-open { --panel-w: 376px; }
 	scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
-.view { max-width: 1480px; }
+.view { max-width: 1480px; margin-inline: auto; }
 
 .eyebrow {
 	margin: 0 0 10px;
@@ -558,7 +558,7 @@ body.idle #ambient, body.now-open.fs-minimal #ambient { opacity: 1; transform: n
 
 body.now-open.fs-minimal:not(.rest) #ambient { transition-delay: 0s; transform: translateY(-72px); }
 
-body.rest #dock { opacity: 0; transform: translateY(12px); pointer-events: none; }
+body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: none; }
 
 #ambient > img { width: clamp(180px, 18vw, 260px); aspect-ratio: 1; object-fit: cover; border-radius: 14px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8); }
 
@@ -1257,3 +1257,14 @@ body.no-select, body.no-select * { -webkit-user-select: none !important; user-se
 .login .error { margin: 0; color: #ffb4b4; font-size: 13px; }
 .status-note { padding: 120px 0; color: var(--ink-3); font-size: 15px; }
 .set-row.action { justify-content: flex-start; }
+
+.album-main > .tracks { min-height: 144px; }
+.np-empty { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; margin: 0 0 12px; padding: 6px; border-radius: 10px; border: 1px dashed var(--line-2); }
+.np-empty .ni { width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.05); color: var(--ink-3); }
+.np-empty .ni svg { width: 18px; height: 18px; }
+.np-empty b { display: block; font-weight: 500; font-size: 13.5px; color: var(--ink-2); }
+.np-empty small { display: block; color: var(--ink-3); font-size: 12px; }
+.np-next .ghost { padding-left: 6px; }
+.bio { margin: 16px 0 0; max-width: 72ch; color: var(--ink-2); font-size: 14px; line-height: 1.6; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: var(--shadow-text); -webkit-user-select: text; user-select: text; }
+.bio.open { display: block; }
+.artist-intro .ghost { padding: 4px 0 0; }

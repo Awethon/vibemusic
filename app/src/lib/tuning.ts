@@ -112,8 +112,6 @@ export const HOME = Object.freeze({
 	playlistMixPattern: Object.freeze(['smart', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre'])
 });
 
-export const ARTIST_PAGE = Object.freeze({ openerCount: 6 });
-
 export const ALBUM_PAGE = Object.freeze({ moreByCount: 12 });
 
 export const QUEUE = Object.freeze({

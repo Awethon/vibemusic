@@ -46,7 +46,9 @@
 			<ol id="npNext" onclick={playRow} role="presentation">
 				{#each rows as row (row.entry.entryId)}<QueueRow entry={row.entry} queuedIndex={row.queuedIndex} sourceIndex={row.sourceIndex} />{/each}
 			</ol>
-			{#if !rows.length}<p class="q-empty">Nothing up next</p>{/if}
+			{#if !rows.length}
+				<div class="np-empty"><span class="ni"><Icon name="queue" /></span><div><b>Nothing up next</b><small>Right-click any track to add it</small></div></div>
+			{/if}
 			<button class="ghost" type="button" onclick={() => togglePanel(true, 'queue')}>Open queue</button>
 		</aside>
 	</div>

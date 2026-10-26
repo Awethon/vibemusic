@@ -168,15 +168,6 @@ export const artistTracks = (artistId: string) =>
 		[artistId]
 	);
 
-export const artistOpeners = (artistId: string, count: number) =>
-	tracks(
-		`select ${TRACK_COLUMNS} from (select id from album where artist_id = ? order by year desc, created desc limit ?) as newest
-		join album on album.id = newest.id
-		join track on track.id = (select id from track first where first.album_id = newest.id order by disc_no, track_no limit 1)
-		order by album.year desc, album.created desc`,
-		[artistId, count]
-	);
-
 export const playlistTracks = (playlistId: string) =>
 	tracks(
 		`select ${TRACK_COLUMNS} from playlist_track join track on track.id = playlist_track.track_id join album on album.id = track.album_id
