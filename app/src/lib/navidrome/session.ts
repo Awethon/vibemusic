@@ -1,6 +1,6 @@
 import { NavidromeError, type Credentials } from './credentials.ts';
 
-const STORAGE_KEY = 'vibemusic.session';
+const STORAGE_KEY = `vibemusic.session:${NAVIDROME_TARGET}`;
 
 type LoginResponse = {
 	id: string;
