@@ -1,6 +1,6 @@
 import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { NavidromeHttp } from '../navidrome/http.ts';
-import { SessionExpiredError } from '../navidrome/credentials.ts';
+import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { buildLibrary, readMeta } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
@@ -159,7 +159,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerEnvelope>) => 
 	try {
 		reply = { id, ok: true, value: await handle(request) };
 	} catch (error) {
-		reply = { id, ok: false, error: error instanceof Error ? error.message : String(error), expired: error instanceof SessionExpiredError };
+		reply = { id, ok: false, error: error instanceof Error ? error.message : String(error), expired: error instanceof SessionExpiredError, unreachable: error instanceof NavidromeUnreachableError };
 	}
 	self.postMessage(reply);
 });

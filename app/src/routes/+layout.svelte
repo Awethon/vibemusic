@@ -19,7 +19,7 @@
 	import { isPreviewingPalette, previewPalette, updatePalettePageHold } from '#lib/engine/palette.ts';
 	import { setRailExpanded } from '#lib/engine/rail.ts';
 	import { history, seedHistory } from '#lib/history.svelte.ts';
-	import { library, startLibrary } from '#lib/library/library.svelte.ts';
+	import { library, resyncLibrary, startLibrary } from '#lib/library/library.svelte.ts';
 	import { recentlyPlayedAlbums } from '#lib/library/queries.ts';
 	import { loadLyricsFor } from '#lib/player/lyricsState.svelte.ts';
 	import { currentTrack, player, playNextTrack, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, togglePlay } from '#lib/player/player.svelte.ts';
@@ -29,7 +29,10 @@
 	import Ambient from '#lib/ui/Ambient.svelte';
 	import Background from '#lib/ui/Background.svelte';
 	import Capsule from '#lib/ui/Capsule.svelte';
+	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
+	import { installBrokenImageRetry } from '#lib/ui/brokenImages.ts';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
+	import { checkConnection, connection, watchConnection } from '#lib/connection.svelte.ts';
 	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import Login from '#lib/ui/Login.svelte';
 	import { anyMenuOpen, closeAllMenus } from '#lib/ui/menu.svelte.ts';
@@ -53,6 +56,8 @@
 	$effect(() => {
 		if (!signedIn || started) return;
 		started = true;
+		watchConnection();
+		installBrokenImageRetry();
 		startPlayer();
 		void startLibrary();
 	});
@@ -167,7 +172,11 @@
 			{#if library.status === 'ready'}
 				{@render children()}
 			{:else if library.status === 'error'}
-				<p class="status-note">Could not load the library: {library.error}</p>
+				<div class="first-run-problem">
+					<h1 class="display">{connection.unreachable ? 'Can’t reach Navidrome' : 'Couldn’t load your library'}</h1>
+					<p>{connection.unreachable ? `vibemusic is trying ${new URL(NAVIDROME_TARGET).host} again every few seconds.` : library.error}</p>
+					<button class="ghost" type="button" onclick={() => (connection.unreachable ? void checkConnection() : void resyncLibrary())}>Retry</button>
+				</div>
 			{:else}
 				<p class="status-note">{library.status === 'syncing' ? 'Syncing your library for the first time…' : 'Loading library…'}</p>
 			{/if}
@@ -183,5 +192,6 @@
 	<FilterPopover />
 	<ContextMenu />
 	<SearchPalette />
+	<ConnectionNote />
 	<Toast />
 {/if}

@@ -16,6 +16,26 @@ export class SessionExpiredError extends Error {
 
 export class NavidromeError extends Error {}
 
+export class NavidromeUnreachableError extends NavidromeError {
+	constructor() {
+		super('Navidrome isn’t reachable');
+	}
+}
+
+const UNREACHABLE_STATUSES = new Set([502, 503, 504]);
+
+export async function reachNavidrome(input: string, init?: RequestInit): Promise<Response> {
+	let response: Response;
+	try {
+		response = await fetch(input, init);
+	} catch (error) {
+		if (error instanceof DOMException && error.name === 'AbortError') throw error;
+		throw new NavidromeUnreachableError();
+	}
+	if (UNREACHABLE_STATUSES.has(response.status)) throw new NavidromeUnreachableError();
+	return response;
+}
+
 const SUBSONIC_VERSION = '1.16.1';
 const CLIENT_NAME = 'vibemusic';
 

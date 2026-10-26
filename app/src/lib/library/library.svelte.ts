@@ -1,4 +1,5 @@
-import { SessionExpiredError } from '../navidrome/credentials.ts';
+import { onReconnect, reportReachable, reportUnreachable } from '../connection.svelte.ts';
+import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { navidrome, renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { fetchLibraryVersion } from './fetch.ts';
@@ -47,7 +48,7 @@ function onWorkerReply(event: MessageEvent<WorkerReply>) {
 	if (!waiter) return;
 	pending.delete(reply.id);
 	if (reply.ok) waiter.resolve(reply.value);
-	else waiter.reject(reply.expired ? new SessionExpiredError() : new Error(reply.error));
+	else waiter.reject(reply.expired ? new SessionExpiredError() : reply.unreachable ? new NavidromeUnreachableError() : new Error(reply.error));
 }
 
 function loaded(meta: LibraryMeta | null) {
@@ -62,6 +63,7 @@ function failed(error: unknown) {
 		sessionExpired();
 		return;
 	}
+	if (error instanceof NavidromeUnreachableError) reportUnreachable();
 	library.error = error instanceof Error ? error.message : String(error);
 	if (!library.meta) library.status = 'error';
 }
@@ -69,6 +71,7 @@ function failed(error: unknown) {
 async function syncNow() {
 	if (!library.meta) library.status = 'syncing';
 	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()) });
+	reportReachable();
 	renewToken(result.token);
 	library.timings = result.timings;
 	loaded(result.meta);
@@ -81,6 +84,7 @@ async function checkForChanges(force = false) {
 		try {
 			const version = await fetchLibraryVersion(navidrome());
 			if (force || !library.meta || library.meta.version !== version) await syncNow();
+			library.error = '';
 		} catch (error) {
 			failed(error);
 		} finally {
@@ -89,6 +93,10 @@ async function checkForChanges(force = false) {
 	})();
 	return syncing;
 }
+
+onReconnect(() => {
+	if (library.leader) void checkForChanges();
+});
 
 function lead() {
 	library.leader = true;

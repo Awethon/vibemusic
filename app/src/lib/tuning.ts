@@ -171,6 +171,8 @@ export const POPOVER = Object.freeze({
 
 export const TOAST = Object.freeze({ visibleMs: 1700 });
 
+export const CONNECTION = Object.freeze({ retryMs: 10000, skipFailedTracksInRow: 3 });
+
 export const SEARCH = Object.freeze({
 	recentCount: 7,
 	artistLimit: 4,

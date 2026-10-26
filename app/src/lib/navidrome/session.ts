@@ -1,4 +1,4 @@
-import { NavidromeError, type Credentials } from './credentials.ts';
+import { NavidromeError, reachNavidrome, type Credentials } from './credentials.ts';
 
 const STORAGE_KEY = `vibemusic.session:${NAVIDROME_TARGET}`;
 
@@ -30,7 +30,7 @@ export function forgetCredentials() {
 }
 
 export async function logIn(username: string, password: string): Promise<Credentials> {
-	const response = await fetch('/auth/login', {
+	const response = await reachNavidrome('/auth/login', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ username, password })

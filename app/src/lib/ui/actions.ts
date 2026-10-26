@@ -7,9 +7,14 @@ import { navidrome, requireCredentials } from '../session.svelte.ts';
 import { plural } from './format.ts';
 import type { MenuItem } from './menu.svelte.ts';
 import { addToQueueFromMenu, clearQueued, moveQueuedToTop, playListAnimated, playNextFromMenu, playQueuedNow, playSourceTrackNext, playSourceTrackNow, removeFromSource, removeQueued } from './queueActions.ts';
+import { isUnreachable } from '../connection.svelte.ts';
 import { showToast } from './state.svelte.ts';
 
 const SEPARATOR: MenuItem = { separator: true };
+
+export function reportFailure(what: string, error: unknown) {
+	showToast(`Couldn’t ${what}${isUnreachable(error) ? ' — Navidrome isn’t reachable' : ''}`);
+}
 
 export const openAlbum = (id: string) => goto(resolve('/album/[id]', { id }));
 export const openArtist = (id: string) => goto(resolve('/artist/[id]', { id }));
@@ -22,7 +27,12 @@ async function addTracksToPlaylist(playlist: Playlist, tracks: Track[]) {
 		showToast(`Already in ${playlist.name}`);
 		return;
 	}
-	await navidrome().subsonic('updatePlaylist', { playlistId: playlist.id, songIdToAdd: fresh.map((track) => track.id) });
+	try {
+		await navidrome().subsonic('updatePlaylist', { playlistId: playlist.id, songIdToAdd: fresh.map((track) => track.id) });
+	} catch (error) {
+		reportFailure(`add to ${playlist.name}`, error);
+		return;
+	}
 	showToast(`Added ${fresh.length > 1 ? `${plural(fresh.length, 'track')} ` : ''}to ${playlist.name}`);
 	await resyncLibrary();
 }
@@ -59,7 +69,12 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 		entries.push(SEPARATOR, {
 			label: 'Remove from this playlist',
 			run: async () => {
-				await navidrome().subsonic('updatePlaylist', { playlistId: playlist.id, songIndexToRemove: index });
+				try {
+					await navidrome().subsonic('updatePlaylist', { playlistId: playlist.id, songIndexToRemove: index });
+				} catch (error) {
+					reportFailure(`remove from ${playlist.name}`, error);
+					return;
+				}
 				showToast('Removed');
 				await resyncLibrary();
 			}

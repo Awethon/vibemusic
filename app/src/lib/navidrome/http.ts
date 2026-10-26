@@ -1,10 +1,27 @@
-import { appendParams, NavidromeError, SessionExpiredError, subsonicUrl, type Credentials, type SubsonicParams } from './credentials.ts';
+import { appendParams, NavidromeError, NavidromeUnreachableError, reachNavidrome, SessionExpiredError, subsonicUrl, type Credentials, type SubsonicParams } from './credentials.ts';
 
 export type NativePage<T> = { items: T[]; total: number };
 
 export type TokenListener = (token: string) => void;
 
 const TOKEN_HEADER = 'x-nd-authorization';
+
+let reachability: (reachable: boolean) => void = () => {};
+
+export function watchReachability(listener: (reachable: boolean) => void) {
+	reachability = listener;
+}
+
+async function request(input: string, init: RequestInit): Promise<Response> {
+	try {
+		const response = await reachNavidrome(input, init);
+		reachability(true);
+		return response;
+	} catch (error) {
+		if (error instanceof NavidromeUnreachableError) reachability(false);
+		throw error;
+	}
+}
 
 export class NavidromeHttp {
 	constructor(
@@ -19,7 +36,7 @@ export class NavidromeHttp {
 	async native(path: string, init: RequestInit = {}): Promise<Response> {
 		const headers = new Headers(init.headers);
 		headers.set(TOKEN_HEADER, `Bearer ${this.credentials.token}`);
-		const response = await fetch(`/api/${path}`, { ...init, headers });
+		const response = await request(`/api/${path}`, { ...init, headers });
 		if (response.status === 401) throw new SessionExpiredError();
 		if (!response.ok) throw new NavidromeError(`Navidrome ${path}: ${response.status}`);
 		const renewed = response.headers.get(TOKEN_HEADER)?.replace(/^Bearer /, '');
@@ -53,7 +70,7 @@ export class NavidromeHttp {
 	}
 
 	async subsonic<T = Record<string, unknown>>(method: string, params: SubsonicParams = {}): Promise<T> {
-		const response = await fetch(subsonicUrl(this.credentials, method, { f: 'json' }), {
+		const response = await request(subsonicUrl(this.credentials, method, { f: 'json' }), {
 			method: 'POST',
 			headers: { 'content-type': 'application/x-www-form-urlencoded' },
 			body: appendParams(new URLSearchParams(), params)

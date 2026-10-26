@@ -26,4 +26,4 @@ export type WorkerResults = {
 
 export type WorkerEnvelope = { id: number; request: WorkerRequest };
 
-export type WorkerReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string; expired: boolean };
+export type WorkerReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string; expired: boolean; unreachable: boolean };

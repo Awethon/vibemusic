@@ -3,7 +3,9 @@ import { streamUrl } from '../navidrome/credentials.ts';
 import { patchLibrary } from '../library/library.svelte.ts';
 import { tracksByIds, type Track } from '../library/queries.ts';
 import { rememberPlayedList } from '../history.svelte.ts';
-import { PLAYBACK } from '../tuning.ts';
+import { checkConnection, isUnreachable, onReconnect } from '../connection.svelte.ts';
+import { showToast } from '../ui/state.svelte.ts';
+import { CONNECTION, PLAYBACK } from '../tuning.ts';
 import { AudioEngine } from './engine.ts';
 import * as queue from './queue.ts';
 import { updateMediaSession, installMediaSession } from './mediaSession.ts';
@@ -15,6 +17,9 @@ const SCROBBLE_MIN_TRACK_SECONDS = 30;
 const SCROBBLE_AFTER_SECONDS = 240;
 const SOURCE_NAME_KEY = 'vibemusic.queue.source';
 const VOLUME_KEY = 'vibemusic.volume';
+const PENDING_SCROBBLES_KEY = 'vibemusic.pendingScrobbles';
+
+type PendingScrobble = { trackId: string; albumId: string; time: number };
 
 const queueState = queue.emptyQueue();
 const trackCache = new Map<string, Track>();
@@ -56,9 +61,7 @@ function queueChanged() {
 
 const engine = new AudioEngine({
 	ended: () => apply(queue.playNext(queueState)),
-	failed: (message) => {
-		player.error = message;
-	},
+	failed: (message) => void playbackFailed(message),
 	changed: () => refresh()
 });
 
@@ -67,6 +70,38 @@ let lastSavedAt = 0;
 let lastTickAt = 0;
 let listenedSeconds = 0;
 let scrobbled = false;
+let failedInRow = 0;
+let handlingFailure = false;
+
+async function playbackFailed(message: string) {
+	if (handlingFailure) return;
+	handlingFailure = true;
+	try {
+		await recoverFromFailure(message);
+	} finally {
+		handlingFailure = false;
+	}
+}
+
+async function recoverFromFailure(message: string) {
+	const track = currentTrack();
+	player.error = message;
+	const title = track ? `“${track.title}”` : 'this track';
+	if (!(await checkConnection())) {
+		engine.pause();
+		showToast(`Couldn’t play ${title} — Navidrome isn’t reachable`);
+		return;
+	}
+	failedInRow += 1;
+	if (failedInRow >= CONNECTION.skipFailedTracksInRow) {
+		failedInRow = 0;
+		engine.pause();
+		showToast(`Couldn’t play ${title} or the tracks before it`);
+		return;
+	}
+	showToast(`Couldn’t play ${title}, skipped`);
+	apply(queue.playNext(queueState));
+}
 
 function remember(tracks: Track[]) {
 	let added = false;
@@ -79,6 +114,7 @@ function remember(tracks: Track[]) {
 }
 
 function refresh() {
+	if (engine.playing && !engine.buffering) failedInRow = 0;
 	player.playing = engine.playing;
 	player.buffering = engine.buffering;
 	player.position = engine.position;
@@ -133,15 +169,49 @@ async function saveQueue() {
 	}
 }
 
+const pendingScrobblesKey = () => `${PENDING_SCROBBLES_KEY}:${requireCredentials().userId}`;
+
+function pendingScrobbles(): PendingScrobble[] {
+	try {
+		return JSON.parse(localStorage.getItem(pendingScrobblesKey()) ?? '[]') as PendingScrobble[];
+	} catch {
+		return [];
+	}
+}
+
+function keepPendingScrobbles(scrobbles: PendingScrobble[]) {
+	if (scrobbles.length) localStorage.setItem(pendingScrobblesKey(), JSON.stringify(scrobbles));
+	else localStorage.removeItem(pendingScrobblesKey());
+}
+
+async function sendScrobble(scrobble: PendingScrobble) {
+	await navidrome().subsonic('scrobble', { id: scrobble.trackId, submission: 'true', time: scrobble.time });
+	const playedAt = new Date(scrobble.time).toISOString();
+	await patchLibrary('update track set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [playedAt, scrobble.trackId]);
+	await patchLibrary('update album set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [playedAt, scrobble.albumId]);
+}
+
 async function submitScrobble(track: Track) {
 	scrobbled = true;
+	const scrobble = { trackId: track.id, albumId: track.albumId, time: Date.now() };
 	try {
-		await navidrome().subsonic('scrobble', { id: track.id, submission: 'true', time: Date.now() });
-		const now = new Date().toISOString();
-		await patchLibrary('update track set play_count = play_count + 1, play_date = ? where id = ?', [now, track.id]);
-		await patchLibrary('update album set play_count = play_count + 1, play_date = ? where id = ?', [now, track.albumId]);
-	} catch {
-		scrobbled = false;
+		await sendScrobble(scrobble);
+	} catch (error) {
+		if (isUnreachable(error)) keepPendingScrobbles([...pendingScrobbles(), scrobble]);
+		else scrobbled = false;
+	}
+}
+
+async function sendPendingScrobbles() {
+	const waiting = pendingScrobbles();
+	while (waiting.length) {
+		try {
+			await sendScrobble(waiting[0]);
+		} catch (error) {
+			if (isUnreachable(error)) break;
+		}
+		waiting.shift();
+		keepPendingScrobbles(waiting);
 	}
 }
 
@@ -160,6 +230,11 @@ function tick() {
 
 export function startPlayer() {
 	applyLevel();
+	onReconnect(() => {
+		void sendPendingScrobbles();
+		void saveQueue();
+	});
+	void sendPendingScrobbles();
 	setInterval(tick, TICK_MS);
 	installMediaSession({
 		play: () => void engine.resume(),
@@ -215,8 +290,8 @@ export function togglePlay() {
 	if (engine.playing) {
 		engine.pause();
 		void saveQueue();
-	} else if (engine.trackId) void engine.resume();
-	else void startCurrent();
+	} else if (engine.trackId && !player.error) void engine.resume();
+	else void startCurrent(true, engine.trackId === queueState.currentTrackId ? engine.position : 0);
 }
 
 export function playNextTrack() {
