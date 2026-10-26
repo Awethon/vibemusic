@@ -7,11 +7,16 @@
 
 	$effect(() => {
 		if (!menu.open || !element) return;
-		const { width, height } = element.getBoundingClientRect();
-		position = {
-			left: Math.min(menu.x, innerWidth - width - POPOVER.edgeMarginPx),
-			top: Math.min(menu.y, innerHeight - height - POPOVER.edgeMarginPx)
-		};
+		void menu.items;
+		position = { left: 0, top: 0 };
+		requestAnimationFrame(() => {
+			if (!element) return;
+			const size = element.getBoundingClientRect();
+			position = {
+				left: Math.min(menu.x, innerWidth - size.width - POPOVER.edgeMarginPx),
+				top: Math.max(POPOVER.edgeMarginPx, Math.min(menu.y, innerHeight - size.height - POPOVER.edgeMarginPx))
+			};
+		});
 	});
 
 	function run(item: MenuItem) {
@@ -22,14 +27,22 @@
 
 <svelte:window onpointerdown={(event) => menu.open && !element?.contains(event.target as Node) && closeMenu()} onblur={closeMenu} />
 
-{#if menu.open}
-	<div class="menu" bind:this={element} style:left="{position.left}px" style:top="{position.top}px" role="menu">
-		{#each menu.items as item, index (index)}
-			{#if 'separator' in item}
-				<hr />
-			{:else}
-				<button role="menuitem" disabled={item.disabled} onclick={() => run(item)}>{item.label}</button>
-			{/if}
-		{/each}
-	</div>
-{/if}
+{#snippet button(item: MenuItem)}
+	{#if 'run' in item}
+		<button type="button" role="menuitem" onclick={() => run(item)}>{item.label}{#if item.hint}<span>{item.hint}</span>{/if}</button>
+	{/if}
+{/snippet}
+
+<div id="ctx" class="menu" class:open={menu.open} role="menu" bind:this={element} style:left="{position.left}px" style:top="{position.top}px">
+	{#each menu.items as item, index (index)}
+		{#if 'separator' in item}
+			<hr />
+		{:else if 'heading' in item}
+			<p class="mh">{item.heading}</p>
+		{:else if 'group' in item}
+			<div class="mscroll">{#each item.group as child, childIndex (childIndex)}{@render button(child)}{/each}</div>
+		{:else}
+			{@render button(item)}
+		{/if}
+	{/each}
+</div>

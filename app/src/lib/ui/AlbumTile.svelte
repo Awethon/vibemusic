@@ -10,8 +10,15 @@
 	const playing = $derived(currentTrack()?.albumId === album.id);
 </script>
 
-<a class="tile" href={resolve('/album/[id]', { id: album.id })} oncontextmenu={(event) => openMenu(event, albumMenu(album))}>
-	<Cover albumId={album.id} />
-	<span class="name">{#if playing}<span class="dot">●</span> {/if}{album.name}</span>
-	<span class="meta">{subtitle ?? `${album.artist}${album.year ? ` · ${album.year}` : ''}`}</span>
+<a
+	class="tile"
+	class:playing
+	href={resolve('/album/[id]', { id: album.id })}
+	data-album={album.id}
+	data-id={album.id}
+	data-preview-album={album.id}
+	oncontextmenu={(event) => openMenu(event, albumMenu(album))}
+>
+	<span class="art"><Cover albumId={album.id} size={400} /></span>
+	<span class="t">{album.name}</span><span class="s">{subtitle ?? `${album.artist}${album.year ? ` · ${album.year}` : ''}`}</span>
 </a>

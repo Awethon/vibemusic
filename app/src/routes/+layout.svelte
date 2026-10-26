@@ -1,34 +1,67 @@
 <script lang="ts">
+	import '@fontsource/onest/400.css';
+	import '@fontsource/onest/500.css';
+	import '@fontsource/onest/600.css';
+	import '@fontsource/onest/700.css';
+	import '@fontsource/unbounded/300.css';
+	import '@fontsource/unbounded/400.css';
+	import '@fontsource/unbounded/500.css';
 	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
+	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
+	import { bodyHasClass, setBodyClass } from '#lib/engine/dom.ts';
+	import { installGestureRecognizer } from '#lib/engine/gestures.ts';
+	import { installIdleTracking } from '#lib/engine/idle.svelte.ts';
+	import { installResizeRelayout } from '#lib/engine/layout.svelte.ts';
+	import { isPreviewingPalette, previewPalette, updatePalettePageHold } from '#lib/engine/palette.ts';
+	import { setRailExpanded } from '#lib/engine/rail.ts';
 	import { library, startLibrary } from '#lib/library/library.svelte.ts';
-	import { player, playNextTrack, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, togglePlay } from '#lib/player/player.svelte.ts';
+	import { loadLyricsFor } from '#lib/player/lyricsState.svelte.ts';
+	import { currentTrack, player, playNextTrack, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, togglePlay } from '#lib/player/player.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { PLAYBACK } from '#lib/tuning.ts';
+	import AlphabetNav from '#lib/ui/AlphabetNav.svelte';
+	import Ambient from '#lib/ui/Ambient.svelte';
 	import Background from '#lib/ui/Background.svelte';
+	import Capsule from '#lib/ui/Capsule.svelte';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
-	import FullScreen from '#lib/ui/FullScreen.svelte';
+	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import Login from '#lib/ui/Login.svelte';
-	import { closeMenu, menu } from '#lib/ui/menu.svelte.ts';
+	import { anyMenuOpen, closeAllMenus } from '#lib/ui/menu.svelte.ts';
+	import NowCanvas from '#lib/ui/NowCanvas.svelte';
+	import NowClassic from '#lib/ui/NowClassic.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
-	import PlayerBar from '#lib/ui/PlayerBar.svelte';
-	import Search from '#lib/ui/Search.svelte';
-	import Settings from '#lib/ui/Settings.svelte';
-	import Sidebar from '#lib/ui/Sidebar.svelte';
-	import { setFullScreen, togglePanel, ui } from '#lib/ui/state.svelte.ts';
+	import Rail from '#lib/ui/Rail.svelte';
+	import SearchPalette from '#lib/ui/SearchPalette.svelte';
+	import SettingsPopover from '#lib/ui/SettingsPopover.svelte';
+	import { applyFullScreenStyleClass, setFullScreen, toggleFullScreen, togglePanel, togglePanelTab } from '#lib/ui/shell.ts';
+	import { ui } from '#lib/ui/state.svelte.ts';
+	import Toast from '#lib/ui/Toast.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 	let main = $state<HTMLElement | null>(null);
 	let started = false;
 	let restored = false;
+	const signedIn = $derived(!!session.credentials && !session.expired);
 
 	$effect(() => {
-		if (!session.credentials || session.expired || started) return;
+		if (!signedIn || started) return;
 		started = true;
 		startPlayer();
 		void startLibrary();
+	});
+
+	$effect(() => {
+		if (!signedIn) return;
+		const cleanups = untrack(() => {
+			setRailExpanded(ui.railExpanded, true);
+			applyFullScreenStyleClass();
+			return [installGestureRecognizer(), installIdleTracking(), installResizeRelayout()];
+		});
+		return () => cleanups.forEach((cleanup) => cleanup());
 	});
 
 	$effect(() => {
@@ -37,41 +70,82 @@
 		void restoreSavedQueue();
 	});
 
-	afterNavigate(({ type }) => {
-		if (type !== 'popstate') main?.scrollTo({ top: 0 });
-		closeMenu();
-		ui.settingsOpen = false;
-		setFullScreen(false);
+	$effect(() => {
+		setBodyClass('is-playing', player.playing);
 	});
 
-	function typing(target: EventTarget | null) {
-		return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+	$effect(() => {
+		const trackId = currentTrack()?.id ?? '';
+		untrack(() => loadLyricsFor(trackId));
+	});
+
+	$effect(() => {
+		const element = main;
+		if (!element) return;
+		const onOver = (event: MouseEvent) => {
+			if (ui.view.name === 'album') return;
+			const target = (event.target as Element).closest<HTMLElement>('[data-preview-album]');
+			if (target?.dataset.previewAlbum) previewPalette(target.dataset.previewAlbum);
+			else if (isPreviewingPalette()) previewPalette(null);
+		};
+		const onLeave = () => previewPalette(null);
+		element.addEventListener('mouseover', onOver);
+		element.addEventListener('mouseleave', onLeave);
+		return () => {
+			element.removeEventListener('mouseover', onOver);
+			element.removeEventListener('mouseleave', onLeave);
+		};
+	});
+
+	afterNavigate(({ type }) => {
+		const route = page.route.id ?? '/';
+		const name = route === '/' ? 'home' : (route.split('/')[1] ?? 'home');
+		const id = page.params.id ?? page.params.kind ?? '';
+		ui.view = { name, id };
+		updatePalettePageHold(name, id);
+		closeAllMenus();
+		setFullScreen(false);
+		if (type !== 'popstate') main?.scrollTo({ top: 0 });
+	});
+
+	function handleEscape() {
+		if (ui.searchOpen) {
+			ui.searchOpen = false;
+			previewPalette(null);
+			return true;
+		}
+		if (anyMenuOpen()) {
+			closeAllMenus();
+			return true;
+		}
+		if (bodyHasClass('now-open')) {
+			setFullScreen(false);
+			return true;
+		}
+		if (bodyHasClass('panel-open')) {
+			togglePanel(false);
+			return true;
+		}
+		return false;
 	}
 
 	function onkeydown(event: KeyboardEvent) {
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			ui.searchOpen = !ui.searchOpen;
+			if (!ui.searchOpen) previewPalette(null);
 			return;
 		}
-		if (event.key === 'Escape') {
-			if (ui.searchOpen) ui.searchOpen = false;
-			else if (menu.open || ui.settingsOpen) {
-				closeMenu();
-				ui.settingsOpen = false;
-			} else if (ui.fullScreen) setFullScreen(false);
-			else if (ui.panelOpen) ui.panelOpen = false;
-			return;
-		}
-		if (typing(event.target) || ui.searchOpen || event.metaKey || event.ctrlKey) return;
-		if (event.key === ' ') togglePlay();
+		if (event.key === 'Escape' && handleEscape()) return;
+		if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen) return;
+		if (event.code === 'Space') togglePlay();
 		else if (event.shiftKey && event.key === 'ArrowRight') playNextTrack();
 		else if (event.shiftKey && event.key === 'ArrowLeft') playPreviousTrack();
 		else if (event.altKey && event.key === 'ArrowRight') seekBy(PLAYBACK.seekStepSeconds);
 		else if (event.altKey && event.key === 'ArrowLeft') seekBy(-PLAYBACK.seekStepSeconds);
-		else if (event.key === 'q') togglePanel('queue');
-		else if (event.key === 'l') togglePanel('lyrics');
-		else if (event.key === 'f') setFullScreen(!ui.fullScreen);
+		else if (event.key === 'q') togglePanelTab('queue');
+		else if (event.key === 'l') togglePanelTab('lyrics');
+		else if (event.key === 'f') toggleFullScreen();
 		else return;
 		event.preventDefault();
 	}
@@ -79,32 +153,36 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>{player.queue.currentTrackId && player.tracks[player.queue.currentTrackId] ? `${player.tracks[player.queue.currentTrackId].title} · vibemusic` : 'vibemusic'}</title>
+	<title>{currentTrack() ? `${currentTrack()?.title} · ${currentTrack()?.artist}` : 'vibemusic'}</title>
 </svelte:head>
 
 <svelte:window {onkeydown} />
 
-{#if !session.credentials || session.expired}
+<Background />
+{#if !signedIn}
 	<Login />
 {:else}
-	<Background />
-	<div class="app" class:panel-open={ui.panelOpen} class:sidebar-open={ui.sidebarOpen} class:full-screen={ui.fullScreen}>
-		<Sidebar />
-		<main class="main" bind:this={main}>
+	<div id="chrome">
+		<Rail />
+		<main id="main" tabindex="-1" bind:this={main}>
 			{#if library.status === 'ready'}
 				{@render children()}
 			{:else if library.status === 'error'}
-				<p class="empty-state">Could not load the library: {library.error}</p>
+				<p class="status-note">Could not load the library: {library.error}</p>
 			{:else}
-				<p class="empty-state">{library.status === 'syncing' ? 'Syncing your library for the first time…' : 'Loading library…'}</p>
+				<p class="status-note">{library.status === 'syncing' ? 'Syncing your library for the first time…' : 'Loading library…'}</p>
 			{/if}
 		</main>
-		<Panel />
-		{#if ui.fullScreen}<FullScreen />{/if}
-		<PlayerBar />
-		{#if ui.settingsOpen}<Settings />{/if}
-		{#if ui.searchOpen && library.status === 'ready'}<Search />{/if}
-		<ContextMenu />
-		{#if ui.toast}<div class="toast" role="status">{ui.toast}</div>{/if}
+		<AlphabetNav />
 	</div>
+	<NowCanvas />
+	<NowClassic />
+	<Ambient />
+	<Panel />
+	<Capsule />
+	<SettingsPopover />
+	<FilterPopover />
+	<ContextMenu />
+	<SearchPalette />
+	<Toast />
 {/if}

@@ -1,34 +1,77 @@
 <script lang="ts">
-	import { currentTrack, player, toggleLike } from '../player/player.svelte.ts';
-	import { QUEUE, LYRICS } from '../tuning.ts';
+	import { showPanelTab } from '../engine/panel.ts';
+	import { currentTrack, player } from '../player/player.svelte.ts';
 	import * as queue from '../player/queue.ts';
+	import { LYRICS, PANEL, QUEUE } from '../tuning.ts';
 	import Cover from './Cover.svelte';
-	import { countLabel } from './format.ts';
-	import LyricsView from './LyricsView.svelte';
-	import UpNext from './UpNext.svelte';
+	import { formatCount, longDuration } from './format.ts';
+	import LikeButton from './LikeButton.svelte';
+	import LyricsLines from './LyricsLines.svelte';
+	import QueueRow from './QueueRow.svelte';
+	import { beginPress, endPress, followPointer } from './queueDrag.ts';
+	import { clearQueued } from './queueActions.ts';
+	import { toggleFullScreen } from './shell.ts';
 	import { ui } from './state.svelte.ts';
+	import TrackLinks from './TrackLinks.svelte';
 
 	const track = $derived(currentTrack());
-	const count = $derived(queue.upNextCount(player.queue));
+	const sourceRows = $derived(player.queue.sourceQueue.slice(player.queue.sourceIndex + 1, player.queue.sourceIndex + 1 + QUEUE.visibleRowCap));
+	const sourceRemaining = $derived(Math.max(0, player.queue.sourceQueue.length - player.queue.sourceIndex - 1));
+	const queuedRows = $derived(player.queue.userQueue.slice(0, QUEUE.visibleRowCap));
+	const total = $derived(queue.upNextCount(player.queue));
+	const hiddenCount = $derived(sourceRemaining - sourceRows.length);
+	const remainingDuration = $derived(
+		player.queue.sourceQueue.slice(player.queue.sourceIndex + 1).reduce((sum, entry) => sum + (player.tracks[entry.trackId]?.duration ?? 0), 0)
+	);
+
+	let tabs = $state<HTMLElement | null>(null);
+	let ink = $state('');
+
+	$effect(() => {
+		void ui.panelTab;
+		void ui.panelOpen;
+		void total;
+		const frame = requestAnimationFrame(() => {
+			const active = tabs?.querySelector<HTMLElement>(`[data-tab="${ui.panelTab}"]`);
+			if (active?.offsetWidth) ink = `translateX(${active.offsetLeft}px) scaleX(${active.offsetWidth / PANEL.tabInkBaseWidthPx})`;
+		});
+		return () => cancelAnimationFrame(frame);
+	});
 </script>
 
-<aside class="panel" class:open={ui.panelOpen}>
-	{#if track}
-		<p class="kicker">Playing from {player.queue.sourceName || 'queue'}</p>
-		<div class="panel-now selectable">
-			<Cover albumId={track.albumId} size={160} />
-			<div>
-				<p class="title">{track.title}</p>
-				<p class="meta">{track.artist} · {track.album}</p>
-			</div>
-			<button class="icon-button" class:liked={track.starred} onclick={() => toggleLike(track)}>{track.starred ? '♥' : '♡'}</button>
+<aside id="panel" aria-label="Now playing and queue">
+	<header class="pn-head"><span class="eyebrow">{player.queue.sourceName ? `Playing from ${player.queue.sourceName}` : 'Now playing'}</span></header>
+	<div class="pn-now">
+		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={160} eager /></button>
+		<div class="pn-meta">
+			<p class="pn-title">{track?.title ?? ''}</p>
+			<p class="pn-sub">{#if track}<TrackLinks {track} />{/if}</p>
 		</div>
-	{/if}
-	<div class="tabs">
-		<button class:active={ui.panelTab === 'queue'} onclick={() => (ui.panelTab = 'queue')}>Up next <small>{countLabel(count, QUEUE.countDisplayCap)}</small></button>
-		<button class:active={ui.panelTab === 'lyrics'} onclick={() => (ui.panelTab = 'lyrics')}>Lyrics</button>
+		<LikeButton className="pn-like" />
 	</div>
-	<div class="panel-body">
-		{#if ui.panelTab === 'queue'}<UpNext />{:else}<LyricsView focusRatio={LYRICS.focusLineRatio.panel} />{/if}
+	<div class="pn-tabs" role="tablist" bind:this={tabs}>
+		<button type="button" role="tab" data-tab="queue" class:on={ui.panelTab === 'queue'} onclick={() => showPanelTab('queue')}>Up next <em>{total ? (total > QUEUE.countDisplayCap ? `${QUEUE.countDisplayCap}+` : formatCount(total)) : ''}</em></button>
+		<button type="button" role="tab" data-tab="lyrics" class:on={ui.panelTab === 'lyrics'} onclick={() => showPanelTab('lyrics')}>Lyrics</button>
+		<span class="tab-ink" style:transform={ink}></span>
+	</div>
+	<div class="pn-body">
+		<div class="pn-pane q-scroll" id="qPane" class:off={ui.panelTab !== 'queue'}>
+			{#if queuedRows.length}
+				<div id="qUserBlock">
+					<p class="eyebrow q-head-row">Queued by you <button type="button" onclick={clearQueued}>Clear</button></p>
+					<ol class="qlist" id="qUser" data-kind="user" onpointerdown={beginPress} onpointermove={followPointer} onpointerup={endPress} onpointercancel={endPress}>
+						{#each queuedRows as entry, index (entry.entryId)}<QueueRow {entry} queuedIndex={index} />{/each}
+					</ol>
+				</div>
+			{/if}
+			{#if sourceRows.length}<p class="eyebrow q-head-row" id="qSourceHead">Next from <span>{player.queue.sourceName || 'this list'}</span></p>{/if}
+			<ol class="qlist" id="qList" data-kind="source" onpointerdown={beginPress} onpointermove={followPointer} onpointerup={endPress} onpointercancel={endPress}>
+				{#each sourceRows as entry, index (entry.entryId)}<QueueRow {entry} sourceIndex={player.queue.sourceIndex + 1 + index} />{/each}
+			</ol>
+			{#if !sourceRows.length && !queuedRows.length}<p class="q-empty">Nothing up next. Right-click any track to add it.</p>{/if}
+			{#if hiddenCount > 0}<p class="q-more">and {formatCount(hiddenCount)} more · {longDuration(remainingDuration)} in total</p>{/if}
+			<p class="q-hint">Drag to reorder · right-click a track for Play next or Add to queue</p>
+		</div>
+		<LyricsLines outerClass="pn-pane pn-lyrics{ui.panelTab === 'lyrics' ? '' : ' off'}" innerClass="pn-lines" outerId="pnLyrics" focusRatio={LYRICS.focusLineRatio.panel} visible={ui.panelOpen && !ui.fullScreen && ui.panelTab === 'lyrics'} />
 	</div>
 </aside>

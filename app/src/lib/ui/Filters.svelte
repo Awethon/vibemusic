@@ -1,32 +1,20 @@
 <script lang="ts">
-	import { decadeCounts, genreCounts } from '../library/queries.ts';
-	import { live } from './live.svelte.ts';
-	import { clearFilters, filtering, ui } from './state.svelte.ts';
+	import Icon from './Icon.svelte';
+	import { clearFilters, filtering, ui, type FilterKind } from './state.svelte.ts';
 
-	const genres = live(genreCounts, []);
-	const decades = live(decadeCounts, []);
-
-	function toggle<T>(list: T[], value: T): T[] {
-		return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+	function toggle(kind: FilterKind, event: MouseEvent) {
+		event.stopPropagation();
+		if (ui.filterPopover?.kind === kind) {
+			ui.filterPopover = null;
+			return;
+		}
+		const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		ui.filterPopover = { kind, left: anchor.left, top: anchor.bottom };
 	}
 </script>
 
 <div class="filters">
-	<details>
-		<summary>Genre{ui.filters.genres.length ? ` (${ui.filters.genres.length})` : ''}</summary>
-		<div class="options">
-			{#each genres.value as { genre, albums } (genre)}
-				<label><input type="checkbox" checked={ui.filters.genres.includes(genre)} onchange={() => (ui.filters.genres = toggle(ui.filters.genres, genre))} /> {genre} <small>{albums}</small></label>
-			{/each}
-		</div>
-	</details>
-	<details>
-		<summary>Decade{ui.filters.decades.length ? ` (${ui.filters.decades.length})` : ''}</summary>
-		<div class="options">
-			{#each decades.value as { decade, albums } (decade)}
-				<label><input type="checkbox" checked={ui.filters.decades.includes(decade)} onchange={() => (ui.filters.decades = toggle(ui.filters.decades, decade))} /> {decade}s <small>{albums}</small></label>
-			{/each}
-		</div>
-	</details>
-	{#if filtering()}<button class="link" onclick={clearFilters}>Clear</button>{/if}
+	<button class="fbtn" class:on={!!ui.filters.genres.length} type="button" onclick={(event) => toggle('genre', event)}>{ui.filters.genres[0] ?? 'All genres'}<Icon name="down" /></button>
+	<button class="fbtn" class:on={!!ui.filters.decades.length} type="button" onclick={(event) => toggle('decade', event)}>{ui.filters.decades.length ? `${ui.filters.decades[0]}s` : 'All years'}<Icon name="down" /></button>
+	{#if filtering()}<button class="fclear" type="button" onclick={clearFilters}>Clear</button>{/if}
 </div>

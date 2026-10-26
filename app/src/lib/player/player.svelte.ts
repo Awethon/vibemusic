@@ -8,7 +8,7 @@ import { AudioEngine } from './engine.ts';
 import * as queue from './queue.ts';
 import { updateMediaSession, installMediaSession } from './mediaSession.ts';
 
-const TICK_MS = 250;
+const TICK_MS = 100;
 const SAVE_DELAY_MS = 3000;
 const SAVE_WHILE_PLAYING_MS = 30000;
 const SCROBBLE_MIN_TRACK_SECONDS = 30;

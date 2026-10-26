@@ -1,0 +1,53 @@
+<script lang="ts">
+	import { library, resyncLibrary } from '../library/library.svelte.ts';
+	import { session, signOut } from '../session.svelte.ts';
+	import { POPOVER } from '../tuning.ts';
+	import { relativeTime } from './format.ts';
+	import { applyFullScreenStyleClass } from './shell.ts';
+	import { setFullScreenStyle, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
+
+	const options: [FullScreenStyle, string, string][] = [
+		['canvas', 'Canvas', 'Lyrics centre stage'],
+		['classic', 'Classic', 'Large cover beside lyrics'],
+		['minimal', 'Minimal', 'Cover and one line']
+	];
+
+	let element = $state<HTMLElement | null>(null);
+	let position = $state({ left: 0, bottom: 0 });
+
+	$effect(() => {
+		if (!ui.settingsOpen || !element) return;
+		const anchor = document.getElementById('bSettings')?.getBoundingClientRect();
+		if (!anchor) return;
+		const width = element.offsetWidth;
+		position = { left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - width - POPOVER.edgeMarginPx)), bottom: innerHeight - anchor.top + POPOVER.anchorGapPx };
+	});
+
+	function chooseStyle(style: FullScreenStyle) {
+		setFullScreenStyle(style);
+		applyFullScreenStyleClass();
+	}
+</script>
+
+<svelte:window onpointerdown={(event) => ui.settingsOpen && !element?.contains(event.target as Node) && !(event.target as Element).closest('#bSettings') && (ui.settingsOpen = false)} />
+
+<div id="settings" class="pop" class:open={ui.settingsOpen} role="dialog" aria-label="Settings" bind:this={element} style:left="{position.left}px" style:bottom="{position.bottom}px">
+	<p class="pop-title">Full-screen style</p>
+	<div class="fs-opts">
+		{#each options as [style, label, description] (style)}
+			<button type="button" class="fs-opt" class:on={ui.fullScreenStyle === style} onclick={() => chooseStyle(style)}>
+				<span class="fs-thumb {style}"><i></i><i></i><i></i></span>
+				<b>{label}</b><small>{description}</small>
+			</button>
+		{/each}
+	</div>
+	<p class="pop-title">Background</p>
+	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
+	<p class="pop-title">Library</p>
+	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary()}>
+		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
+	</button>
+	{#if library.error}<p class="set-foot">{library.error}</p>{/if}
+	<button type="button" class="set-row" onclick={signOut}><span>Sign out<small>{session.credentials?.username ?? ''}</small></span></button>
+	<p class="set-foot">Field renderer · {ui.fieldRenderer || 'none'}</p>
+</div>

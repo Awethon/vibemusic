@@ -1,39 +1,27 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { allPlaylists, type PlaylistKind } from '#lib/library/queries.ts';
-	import PlaylistCard from '#lib/ui/PlaylistCard.svelte';
+	import { BENTO } from '#lib/tuning.ts';
+	import Bento from '#lib/ui/Bento.svelte';
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 
-	const BLOCK_ITEM_LIMIT = 12;
 	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists' };
-
 	const playlists = live(allPlaylists, []);
-	const blocks = $derived(
-		(['own', 'smart', 'genre'] as const)
-			.map((kind) => ({ kind, items: playlists.value.filter((playlist) => playlist.kind === kind) }))
-			.filter((block) => block.items.length)
-			.toSorted((a, b) => b.items.length - a.items.length)
-	);
-	const count = (kind: PlaylistKind) => blocks.find((block) => block.kind === kind)?.items.length ?? 0;
-	const summary = $derived(
-		[plural(count('own'), 'playlist'), count('smart') ? `${count('smart')} smart` : '', count('genre') ? `${count('genre')} by genre` : ''].filter((part) => part && !part.startsWith('0 ')).join(' · ')
-	);
+
+	const blocks = $derived.by(() => {
+		const kinds = (['own', 'smart', 'genre'] as const)
+			.map((kind) => ({ kind, title: titles[kind], playlists: playlists.value.filter((playlist) => playlist.kind === kind) }))
+			.filter((block) => block.playlists.length)
+			.toSorted((a, b) => b.playlists.length - a.playlists.length);
+		const spans = BENTO.blockSpansByKindCount[kinds.length as 1 | 2 | 3] ?? BENTO.blockSpansByKindCount[3];
+		return kinds.map((block, index) => ({ ...block, span: spans[index] }));
+	});
+	const count = (kind: PlaylistKind) => playlists.value.filter((playlist) => playlist.kind === kind).length;
+	const summary = $derived(`${plural(playlists.value.length, 'playlist')}${count('smart') ? ` · ${count('smart')} smart` : ''}${count('genre') ? ` · ${count('genre')} by genre` : ''}`);
 </script>
 
-<header class="page-head">
-	<h1>Playlists</h1>
-	<p class="meta">{summary}</p>
-</header>
-
-{#each blocks as block (block.kind)}
-	<section class="playlist-block">
-		<h2>
-			{titles[block.kind]} <small>{block.items.length}</small>
-			{#if block.items.length > BLOCK_ITEM_LIMIT}<a class="more" href={resolve('/playlists/[kind]', { kind: block.kind })}>See all</a>{/if}
-		</h2>
-		<div class={block.kind === 'genre' ? 'grid small' : 'rows two-column'}>
-			{#each block.items.slice(0, BLOCK_ITEM_LIMIT) as playlist (playlist.id)}<PlaylistCard {playlist} layout={block.kind === 'genre' ? 'genre' : 'row'} />{/each}
-		</div>
-	</section>
-{/each}
+<section class="view" {@attach viewEnter}>
+	<div class="vhead"><div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div></div>
+	{#if blocks.length}<Bento {blocks} />{/if}
+</section>

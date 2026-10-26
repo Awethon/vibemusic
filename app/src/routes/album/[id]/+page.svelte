@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { albumById, albumsByArtist, albumTracks } from '#lib/library/queries.ts';
@@ -20,36 +20,32 @@
 		return current ? (await albumsByArtist(current.artistId)).filter((other) => other.id !== id).slice(0, ALBUM_PAGE.moreByCount) : [];
 	}, []);
 
-	function filterByGenre(genre: string) {
+	function showGenre(genre: string) {
 		ui.filters = { genres: [genre], decades: [] };
-		void goto(resolve('/'));
 	}
 </script>
 
 {#if album.value}
-	<div class="album-page">
-		<aside class="album-side selectable">
-			<Cover albumId={album.value.id} size={600} />
-			<h1>{album.value.name}</h1>
-			<p><a href={resolve('/artist/[id]', { id: album.value.artistId })}>{album.value.artist}</a>{album.value.year ? ` · ${album.value.year}` : ''}</p>
-			<p class="meta">
-				{plural(album.value.songCount, 'track')} · {longDuration(album.value.duration)}
-				{#each album.value.genres as genre (genre)} · <button class="link" onclick={() => filterByGenre(genre)}>{genre}</button>{/each}
+	<section class="view album-layout" {@attach viewEnter}>
+		<div class="album-side">
+			<Cover albumId={album.value.id} size={700} eager />
+			<h1 class="display">{album.value.name}</h1>
+			<p class="sub"><a href={resolve('/artist/[id]', { id: album.value.artistId })}>{album.value.artist}</a>{album.value.year ? ` · ${album.value.year}` : ''}</p>
+			<p class="genres">
+				{plural(album.value.songCount, 'track')} · {longDuration(album.value.duration)}{#if album.value.genres.length}{' · '}{#each album.value.genres as genre, index (genre)}{#if index}, {/if}<a href={resolve('/')} onclick={() => showGenre(genre)}>{genre}</a>{/each}{/if}
 			</p>
-			<PlayButton tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" />
-		</aside>
+			<div class="actions"><PlayButton tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" /></div>
+		</div>
 		<div class="album-main">
 			<TrackList tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" numbering="track" discHeadings />
 			{#if moreBy.value.length}
-				<section>
-					<h2>More by {album.value.artist}</h2>
-					<div class="grid">
-						{#each moreBy.value as other (other.id)}<AlbumTile album={other} subtitle={other.year ? String(other.year) : ''} />{/each}
-					</div>
-				</section>
+				<h2 class="section-title">More by {album.value.artist}</h2>
+				<div class="grid more-by">
+					{#each moreBy.value as other (other.id)}<AlbumTile album={other} />{/each}
+				</div>
 			{/if}
 		</div>
-	</div>
+	</section>
 {:else if album.loaded}
-	<p class="empty-state">Album not found.</p>
+	<p class="status-note">This album isn't in your library.</p>
 {/if}

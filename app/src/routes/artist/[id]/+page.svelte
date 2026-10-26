@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { page } from '$app/state';
 	import { albumsByArtist, artistById, artistOpeners, artistTracks } from '#lib/library/queries.ts';
 	import { ARTIST_PAGE } from '#lib/tuning.ts';
@@ -16,22 +17,21 @@
 </script>
 
 {#if artist.value}
-	<header class="page-head">
-		<p class="kicker">Artist</p>
-		<h1 class="selectable">{artist.value.name}</h1>
-		<p class="meta">{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}</p>
-		<PlayButton tracks={tracks.value} sourceName={artist.value.name} listKey="artist:{id}" label="Play all" />
-	</header>
-	<section>
-		<h2>Albums</h2>
-		<div class="grid">
-			{#each albums.value as album (album.id)}<AlbumTile {album} subtitle={album.year ? String(album.year) : ''} />{/each}
+	<section class="view" {@attach viewEnter}>
+		<div class="vhead">
+			<div>
+				<p class="eyebrow">Artist</p>
+				<h1 class="display">{artist.value.name}</h1>
+				<p class="sub">{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}</p>
+			</div>
+			<PlayButton tracks={tracks.value} sourceName={artist.value.name} listKey="artist:{id}" label="Play all" />
 		</div>
-	</section>
-	<section>
-		<h2>Openers</h2>
+		<div class="grid" id="grid">
+			{#each albums.value as album (album.id)}<AlbumTile {album} />{/each}
+		</div>
+		<h2 class="section-title">Openers</h2>
 		<TrackList tracks={openers.value} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
 	</section>
 {:else if artist.loaded}
-	<p class="empty-state">Artist not found.</p>
+	<p class="status-note">This artist isn't in your library.</p>
 {/if}

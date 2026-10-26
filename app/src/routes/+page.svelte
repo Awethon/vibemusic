@@ -1,50 +1,59 @@
 <script lang="ts">
+	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { resolve } from '$app/paths';
+	import { albumGridMeasure } from '#lib/engine/geometry.ts';
+	import { alphabetEntriesFor } from '#lib/engine/layout.svelte.ts';
 	import { history } from '#lib/history.svelte.ts';
 	import { library } from '#lib/library/library.svelte.ts';
-	import { albumsByIds, albumWall, allPlaylists, artistStrip, artistById, playlistById, type AlbumSort, type Playlist } from '#lib/library/queries.ts';
-	import { HOME, SEARCH } from '#lib/tuning.ts';
+	import { albumsByIds, albumWall, allPlaylists, artistById, artistStrip, playlistById, type Album, type AlbumSort, type Playlist } from '#lib/library/queries.ts';
+	import { HOME, SHELVES } from '#lib/tuning.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
-	import AlphabetIndex from '#lib/ui/AlphabetIndex.svelte';
-	import ArtistTile from '#lib/ui/ArtistTile.svelte';
-	import Chips from '#lib/ui/Chips.svelte';
 	import Filters from '#lib/ui/Filters.svelte';
 	import JumpCard from '#lib/ui/JumpCard.svelte';
-	import PlaylistCard from '#lib/ui/PlaylistCard.svelte';
-	import { alphabetBucket, decadeLabel, plural } from '#lib/ui/format.ts';
+	import PlaylistTile from '#lib/ui/PlaylistTile.svelte';
+	import Shelf from '#lib/ui/Shelf.svelte';
+	import SortChips from '#lib/ui/SortChips.svelte';
+	import VirtualGrid from '#lib/ui/VirtualGrid.svelte';
+	import { alphabetBucket, decadeLabel, formatCount, plural, withoutLeadingThe } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
-	import { filtering, ui } from '#lib/ui/state.svelte.ts';
+	import { keepScrollNearGrid } from '#lib/ui/scrollKeep.ts';
+	import { clearFilters, filterSuffix, filtering, ui } from '#lib/ui/state.svelte.ts';
 
-	const sorts: { value: AlbumSort; label: string }[] = [
-		{ value: 'mostPlayed', label: 'Most played' },
-		{ value: 'recentlyAdded', label: 'Recently added' },
-		{ value: 'byArtist', label: 'By artist' },
-		{ value: 'az', label: 'A–Z' },
-		{ value: 'newest', label: 'Newest' }
-	];
+	const sorts = [
+		['mostPlayed', 'Most played'],
+		['recentlyAdded', 'Recently added'],
+		['byArtist', 'By artist'],
+		['az', 'A–Z'],
+		['newest', 'Newest']
+	] as const satisfies readonly (readonly [AlbumSort, string])[];
+
+	const bucketBySort: Partial<Record<AlbumSort, (album: Album) => string>> = {
+		byArtist: (album) => alphabetBucket(withoutLeadingThe(album.artist)),
+		az: (album) => alphabetBucket(album.name),
+		newest: (album) => decadeLabel(album.year)
+	};
 
 	const wall = live(() => albumWall(ui.albumSort, ui.filters), []);
 	const strip = live(() => artistStrip(ui.filters, HOME.artistStripCount), []);
 	const playlists = live(allPlaylists, []);
 	const jumpBackIn = live(async () => {
-		const items = history.items.slice(0, SEARCH.recentCount * 2);
-		return Promise.all(
-			items.map(async (item) => {
-				if (item.kind === 'album') return { item, album: (await albumsByIds([item.id]))[0] ?? null };
-				if (item.kind === 'artist') return { item, artist: await artistById(item.id) };
-				return { item, playlist: await playlistById(item.id) };
+		const entries = await Promise.all(
+			history.items.map(async (item) => {
+				if (item.kind === 'album') return { key: `album:${item.id}`, album: (await albumsByIds([item.id]))[0] ?? null };
+				if (item.kind === 'artist') return { key: `artist:${item.id}`, artist: await artistById(item.id) };
+				return { key: `playlist:${item.id}`, playlist: await playlistById(item.id) };
 			})
 		);
+		return entries.filter((entry) => ('album' in entry && entry.album) || ('artist' in entry && entry.artist) || ('playlist' in entry && entry.playlist));
 	}, []);
 
 	const homePlaylists = $derived.by(() => {
-		const byKind = { own: [] as Playlist[], smart: [] as Playlist[], genre: [] as Playlist[] };
+		const byKind: Record<string, Playlist[]> = { own: [], smart: [], genre: [] };
 		for (const playlist of playlists.value) byKind[playlist.kind].push(playlist);
 		const mixed: Playlist[] = [];
-		const pattern = HOME.playlistMixPattern as readonly (keyof typeof byKind)[];
 		while (mixed.length < playlists.value.length) {
 			const before = mixed.length;
-			for (const kind of pattern) {
+			for (const kind of HOME.playlistMixPattern) {
 				const next = byKind[kind].shift();
 				if (next) mixed.push(next);
 			}
@@ -53,55 +62,55 @@
 		return mixed;
 	});
 
-	const buckets = $derived.by(() => {
-		const label = ui.albumSort === 'byArtist' ? (index: number) => alphabetBucket(wall.value[index].artist) : ui.albumSort === 'az' ? (index: number) => alphabetBucket(wall.value[index].name) : ui.albumSort === 'newest' ? (index: number) => decadeLabel(wall.value[index].year) : null;
-		if (!label) return [];
-		const result: { label: string; index: number }[] = [];
-		wall.value.forEach((_, index) => {
-			const bucket = label(index);
-			if (result.at(-1)?.label !== bucket) result.push({ label: bucket, index });
-		});
-		return result;
+	const alphabetEntries = $derived(alphabetEntriesFor(wall.value, bucketBySort[ui.albumSort] ?? null));
+	const countLine = $derived(
+		library.meta ? (filtering() ? `${formatCount(wall.value.length)} of ${plural(library.meta.albums, 'album')}${filterSuffix()}` : plural(library.meta.albums, 'album')) : ''
+	);
+
+	let firstRender = true;
+	$effect(() => {
+		void ui.albumSort;
+		void ui.filters;
+		if (firstRender) firstRender = false;
+		else requestAnimationFrame(keepScrollNearGrid);
 	});
 </script>
 
-<header class="page-head">
-	<h1>Your Music</h1>
-	{#if library.meta}<p class="meta">{plural(library.meta.albums, 'album')} · {plural(library.meta.artists, 'artist')} · {plural(library.meta.tracks, 'track')}</p>{/if}
-</header>
-
-<section class="artist-strip">
-	{#each strip.value as artist (artist.id)}<ArtistTile {artist} layout="chip" />{/each}
-	<a class="more" href={resolve('/artists')}>All artists →</a>
-</section>
-
-{#if jumpBackIn.value.length}
-	<section>
-		<h2>Jump back in</h2>
-		<div class="shelf jump">
-			{#each jumpBackIn.value as entry (entry.item.kind + entry.item.id)}<JumpCard {...entry} />{/each}
+<section class="view" {@attach viewEnter}>
+	<div class="vhead">
+		<div>
+			<h1 class="display">Your Music</h1>
+			{#if library.meta}<p class="sub">{plural(library.meta.albums, 'album')} · {plural(library.meta.artists, 'artist')} · {plural(library.meta.tracks, 'track')}</p>{/if}
 		</div>
-	</section>
-{/if}
-
-{#if homePlaylists.length}
-	<section>
-		<h2>Playlists <a class="more" href={resolve('/playlists')}>See all</a></h2>
-		<div class="shelf playlists-shelf">
-			{#each homePlaylists as playlist (playlist.id)}<PlaylistCard {playlist} />{/each}
-		</div>
-	</section>
-{/if}
-
-<section>
+	</div>
+	<div class="artist-strip">
+		{#each strip.value as artist (artist.id)}
+			<a href={resolve('/artist/[id]', { id: artist.id })} data-preview-album={artist.newestAlbumId}>{artist.name}<sup>{artist.albumCount}</sup></a>
+		{/each}
+		<a class="more" href={resolve('/artists')}>All artists →</a>
+	</div>
+	{#if jumpBackIn.value.length}
+		<div class="sec-head first"><h2 class="section-title">Jump back in</h2></div>
+		<Shelf id="jumpShelf" items={jumpBackIn.value} {...SHELVES.jumpBackIn}>
+			{#snippet item(entry)}<JumpCard {...entry} />{/snippet}
+		</Shelf>
+	{/if}
+	{#if homePlaylists.length}
+		<div class="sec-head"><h2 class="section-title">Playlists</h2><a class="see-all" href={resolve('/playlists')}>See all</a></div>
+		<Shelf id="plShelf" items={homePlaylists} {...SHELVES.homePlaylists}>
+			{#snippet item(playlist)}<PlaylistTile {playlist} />{/snippet}
+		</Shelf>
+	{/if}
+	<div class="sec-head"><h2 class="section-title">Albums <small>{countLine}</small></h2></div>
 	<div class="toolbar">
-		<h2>Albums</h2>
-		<Chips options={sorts} value={ui.albumSort} onchange={(sort) => (ui.albumSort = sort)} />
+		<SortChips options={sorts} value={ui.albumSort} onchange={(sort) => (ui.albumSort = sort)} />
 		<Filters />
-		{#if filtering() && library.meta}<span class="meta">{wall.value.length} of {plural(library.meta.albums, 'album')}</span>{/if}
 	</div>
-	<AlphabetIndex {buckets} target="wall" />
-	<div class="grid" data-index-target="wall">
-		{#each wall.value as album (album.id)}<AlbumTile {album} />{/each}
-	</div>
+	{#if wall.value.length || !wall.loaded}
+		<VirtualGrid items={wall.value} key={(album) => album.id} measure={albumGridMeasure} {alphabetEntries}>
+			{#snippet item(album)}<AlbumTile {album} />{/snippet}
+		</VirtualGrid>
+	{:else}
+		<p class="empty">No albums match these filters. <button type="button" class="fclear" onclick={clearFilters}>Clear filters</button></p>
+	{/if}
 </section>

@@ -23,12 +23,11 @@
 
 <main class="login">
 	<form onsubmit={submit}>
-		<h1>vibemusic</h1>
-		<p class="meta">Navidrome at {NAVIDROME_TARGET}</p>
-		{#if session.expired}<p class="meta">Your session expired. Sign in again.</p>{/if}
+		<h1>vibe<span>music</span></h1>
+		<p class="note">{session.expired ? 'Your session expired. Sign in again.' : `Navidrome at ${NAVIDROME_TARGET}`}</p>
 		<label>Username <input bind:value={username} autocomplete="username" required /></label>
 		<label>Password <input type="password" bind:value={password} autocomplete="current-password" required /></label>
 		{#if error}<p class="error">{error}</p>{/if}
-		<button class="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+		<button class="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
 	</form>
 </main>

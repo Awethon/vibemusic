@@ -1,19 +1,30 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { HistoryItem } from '../history.svelte.ts';
 	import type { Album, Artist, Playlist } from '../library/queries.ts';
+	import { albumMenu, artistMenu, playlistMenu } from './actions.ts';
 	import Cover from './Cover.svelte';
-	import Mosaic from './Mosaic.svelte';
 	import { plural } from './format.ts';
-	import { playlistKindLabel } from './PlaylistCard.svelte';
+	import { openMenu } from './menu.svelte.ts';
+	import PlaylistMosaic from './PlaylistMosaic.svelte';
+	import { playlistKindLabel } from './playlistText.ts';
+	import SmartIcon from './SmartIcon.svelte';
 
-	let { album, artist, playlist }: { item: HistoryItem; album?: Album | null; artist?: Artist | null; playlist?: Playlist | null } = $props();
+	let { album, artist, playlist }: { album?: Album | null; artist?: Artist | null; playlist?: Playlist | null } = $props();
 </script>
 
 {#if album}
-	<a class="jump" href={resolve('/album/[id]', { id: album.id })}><Cover albumId={album.id} size={120} /><span class="name">{album.name}</span><span class="meta">Album · {album.artist}</span></a>
+	<a class="jump" href={resolve('/album/[id]', { id: album.id })} data-id="album:{album.id}" data-preview-album={album.id} oncontextmenu={(event) => openMenu(event, albumMenu(album))}>
+		<span class="j-art"><Cover albumId={album.id} size={120} /></span>
+		<span class="j-text"><b>{album.name}</b><small>Album · {album.artist}</small></span>
+	</a>
 {:else if artist}
-	<a class="jump" href={resolve('/artist/[id]', { id: artist.id })}><Cover albumId={artist.newestAlbumId} size={120} round /><span class="name">{artist.name}</span><span class="meta">Artist · {plural(artist.albumCount, 'album')}</span></a>
+	<a class="jump" href={resolve('/artist/[id]', { id: artist.id })} data-id="artist:{artist.id}" data-preview-album={artist.newestAlbumId} oncontextmenu={(event) => openMenu(event, artistMenu(artist))}>
+		<span class="j-art round"><Cover albumId={artist.newestAlbumId} size={120} /></span>
+		<span class="j-text"><b>{artist.name}</b><small>Artist · {plural(artist.albumCount, 'album')}</small></span>
+	</a>
 {:else if playlist}
-	<a class="jump" href={resolve('/playlist/[id]', { id: playlist.id })}><Mosaic albumIds={playlist.mosaicAlbumIds} size={120} /><span class="name">{playlist.name}</span><span class="meta">{playlistKindLabel[playlist.kind]}</span></a>
+	<a class="jump" href={resolve('/playlist/[id]', { id: playlist.id })} data-id="playlist:{playlist.id}" data-preview-album={playlist.mosaicAlbumIds[0]} oncontextmenu={(event) => openMenu(event, playlistMenu(playlist))}>
+		<PlaylistMosaic {playlist} mini />
+		<span class="j-text"><b>{#if playlist.kind === 'smart'}<SmartIcon />{/if}{playlist.name}</b><small>{playlistKindLabel(playlist)}</small></span>
+	</a>
 {/if}
