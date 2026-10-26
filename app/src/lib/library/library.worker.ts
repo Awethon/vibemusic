@@ -35,12 +35,27 @@ async function writeSnapshot(database: Database) {
 	return bytes.byteLength;
 }
 
+type SyncAccessHandle = { truncate(size: number): void; write(buffer: Uint8Array, options: { at: number }): number; flush(): void; close(): void };
+type WorkerFileHandle = Omit<FileSystemFileHandle, 'createWritable'> & { createWritable?: FileSystemFileHandle['createWritable']; createSyncAccessHandle?(): Promise<SyncAccessHandle> };
+
 async function writeBytes(bytes: Uint8Array<ArrayBuffer>) {
 	const directory = await navigator.storage.getDirectory();
-	const file = await directory.getFileHandle(snapshotName(), { create: true });
-	const writable = await file.createWritable();
-	await writable.write(bytes);
-	await writable.close();
+	const file: WorkerFileHandle = await directory.getFileHandle(snapshotName(), { create: true });
+	if (file.createWritable) {
+		const writable = await file.createWritable();
+		await writable.write(bytes);
+		await writable.close();
+		return;
+	}
+	if (!file.createSyncAccessHandle) throw new Error('This browser cannot save the library');
+	const access = await file.createSyncAccessHandle();
+	try {
+		access.truncate(0);
+		access.write(bytes, { at: 0 });
+		access.flush();
+	} finally {
+		access.close();
+	}
 }
 
 async function removeOutdatedSnapshots() {
