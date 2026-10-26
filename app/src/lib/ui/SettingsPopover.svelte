@@ -16,6 +16,12 @@
 	];
 
 	let element = $state<HTMLElement | null>(null);
+	let fullScreen = $state(!!document.fullscreenElement);
+
+	function toggleBrowserFullScreen() {
+		if (document.fullscreenElement) void document.exitFullscreen();
+		else void document.documentElement.requestFullscreen().catch(() => (fullScreen = false));
+	}
 	let position = $state({ left: 0, bottom: 0 });
 
 	$effect(() => {
@@ -40,6 +46,8 @@
 	}
 </script>
 
+<svelte:document onfullscreenchange={() => (fullScreen = !!document.fullscreenElement)} />
+
 <svelte:window onpointerdown={(event) => ui.settingsOpen && !element?.contains(event.target as Node) && !(event.target as Element).closest('#bSettings') && (ui.settingsOpen = false)} />
 
 <div id="settings" class="pop" class:open={ui.settingsOpen} role="dialog" aria-label="Settings" bind:this={element} style:left="{position.left}px" style:bottom="{position.bottom}px">
@@ -54,6 +62,8 @@
 	</div>
 	<p class="pop-title">Background</p>
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
+	<p class="pop-title">Window</p>
+	<button type="button" class="set-row" class:on={fullScreen} onclick={toggleBrowserFullScreen}><span>Full screen<small>Hide the browser’s tabs and toolbar</small></span><span class="switch"></span></button>
 	<p class="pop-title">Glass</p>
 	<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}><span>Liquid glass<small>Refracting glass for the player, panels and menus</small></span><span class="switch"></span></button>
 	<button
