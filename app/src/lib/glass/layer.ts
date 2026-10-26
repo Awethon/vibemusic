@@ -11,8 +11,6 @@ const LEVELS: Record<GlassLevel, { surfaces: string; above: string }> = {
 
 const PLAYER_RENDERED = 'vibemusic:glass-player-rendered';
 
-const FIELD_REPAINT_MS = 120;
-
 function effectiveOpacity(element: Element): number {
 	let opacity = 1;
 	for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
@@ -51,30 +49,33 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	if (!renderer || !backdrop) return null;
 	let lost = false;
 	let broken = false;
-	const field = document.getElementById('field') as HTMLCanvasElement | null;
 	let dpr = 0;
 	let pageDirty = true;
 	let lastShapes = '';
 	let lastRegion = '';
 	let lastParams = '';
-	let lastFieldPaint = 0;
 	let frame = 0;
 
 	const markDirty = () => {
 		pageDirty = true;
 	};
 	const rebuild = () => {
+		if (canvas.getContext('webgl2')?.isContextLost()) return;
+		let next: GlassRenderer | null = null;
+		try {
+			next = createGlassRenderer(canvas, level === 'player');
+		} catch {
+			next = null;
+		}
+		if (!next) return;
 		renderer?.dispose(false);
-		renderer = createGlassRenderer(canvas, level === 'player');
+		renderer = next;
 		backdrop = newBackdrop();
 		broken = false;
 		dpr = 0;
 		pageDirty = true;
 		lastShapes = '';
 		lastRegion = '';
-	};
-	const onVisibility = () => {
-		if (document.visibilityState === 'visible' && !lost) rebuild();
 	};
 	const onLost = (event: Event) => {
 		event.preventDefault();
@@ -84,7 +85,6 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		lost = false;
 		rebuild();
 	};
-	document.addEventListener('visibilitychange', onVisibility);
 	canvas.addEventListener('webglcontextlost', onLost);
 	canvas.addEventListener('webglcontextrestored', onRestored);
 	const observer = new MutationObserver((records) => {
@@ -98,18 +98,18 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 
 	const pageAnimating = () => document.getAnimations().some((animation) => animation.playState === 'running' && animation.effect instanceof KeyframeEffect && animation.effect.target instanceof Element && !animation.effect.target.closest(above));
 
-	const tick = (now: number) => {
+	const tick = () => {
 		frame = requestAnimationFrame(tick);
 		if (broken) rebuild();
 		if (lost || !renderer || !backdrop) return;
 		try {
-			draw(now, renderer, backdrop);
+			draw(renderer, backdrop);
 		} catch {
 			broken = true;
 		}
 	};
 
-	const draw = (now: number, gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
+	const draw = (gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
 		const ratio = Math.min(devicePixelRatio || 1, 2);
 		if (ratio !== dpr || canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
 			dpr = ratio;
@@ -130,15 +130,11 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		}
 		const region = regionAround(shapes, current);
 		const regionKey = `${region.x},${region.y},${region.width},${region.height}`;
-		if (field && now - lastFieldPaint > FIELD_REPAINT_MS) {
-			lastFieldPaint = now;
-			pageDirty = true;
-		}
 		const repaint = pageDirty || regionKey !== lastRegion || pageAnimating();
 		const shapesKey = JSON.stringify(shapes);
 		if (!repaint && shapesKey === lastShapes && paramsKey === lastParams) return;
 		if (repaint) {
-			paintBackdrop(paint, region, dpr, field, above);
+			paintBackdrop(paint, region, dpr, above);
 			gl.setScene(paint.canvas);
 			pageDirty = false;
 			lastRegion = regionKey;
@@ -157,7 +153,6 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		removeEventListener('load', markDirty, true);
 		removeEventListener('resize', markDirty);
 		removeEventListener(PLAYER_RENDERED, markDirty);
-		document.removeEventListener('visibilitychange', onVisibility);
 		canvas.removeEventListener('webglcontextlost', onLost);
 		canvas.removeEventListener('webglcontextrestored', onRestored);
 		renderer?.clear();

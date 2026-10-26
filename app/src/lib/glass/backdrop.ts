@@ -73,7 +73,7 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	}
 }
 
-export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, field: HTMLCanvasElement | null, above: string) {
+export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, above: string) {
 	const canvas = context.canvas;
 	const width = Math.max(1, Math.round(region.width * dpr));
 	const height = Math.max(1, Math.round(region.height * dpr));
@@ -86,13 +86,6 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 	context.globalAlpha = 1;
 	context.fillStyle = PAGE_COLOR;
 	context.fillRect(region.x, region.y, region.width, region.height);
-	if (field && field.width && field.height) {
-		try {
-			context.drawImage(field, 0, 0, field.width, field.height, 0, 0, innerWidth, innerHeight);
-		} catch {
-			context.fillStyle = PAGE_COLOR;
-		}
-	}
 
 	const visit = (element: Element, opacity: number) => {
 		if (element instanceof SVGElement || element.matches(above) || element.id === 'field') return;
