@@ -4,7 +4,7 @@ import { navidrome, renewToken, requireCredentials, sessionExpired } from '../se
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { fetchLibraryVersion } from './fetch.ts';
 import LibraryWorker from './library.worker.ts?worker';
-import type { SqlParam, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
+import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import { coverAlbumOverrides } from '../navidrome/credentials.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import type { LibraryMeta } from './snapshot.ts';
@@ -13,14 +13,15 @@ type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
 type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync' } | { kind: 'need-snapshot' };
 
-export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null }>({
+export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null; progress: SyncProgress | null }>({
 	status: 'idle',
 	meta: null,
 	revision: 0,
 	leader: false,
 	error: '',
 	openMs: 0,
-	timings: null
+	timings: null,
+	progress: null
 });
 
 const SYNTHETIC_LIBRARY = { version: 'synthetic-1', snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
@@ -44,6 +45,10 @@ function call<K extends WorkerRequest['kind']>(request: Extract<WorkerRequest, {
 
 function onWorkerReply(event: MessageEvent<WorkerReply>) {
 	const reply = event.data;
+	if ('progress' in reply) {
+		library.progress = reply.progress;
+		return;
+	}
 	const waiter = pending.get(reply.id);
 	if (!waiter) return;
 	pending.delete(reply.id);
@@ -64,6 +69,7 @@ function failed(error: unknown) {
 		return;
 	}
 	if (error instanceof NavidromeUnreachableError) reportUnreachable();
+	library.progress = null;
 	library.error = error instanceof Error ? error.message : String(error);
 	if (!library.meta) library.status = 'error';
 }
@@ -74,6 +80,7 @@ async function syncNow() {
 	reportReachable();
 	renewToken(result.token);
 	library.timings = result.timings;
+	library.progress = null;
 	loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
 }

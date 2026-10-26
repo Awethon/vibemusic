@@ -58,13 +58,15 @@ export class NavidromeHttp {
 		return { items, total: Number(response.headers.get('x-total-count') ?? items.length) };
 	}
 
-	async nativeAll(path: string, pageSize: number): Promise<unknown[]> {
+	async nativeAll(path: string, pageSize: number, onPage: (loaded: number, total: number) => void = () => {}): Promise<unknown[]> {
 		const first = await this.nativePage(path, 0, pageSize);
 		const items = [...first.items];
+		onPage(items.length, first.total);
 		while (items.length < first.total) {
 			const page = await this.nativePage(path, items.length, items.length + pageSize);
 			if (!page.items.length) break;
 			items.push(...page.items);
+			onPage(items.length, first.total);
 		}
 		return items;
 	}

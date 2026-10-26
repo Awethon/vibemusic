@@ -24,7 +24,8 @@
 <main class="login">
 	<form onsubmit={submit}>
 		<h1>vibe<span>music</span></h1>
-		<p class="note">{session.expired ? 'Your session expired. Sign in again.' : `Navidrome at ${NAVIDROME_TARGET}`}</p>
+		<p class="note">{session.expired ? 'Your session expired. Sign in again.' : 'Sign in with your Navidrome account.'}</p>
+		<p class="server">{new URL(NAVIDROME_TARGET).host}</p>
 		<label>Username <input bind:value={username} autocomplete="username" required /></label>
 		<label>Password <input type="password" bind:value={password} autocomplete="current-password" required /></label>
 		{#if error}<p class="error">{error}</p>{/if}

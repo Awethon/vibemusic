@@ -116,7 +116,7 @@ function requireDatabase(): Database {
 	return db;
 }
 
-async function handle(request: WorkerRequest): Promise<WorkerResults[keyof WorkerResults]> {
+async function handle(id: number, request: WorkerRequest): Promise<WorkerResults[keyof WorkerResults]> {
 	await ready;
 	switch (request.kind) {
 		case 'open':
@@ -129,7 +129,7 @@ async function handle(request: WorkerRequest): Promise<WorkerResults[keyof Worke
 			let token = request.credentials.token;
 			const http = new NavidromeHttp(request.credentials, (renewed) => (token = renewed));
 			const started = performance.now();
-			const snapshot = await fetchLibrary(http);
+			const snapshot = await fetchLibrary(http, (progress) => self.postMessage({ id, progress } satisfies WorkerReply));
 			return { ...(await install(snapshot, performance.now() - started)), token };
 		}
 		case 'loadFile': {
@@ -157,7 +157,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerEnvelope>) => 
 	const { id, request } = event.data;
 	let reply: WorkerReply;
 	try {
-		reply = { id, ok: true, value: await handle(request) };
+		reply = { id, ok: true, value: await handle(id, request) };
 	} catch (error) {
 		reply = { id, ok: false, error: error instanceof Error ? error.message : String(error), expired: error instanceof SessionExpiredError, unreachable: error instanceof NavidromeUnreachableError };
 	}

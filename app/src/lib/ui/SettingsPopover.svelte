@@ -53,10 +53,10 @@
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
 	<p class="pop-title">Library</p>
 	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary()}>
-		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
+		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
 	</button>
-	{#if library.timings}<p class="set-foot">Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(library.timings.fetchMs)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}</p>{/if}
+	{#if import.meta.env.DEV && library.timings}<p class="set-foot">Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(library.timings.fetchMs)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}</p>{/if}
 	{#if library.error}<p class="set-foot">{library.error}</p>{/if}
 	<button type="button" class="set-row" onclick={signOut}><span>Sign out<small>{session.credentials?.username ?? ''}</small></span></button>
-	<p class="set-foot">Field renderer · {ui.fieldRenderer || 'none'}</p>
+	{#if import.meta.env.DEV}<p class="set-foot">Field renderer · {ui.fieldRenderer || 'none'}</p>{/if}
 </div>

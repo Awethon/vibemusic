@@ -32,6 +32,7 @@
 	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
 	import { installBrokenImageRetry } from '#lib/ui/brokenImages.ts';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
+	import FirstSync from '#lib/ui/FirstSync.svelte';
 	import { checkConnection, connection, watchConnection } from '#lib/connection.svelte.ts';
 	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import Login from '#lib/ui/Login.svelte';
@@ -169,7 +170,12 @@
 	<div id="chrome">
 		<Rail />
 		<main id="main" tabindex="-1" bind:this={main}>
-			{#if library.status === 'ready'}
+			{#if library.status === 'ready' && library.meta?.tracks === 0}
+				<div class="first-run-problem">
+					<h1 class="display">Your library is empty</h1>
+					<p>Navidrome hasn’t found any music yet. Add albums to its music folder and run a scan in Navidrome — vibemusic picks them up within a minute.</p>
+				</div>
+			{:else if library.status === 'ready'}
 				{@render children()}
 			{:else if library.status === 'error'}
 				<div class="first-run-problem">
@@ -177,8 +183,8 @@
 					<p>{connection.unreachable ? `vibemusic is trying ${new URL(NAVIDROME_TARGET).host} again every few seconds.` : library.error}</p>
 					<button class="ghost" type="button" onclick={() => (connection.unreachable ? void checkConnection() : void resyncLibrary())}>Retry</button>
 				</div>
-			{:else}
-				<p class="status-note">{library.status === 'syncing' ? 'Syncing your library for the first time…' : 'Loading library…'}</p>
+			{:else if library.status === 'syncing'}
+				<FirstSync />
 			{/if}
 		</main>
 		<AlphabetNav />
