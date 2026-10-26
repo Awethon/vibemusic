@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GROUPS, PRESETS, decodeLabLink, type GlassSlider } from '#lib/glass/params.ts';
+	import { GROUPS, LOOKS, decodeLabLink, type GlassSlider } from '#lib/glass/params.ts';
 	import { applyGlassParams, applyGlassPreset, glass, setGlassEnabled, setGlassParam } from '#lib/glass/settings.svelte.ts';
 	import { albumWall } from '#lib/library/queries.ts';
 	import Cover from '#lib/ui/Cover.svelte';
@@ -62,7 +62,7 @@
 
 		<p class="pop-title">Looks</p>
 		<div class="chips gt-presets">
-			{#each PRESETS.filter((preset) => preset.id !== 'css') as preset (preset.id)}
+			{#each LOOKS as preset (preset.id)}
 				<button type="button" class="chip" class:on={glass.preset === preset.id} onclick={() => applyGlassPreset(preset.id)}>{preset.name}</button>
 			{/each}
 		</div>

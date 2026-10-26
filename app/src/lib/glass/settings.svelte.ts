@@ -1,7 +1,7 @@
-import { BASE, PRESETS, type GlassParams } from './params.ts';
+import { BASE, DEFAULT_LOOK, LOOKS, type GlassParams } from './params.ts';
 
 const STORAGE_KEY = 'vibemusic.glass';
-const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === 'frosted') ?? PRESETS[0];
+const DEFAULT_PRESET = DEFAULT_LOOK;
 
 type Stored = { enabled: boolean; preset: string; params: GlassParams };
 
@@ -31,12 +31,12 @@ export function setGlassEnabled(enabled: boolean) {
 
 export function setGlassParam(key: keyof GlassParams, value: number) {
 	glass.params[key] = value;
-	glass.preset = PRESETS.find((preset) => Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6))?.id ?? '';
+	glass.preset = LOOKS.find((preset) => Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6))?.id ?? '';
 	save();
 }
 
 export function applyGlassPreset(id: string) {
-	const preset = PRESETS.find((candidate) => candidate.id === id);
+	const preset = LOOKS.find((candidate) => candidate.id === id);
 	if (!preset) return;
 	glass.params = { ...preset.values };
 	glass.preset = id;
@@ -45,6 +45,6 @@ export function applyGlassPreset(id: string) {
 
 export function applyGlassParams(params: GlassParams, preset: string) {
 	glass.params = { ...params };
-	glass.preset = PRESETS.some((candidate) => candidate.id === preset && Object.entries(candidate.values).every(([name, value]) => Math.abs(params[name as keyof GlassParams] - value) < 1e-6)) ? preset : '';
+	glass.preset = LOOKS.some((candidate) => candidate.id === preset && Object.entries(candidate.values).every(([name, value]) => Math.abs(params[name as keyof GlassParams] - value) < 1e-6)) ? preset : '';
 	save();
 }

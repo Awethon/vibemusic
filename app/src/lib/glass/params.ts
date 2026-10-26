@@ -76,6 +76,32 @@ export const PRESETS: GlassPreset[] = [
 	}
 ];
 
+export const DEFAULT_LOOK: GlassPreset = {
+	id: 'default',
+	name: 'Default',
+	values: {
+		...BASE,
+		thick: 23,
+		bevel: 11,
+		curve: 4.2,
+		cut: 0.05,
+		body: 0.1,
+		lens: 0.15,
+		merge: 6,
+		ior: 1.82,
+		disp: 0.16,
+		light: -23,
+		elev: 26,
+		spec: 0,
+		refl: 0.85,
+		studio: 0.6,
+		rim: 0.3,
+		tintA: 0.82
+	}
+};
+
+export const LOOKS: GlassPreset[] = [DEFAULT_LOOK, ...PRESETS.filter((preset) => preset.id !== 'css')];
+
 export type GlassSlider = { key: GlassKey; label: string; min: number; max: number; step: number; unit: string; note?: string };
 export type GlassToggle = { key: GlassKey; label: string; toggle: true };
 export type GlassControl = GlassSlider | GlassToggle;
