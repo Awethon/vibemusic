@@ -693,7 +693,7 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 
 .toolbar {
 	position: sticky;
-	top: -28px;
+	top: -33px;
 	z-index: 3;
 	display: flex;
 	flex-wrap: wrap;
