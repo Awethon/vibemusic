@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { glass, setGlassEnabled } from '../glass/settings.svelte.ts';
 	import { library, resyncLibrary } from '../library/library.svelte.ts';
 	import { session, signOut } from '../session.svelte.ts';
 	import { POPOVER } from '../tuning.ts';
@@ -51,6 +54,16 @@
 	</div>
 	<p class="pop-title">Background</p>
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
+	<p class="pop-title">Glass</p>
+	<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}><span>Liquid glass<small>Refracting glass for the player and menus</small></span><span class="switch"></span></button>
+	<button
+		type="button"
+		class="set-row"
+		onclick={() => {
+			ui.settingsOpen = false;
+			void goto(resolve('/glass'));
+		}}><span>Tune liquid glass<small>Looks, shape, optics and light</small></span></button
+	>
 	<p class="pop-title">Library</p>
 	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary()}>
 		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>

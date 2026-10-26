@@ -33,6 +33,7 @@
 	import { installBrokenImageRetry } from '#lib/ui/brokenImages.ts';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
 	import FirstSync from '#lib/ui/FirstSync.svelte';
+	import GlassLayer from '#lib/ui/GlassLayer.svelte';
 	import { checkConnection, connection, watchConnection } from '#lib/connection.svelte.ts';
 	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import Login from '#lib/ui/Login.svelte';
@@ -193,6 +194,7 @@
 	<NowClassic />
 	<Ambient />
 	<Panel />
+	<GlassLayer />
 	<Capsule />
 	<SettingsPopover />
 	<FilterPopover />
