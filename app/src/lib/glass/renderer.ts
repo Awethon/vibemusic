@@ -1,4 +1,4 @@
-import { glassMargin, lightVector, RENDER, type GlassParams } from './params.ts';
+import { lightVector, RENDER, type GlassParams } from './params.ts';
 import { BLUR, GLASS, MAX_SHAPES, VERT } from './shaders.ts';
 
 export type GlassShape = { x: number; y: number; width: number; height: number; radius: number; alpha: number };
@@ -146,7 +146,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.clear(context.COLOR_BUFFER_BIT);
 	}
 
-	function render(params: GlassParams, shapes: GlassShape[], drawn: GlassShape, region: Region, dpr: number, index = 0) {
+	function render(params: GlassParams, shapes: GlassShape[], areas: Region[], region: Region, dpr: number, index = 0) {
 		const slot = slotAt(index);
 		const blurTex = blurred(slot, params.frost, dpr);
 		const { program, u } = programs.glass;
@@ -201,17 +201,17 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.uniform1f(u.uCaustic, params.caustic);
 		context.uniform4f(u.uTint, TINT[0], TINT[1], TINT[2], params.tintA);
 		context.uniform1f(u.uSat, params.sat);
-		const margin = glassMargin(params);
-		const left = Math.max(0, Math.floor((drawn.x - margin) * dpr));
-		const right = Math.min(width, Math.ceil((drawn.x + drawn.width + margin) * dpr));
-		const top = Math.max(0, Math.floor((drawn.y - margin) * dpr));
-		const bottom = Math.min(height, Math.ceil((drawn.y + drawn.height + margin) * dpr));
-		if (right > left && bottom > top) {
-			context.enable(context.SCISSOR_TEST);
+		context.enable(context.SCISSOR_TEST);
+		for (const area of areas) {
+			const left = Math.round(area.x * dpr);
+			const right = Math.min(width, Math.round((area.x + area.width) * dpr));
+			const top = Math.round(area.y * dpr);
+			const bottom = Math.min(height, Math.round((area.y + area.height) * dpr));
+			if (right <= left || bottom <= top) continue;
 			context.scissor(left, height - bottom, right - left, bottom - top);
 			context.drawArrays(context.TRIANGLES, 0, 3);
-			context.disable(context.SCISSOR_TEST);
 		}
+		context.disable(context.SCISSOR_TEST);
 		context.activeTexture(context.TEXTURE0);
 	}
 

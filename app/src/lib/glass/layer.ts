@@ -1,5 +1,5 @@
 import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
-import { glassMargin, type GlassParams } from './params.ts';
+import { glassMargin, scenePad, type GlassParams } from './params.ts';
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
 
@@ -33,13 +33,34 @@ function surfaces(selector: string): GlassShape[] {
 	return shapes;
 }
 
-function regionAround(shapes: GlassShape[], params: GlassParams): Region {
+function around(shape: GlassShape, by: number): Region {
+	const left = Math.floor(Math.max(0, shape.x - by));
+	const top = Math.floor(Math.max(0, shape.y - by));
+	const right = Math.ceil(Math.min(innerWidth, shape.x + shape.width + by));
+	const bottom = Math.ceil(Math.min(innerHeight, shape.y + shape.height + by));
+	return { x: left, y: top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}
+
+function subtract(rect: Region, cut: Region): Region[] {
+	const right = rect.x + rect.width;
+	const bottom = rect.y + rect.height;
+	const cutRight = cut.x + cut.width;
+	const cutBottom = cut.y + cut.height;
+	if (cut.x >= right || cutRight <= rect.x || cut.y >= bottom || cutBottom <= rect.y) return [rect];
+	const pieces: Region[] = [];
+	if (cut.y > rect.y) pieces.push({ x: rect.x, y: rect.y, width: rect.width, height: cut.y - rect.y });
+	if (cutBottom < bottom) pieces.push({ x: rect.x, y: cutBottom, width: rect.width, height: bottom - cutBottom });
+	const bandTop = Math.max(rect.y, cut.y);
+	const bandHeight = Math.min(bottom, cutBottom) - bandTop;
+	if (cut.x > rect.x) pieces.push({ x: rect.x, y: bandTop, width: cut.x - rect.x, height: bandHeight });
+	if (cutRight < right) pieces.push({ x: cutRight, y: bandTop, width: right - cutRight, height: bandHeight });
+	return pieces;
+}
+
+function drawAreas(shapes: GlassShape[], params: GlassParams): Region[][] {
 	const margin = glassMargin(params);
-	const left = Math.max(0, Math.min(...shapes.map((shape) => shape.x)) - margin);
-	const top = Math.max(0, Math.min(...shapes.map((shape) => shape.y)) - margin);
-	const right = Math.min(innerWidth, Math.max(...shapes.map((shape) => shape.x + shape.width)) + margin);
-	const bottom = Math.min(innerHeight, Math.max(...shapes.map((shape) => shape.y + shape.height)) + margin);
-	return { x: Math.floor(left), y: Math.floor(top), width: Math.ceil(right - left), height: Math.ceil(bottom - top) };
+	const areas = shapes.map((shape) => around(shape, margin));
+	return areas.map((area, index) => areas.slice(index + 1).reduce((pieces, later) => pieces.flatMap((piece) => subtract(piece, later)), [area]));
 }
 
 const inside = (node: Node, selector: string) => (node instanceof Element ? node : node.parentElement)?.closest(selector) != null;
@@ -121,7 +142,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 			pageDirty = true;
 			lastShapes = '';
 		}
-		const shapes = surfaces(selector);
+		const shapes = surfaces(selector).toSorted((a, b) => a.width * a.height - b.width * b.height);
 		const current = params();
 		const paramsKey = JSON.stringify(current);
 		if (!shapes.length) {
@@ -132,7 +153,9 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 			lastShapes = '';
 			return;
 		}
-		const regions = shapes.map((shape) => regionAround([shape], current));
+		const pad = glassMargin(current) + scenePad(current);
+		const regions = shapes.map((shape) => around(shape, pad));
+		const areas = drawAreas(shapes, current);
 		const regionKeys = regions.map((region) => `${region.x},${region.y},${region.width},${region.height}`);
 		const sceneStale = pageDirty || fieldVersion !== fieldSnapshot.version || pageAnimating();
 		const shapesKey = JSON.stringify(shapes);
@@ -144,7 +167,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 				paintBackdrop(paint, regions[index], dpr, above);
 				gl.setScene(paint.canvas, index);
 			}
-			gl.render(current, shapes, shape, regions[index], dpr, index);
+			gl.render(current, shapes, areas[index], regions[index], dpr, index);
 		});
 		pageDirty = false;
 		lastRegions = regionKeys;
