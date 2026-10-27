@@ -2,7 +2,7 @@ import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.or
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
-import { applyChanges, buildLibrary, readMeta, readSyncState } from './build.ts';
+import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary, fetchSnapshotFile } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
@@ -83,14 +83,6 @@ function replaceDatabase(next: Database | null) {
 	previous?.close();
 }
 
-function carryPalettes(from: Database | null, to: Database) {
-	if (!from) return;
-	const rows = from.selectArrays('select album_id, colors from palette');
-	const insert = to.prepare('insert or ignore into palette values (?, ?)');
-	to.transaction(() => rows.forEach((row) => insert.bind(row as [string, string]).stepReset()));
-	insert.finalize();
-}
-
 async function loadSnapshot() {
 	const bytes = await readSnapshot();
 	if (!bytes) return null;
@@ -118,8 +110,7 @@ function scheduleSnapshotWrite() {
 async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ meta: LibraryMeta; timings: SyncTimings }> {
 	const buildStarted = performance.now();
 	const database = new sqlite.oo1.DB();
-	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString());
-	carryPalettes(db, database);
+	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString(), db);
 	replaceDatabase(database);
 	const writeStarted = performance.now();
 	const snapshotBytes = await writeSnapshot(database);
@@ -173,6 +164,17 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 		}
 		case 'persist':
 			return writeSnapshot(requireDatabase());
+		case 'enrichmentRequest':
+			return enrichmentRequest(requireDatabase());
+		case 'enrich': {
+			const database = requireDatabase();
+			const meta = readMeta(database);
+			const sync = readSyncState(database);
+			if (!meta || !sync) throw new Error('Library not loaded');
+			const next = applyEnrichment(database, meta, sync, request.enrichment);
+			await writeSnapshot(database);
+			return next;
+		}
 		case 'run': {
 			const database = requireDatabase();
 			database.exec({ sql: request.sql, bind: request.params });

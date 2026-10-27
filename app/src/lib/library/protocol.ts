@@ -1,5 +1,5 @@
 import type { Credentials } from '../navidrome/credentials.ts';
-import type { LibraryMeta } from './snapshot.ts';
+import type { Enrichment, EnrichmentRequest, LibraryMeta } from './snapshot.ts';
 
 export type SqlParam = string | number | null;
 
@@ -14,7 +14,9 @@ export type WorkerRequest =
 	| { kind: 'loadFile'; url: string }
 	| { kind: 'persist' }
 	| { kind: 'query'; sql: string; params: SqlParam[] }
-	| { kind: 'run'; sql: string; params: SqlParam[]; persist: boolean };
+	| { kind: 'run'; sql: string; params: SqlParam[]; persist: boolean }
+	| { kind: 'enrichmentRequest' }
+	| { kind: 'enrich'; enrichment: Enrichment };
 
 export type WorkerResults = {
 	open: LibraryMeta | null;
@@ -24,6 +26,8 @@ export type WorkerResults = {
 	query: { columns: string[]; rows: SqlParam[][] };
 	run: number;
 	persist: number;
+	enrichmentRequest: EnrichmentRequest;
+	enrich: LibraryMeta;
 };
 
 export type WorkerEnvelope = { id: number; request: WorkerRequest };

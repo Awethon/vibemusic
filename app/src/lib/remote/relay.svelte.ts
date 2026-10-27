@@ -1,4 +1,5 @@
 import { session } from '../session.svelte.ts';
+import type { Enrichment } from '../library/snapshot.ts';
 import { REMOTE } from '../tuning.ts';
 
 export type Device = { id: string; name: string; online: boolean };
@@ -11,6 +12,7 @@ export type RelayMessage =
 	| { type: 'command'; command: unknown; from: string }
 	| { type: 'release'; to: string; handoff: boolean }
 	| { type: 'takeover'; queue: unknown; playback: unknown; ageMs: number }
+	| ({ type: 'enrichment' } & Enrichment)
 	| { type: 'unauthorized' };
 
 const DEVICE_KEY = 'vibemusic.device';
@@ -24,6 +26,12 @@ export const relay = $state<{ connected: boolean; deviceId: string; devices: Dev
 
 let socket: WebSocket | null = null;
 let listener: (message: RelayMessage) => void = () => {};
+const extraListeners = new Set<(message: RelayMessage) => void>();
+
+export function listenToRelay(onMessage: (message: RelayMessage) => void) {
+	extraListeners.add(onMessage);
+	return () => extraListeners.delete(onMessage);
+}
 let retryMs: number = REMOTE.reconnectMinMs;
 
 function browserName(agent: string) {
@@ -87,6 +95,7 @@ function connect() {
 			relay.active = message.active;
 		}
 		listener(message);
+		for (const extra of extraListeners) extra(message);
 	});
 	current.addEventListener('close', () => {
 		if (socket !== current) return;

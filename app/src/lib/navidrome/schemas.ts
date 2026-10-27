@@ -24,6 +24,7 @@ export const nativeAlbum = z.object({
 	starred: z.boolean().nullish().transform((value) => value ?? false),
 	starredAt: optionalDate,
 	missing: z.boolean().nullish().transform((value) => value ?? false),
+	mbzReleaseGroupId: optionalString,
 	participants: z
 		.object({ albumartist: z.array(z.object({ id: z.string(), name: z.string() })).nullish() })
 		.nullish()

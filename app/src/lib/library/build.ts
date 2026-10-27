@@ -1,9 +1,11 @@
 import type { Database } from '@sqlite.org/sqlite-wasm';
 import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
-import { createGenreResolver, withAncestors, type GenreResolver } from '../genres/genres.ts';
+import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
+import { createGenreResolver, withAncestors } from '../genres/genres.ts';
+import { songRanks } from '../genres/titles.ts';
 import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
-import { normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
-import type { LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
+import { KEPT_TABLES, normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
+import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
 
 const albumCreditsOf = (album: NativeAlbum) => {
 	const credited = album.participants.filter((artist) => artist.id && artist.name);
@@ -30,7 +32,7 @@ export function playlistSignature(playlist: NativePlaylist) {
 	return playlist.rules ? `smart:${playlist.uploadedImage}` : `${playlist.updatedAt}:${playlist.songCount}:${playlist.uploadedImage}`;
 }
 
-function eachBound(db: Database, sql: string, rows: (string | number)[][]) {
+function eachBound(db: Database, sql: string, rows: (string | number | null)[][]) {
 	if (!rows.length) return;
 	const statement = db.prepare(sql);
 	for (const row of rows) statement.bind(row).stepReset();
@@ -42,7 +44,7 @@ function deleteWhereIn(db: Database, sql: string, ids: string[]) {
 }
 
 function insertAlbums(db: Database, albums: NativeAlbum[]) {
-	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0]));
+	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId]));
 	eachBound(db, 'insert or ignore into album_credit values (?,?,?,?,?)', albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order])));
 	eachBound(db, 'insert into search values (?,?,?)', albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]));
 }
@@ -60,19 +62,8 @@ const songGenresOf = (song: NativeSong) => {
 	return names.length ? names : song.genre ? [song.genre] : [];
 };
 
-function insertTracks(db: Database, songs: NativeSong[], albums: NativeAlbum[], resolver: GenreResolver) {
-	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0]));
-	const albumGenres = new Map(albums.map((album) => [album.id, albumGenresOf(album)]));
-	eachBound(
-		db,
-		'insert or ignore into track_genre values (?,?,?)',
-		songs.flatMap((song) => {
-			const raw = songGenresOf(song);
-			const direct = resolver.genresOf(raw.length ? raw : (albumGenres.get(song.albumId) ?? []));
-			const broader = direct.flatMap(withAncestors).filter((genre) => !direct.includes(genre));
-			return [...direct.map((genre) => [genre, song.id, 1]), ...broader.map((genre) => [genre, song.id, 0])];
-		})
-	);
+function insertTracks(db: Database, songs: NativeSong[]) {
+	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0, JSON.stringify(songGenresOf(song))]));
 	eachBound(db, 'insert into search values (?,?,?)', songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)]));
 }
 
@@ -128,6 +119,32 @@ function rebuildArtists(db: Database) {
 	`);
 }
 
+const parsedTags = (value: unknown): Tag[] | null => (typeof value === 'string' ? (JSON.parse(value) as Tag[]) : null);
+
+function rebuildTrackGenres(db: Database) {
+	db.exec('delete from track_genre');
+	const resolver = createGenreResolver();
+	const albumTags = new Map<string, Tag[] | null>();
+	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.raw_genres as albumGenres, mb_release_group.tags as albumTags, mb_artist.tags as artistTags
+		from track join album on album.id = track.album_id
+		left join mb_release_group on mb_release_group.id = album.release_group
+		left join mb_artist on mb_artist.id = json_extract(mb_release_group.artists, '$[0]')`);
+	const insert = db.prepare('insert or ignore into track_genre values (?,?,?)');
+	for (const row of rows) {
+		const songGenres = JSON.parse(row.songGenres as string) as string[];
+		const albumId = row.albumId as string;
+		if (!albumTags.has(albumId)) albumTags.set(albumId, parsedTags(row.albumTags));
+		const direct = genresFromEvidence(resolver, {
+			fileGenres: songGenres.length ? songGenres : (JSON.parse(row.albumGenres as string) as string[]),
+			albumTags: albumTags.get(albumId) ?? null,
+			artistTags: parsedTags(row.artistTags)
+		});
+		for (const genre of direct) insert.bind([genre, row.id as string, 1]).stepReset();
+		for (const genre of new Set(direct.flatMap(withAncestors))) if (!direct.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
+	}
+	insert.finalize();
+}
+
 function rebuildAlbumGenres(db: Database) {
 	db.exec(`
 		delete from album_genre;
@@ -142,13 +159,28 @@ function rebuildGenrePlaylists(db: Database) {
 	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', genreIds);
 	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", genreIds);
 	db.exec("delete from playlist where kind = 'genre'");
-	const rows = db.selectObjects(`select track.id, track.album_id as albumId, album.artist_id as artistId, track.play_count as plays, album.play_count as albumPlays,
+	const rows = db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, track.play_count as plays,
 		track.starred, track.duration, (select json_group_array(genre) from track_genre where track_genre.track_id = track.id) as genres
 		from track join album on album.id = track.album_id where exists (select 1 from track_genre where track_genre.track_id = track.id)`);
+	const deezer = new Map(
+		db.selectObjects('select artist_id, fans, top from deezer_artist where deezer_id is not null').map((row) => [row.artist_id as string, { fans: row.fans as number, rankOf: songRanks(JSON.parse(row.top as string)) }])
+	);
 	const durations = new Map<string, number>();
 	const songs: GenreSong[] = rows.map((row) => {
 		durations.set(row.id as string, row.duration as number);
-		return { id: row.id as string, albumId: row.albumId as string, artistId: row.artistId as string, genres: JSON.parse(row.genres as string), plays: row.plays as number, albumPlays: row.albumPlays as number, starred: row.starred === 1 };
+		const artist = deezer.get(row.artistId as string);
+		return {
+			id: row.id as string,
+			title: row.title as string,
+			duration: row.duration as number,
+			albumId: row.albumId as string,
+			artistId: row.artistId as string,
+			genres: JSON.parse(row.genres as string),
+			plays: row.plays as number,
+			starred: row.starred === 1,
+			fans: artist?.fans ?? null,
+			popularity: artist?.rankOf(row.title as string) ?? null
+		};
 	});
 	const insertPlaylist = db.prepare('insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)');
 	const insertPlaylistTrack = db.prepare('insert into playlist_track values (?,?,?)');
@@ -169,6 +201,7 @@ function rebuildGenrePlaylists(db: Database) {
 function rebuildDerived(db: Database) {
 	db.exec("update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where kind != 'genre'");
 	rebuildArtists(db);
+	rebuildTrackGenres(db);
 	rebuildAlbumGenres(db);
 	rebuildGenrePlaylists(db);
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
@@ -181,11 +214,23 @@ function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 
 	return full;
 }
 
-export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: string, syncedAt: string): LibraryMeta {
+function carryKept(from: Database | null, to: Database) {
+	if (!from) return;
+	for (const table of KEPT_TABLES) {
+		const rows = from.selectArrays(`select * from ${table}`);
+		if (!rows.length) continue;
+		const insert = to.prepare(`insert or replace into ${table} values (${rows[0].map(() => '?').join(',')})`);
+		for (const row of rows) insert.bind(row as (string | number | null)[]).stepReset();
+		insert.finalize();
+	}
+}
+
+export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: string, syncedAt: string, previous: Database | null = null): LibraryMeta {
 	db.exec(SCHEMA);
+	carryKept(previous, db);
 	db.transaction(() => {
 		insertAlbums(db, snapshot.albums);
-		insertTracks(db, snapshot.songs, snapshot.albums, createGenreResolver());
+		insertTracks(db, snapshot.songs);
 		insertPlaylists(db, snapshot.playlists);
 		insertPlaylistTracks(db, snapshot.playlistTracks);
 		rebuildDerived(db);
@@ -214,7 +259,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			removeAlbums(db, ids);
 			insertAlbums(db, changes.albums.filter((album) => !album.missing));
 			removeTracks(db, changes.albumSongs.map((song) => song.id));
-			insertTracks(db, changes.albumSongs, changes.albums, createGenreResolver(db.selectValues('select distinct genre from track_genre') as string[]));
+			insertTracks(db, changes.albumSongs);
 		}
 		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats);
 		if (playlistsChanged) {
@@ -255,4 +300,33 @@ export function readSyncState(db: Database): SyncState | null {
 	} catch {
 		return null;
 	}
+}
+
+const VARIOUS_ARTISTS = new Set(['various artists', 'various', 'va']);
+const SONGS_PER_ARTIST = 5;
+
+export function enrichmentRequest(db: Database): EnrichmentRequest {
+	const since = Number(db.selectValue("select value from enrichment_state where key = 'since'") ?? 0);
+	const releaseGroups = db.selectValues("select distinct release_group from album where release_group != ''") as string[];
+	const titles = new Map<string, { name: string; songs: string[] }>();
+	const rows = db.selectObjects(`select album.artist_id as id, album.artist as name, track.title from track join album on album.id = track.album_id
+		where album.artist_id != '' order by album.artist_id, track.play_count desc, album.play_count desc, track.disc_no, track.track_no`);
+	for (const row of rows) {
+		if (VARIOUS_ARTISTS.has((row.name as string).toLowerCase())) continue;
+		const artist = titles.get(row.id as string) ?? { name: row.name as string, songs: [] };
+		if (artist.songs.length < SONGS_PER_ARTIST && !artist.songs.includes(row.title as string)) artist.songs.push(row.title as string);
+		titles.set(row.id as string, artist);
+	}
+	return { since, releaseGroups, artists: [...titles].map(([id, artist]) => ({ id, ...artist })) };
+}
+
+export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState, enrichment: Enrichment): LibraryMeta {
+	db.transaction(() => {
+		eachBound(db, 'insert or replace into mb_release_group values (?,?,?)', Object.entries(enrichment.releaseGroups).map(([id, group]) => [id, group && JSON.stringify(group.artists), group && JSON.stringify(group.tags)]));
+		eachBound(db, 'insert or replace into mb_artist values (?,?)', Object.entries(enrichment.mbArtists).map(([id, artist]) => [id, artist && JSON.stringify(artist.tags)]));
+		eachBound(db, 'insert or replace into deezer_artist values (?,?,?,?,?)', Object.entries(enrichment.deezer).map(([id, artist]) => [id, artist && artist.id, artist && artist.name, artist && artist.fans, artist && JSON.stringify(artist.top)]));
+		db.exec({ sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))", bind: [enrichment.at] });
+		rebuildDerived(db);
+	});
+	return writeMeta(db, { version: new Date().toISOString(), syncedAt: meta.syncedAt, userId: meta.userId }, sync);
 }

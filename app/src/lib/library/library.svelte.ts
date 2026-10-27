@@ -1,12 +1,13 @@
 import { onReconnect, reportReachable, reportUnreachable } from '../connection.svelte.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
-import { LIBRARY_SYNC } from '../tuning.ts';
+import { listenToRelay, relay, sendToRelay } from '../remote/relay.svelte.ts';
+import { ENRICHMENT, LIBRARY_SYNC } from '../tuning.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import { coverAlbumOverrides } from '../navidrome/credentials.ts';
 import { SCHEMA_VERSION } from './schema.ts';
-import type { LibraryMeta } from './snapshot.ts';
+import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
@@ -86,7 +87,61 @@ async function syncNow(full: boolean) {
 	}
 	loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
+	void requestEnrichment(true);
 }
+
+let pendingEnrichment: Enrichment | null = null;
+let enrichmentTimer: ReturnType<typeof setTimeout> | undefined;
+let lastEnrichmentAt = 0;
+let lastEnrichmentRequestAt = 0;
+
+async function requestEnrichment(force = false) {
+	if (!library.leader || !relay.connected || !library.meta || syntheticLibrary) return;
+	if (!force && Date.now() - lastEnrichmentRequestAt < ENRICHMENT.requestIntervalMs) return;
+	lastEnrichmentRequestAt = Date.now();
+	try {
+		sendToRelay({ type: 'enrich', ...(await call({ kind: 'enrichmentRequest' })) });
+	} catch {
+		lastEnrichmentRequestAt = 0;
+	}
+}
+
+function queueEnrichment(enrichment: Enrichment) {
+	if (!Object.keys(enrichment.releaseGroups).length && !Object.keys(enrichment.mbArtists).length && !Object.keys(enrichment.deezer).length) return;
+	pendingEnrichment = pendingEnrichment
+		? {
+				at: Math.max(pendingEnrichment.at, enrichment.at),
+				releaseGroups: { ...pendingEnrichment.releaseGroups, ...enrichment.releaseGroups },
+				mbArtists: { ...pendingEnrichment.mbArtists, ...enrichment.mbArtists },
+				deezer: { ...pendingEnrichment.deezer, ...enrichment.deezer }
+			}
+		: enrichment;
+	if (enrichmentTimer) return;
+	enrichmentTimer = setTimeout(applyEnrichment, Math.max(ENRICHMENT.applyDelayMs, lastEnrichmentAt + ENRICHMENT.applyIntervalMs - Date.now()));
+}
+
+async function applyEnrichment() {
+	enrichmentTimer = undefined;
+	const enrichment = pendingEnrichment;
+	pendingEnrichment = null;
+	if (!enrichment || !library.meta) return;
+	lastEnrichmentAt = Date.now();
+	try {
+		const meta = await call({ kind: 'enrich', enrichment });
+		loaded(meta);
+		channel?.postMessage({ kind: 'snapshot', version: meta.version } satisfies ChannelMessage);
+	} catch (error) {
+		console.warn('Could not apply genre and popularity data', error);
+	}
+}
+
+listenToRelay((message) => {
+	if (message.type === 'welcome') void requestEnrichment(true);
+	if (message.type === 'enrichment' && library.leader) {
+		const { type: _, ...enrichment } = message;
+		queueEnrichment(enrichment);
+	}
+});
 
 async function checkForChanges(full = false) {
 	if (syncing) return syncing;
@@ -109,8 +164,8 @@ onReconnect(() => {
 
 function lead() {
 	library.leader = true;
-	void checkForChanges();
-	setInterval(() => void checkForChanges(), LIBRARY_SYNC.pollIntervalMs);
+	void checkForChanges().then(() => requestEnrichment(true));
+	setInterval(() => void checkForChanges().then(() => requestEnrichment()), LIBRARY_SYNC.pollIntervalMs);
 }
 
 async function onChannelMessage(event: MessageEvent<ChannelMessage>) {

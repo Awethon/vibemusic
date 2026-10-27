@@ -34,9 +34,8 @@ const known = (words: string[]) => {
 
 export const splitGenres = (raw: string) => (byKey.has(genreKey(raw).join('')) ? [raw] : raw.split(/\s*[/;|,]\s*/).filter(Boolean));
 
-export function createGenreResolver(existing: string[] = []) {
+export function createGenreResolver() {
 	const unknown = new Map<string, string>();
-	for (const name of existing) if (!(name in nodes)) unknown.set(genreKey(name).join(''), name);
 
 	function resolve(raw: string): string | null {
 		const words = genreKey(raw);
@@ -51,6 +50,10 @@ export function createGenreResolver(existing: string[] = []) {
 	return {
 		genresOf(rawGenres: string[]): string[] {
 			return [...new Set(rawGenres.flatMap(splitGenres).map(resolve).filter((name): name is string => !!name))];
+		},
+		knownGenre(raw: string): string | null {
+			const words = genreKey(raw);
+			return IGNORED.has(words.join('')) ? null : known(words);
 		},
 		unknownGenres: () => [...unknown.values()]
 	};

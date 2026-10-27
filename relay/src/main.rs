@@ -1,5 +1,8 @@
 mod auth;
+mod deezer;
+mod enrich;
 mod hub;
+mod musicbrainz;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -15,6 +18,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc::unbounded_channel;
 
 use auth::Navidrome;
+use enrich::{EnrichRequest, Enricher};
 use hub::Hub;
 
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
@@ -26,6 +30,7 @@ const MAX_DEVICE_ID_CHARS: usize = 64;
 struct App {
     hub: Arc<Mutex<Hub>>,
     navidrome: Navidrome,
+    enricher: Arc<Enricher>,
 }
 
 #[derive(Deserialize)]
@@ -41,7 +46,9 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into())).init();
     let navidrome_url = std::env::var("NAVIDROME_URL").unwrap_or_else(|_| "http://127.0.0.1:4533".into());
     let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:4600".into());
-    let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()) };
+    let cache = std::env::var("ENRICHMENT_CACHE").unwrap_or_else(|_| "/data/enrichment.json".into());
+    let cache = (!cache.is_empty()).then(|| std::path::PathBuf::from(cache));
+    let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()), enricher: Enricher::new(cache) };
     let router = Router::new().route("/relay", get(upgrade)).route("/health", get(|| async { "ok" })).with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
     tracing::info!(%listen, %navidrome_url, "relay listening");
@@ -77,6 +84,8 @@ async fn serve(app: App, mut socket: WebSocket) {
     };
     let name: String = hello.name.chars().take(MAX_NAME_CHARS).collect();
     let (outbox, mut inbox) = unbounded_channel::<String>();
+    let replies = outbox.clone();
+    let mut updates = app.enricher.subscribe();
     let connection = app.hub.lock().unwrap().join(&user, &hello.device_id, &name, outbox);
     tracing::info!(user, device = hello.device_id, name, "device connected");
     let (mut sink, mut stream) = socket.split();
@@ -89,12 +98,23 @@ async fn serve(app: App, mut socket: WebSocket) {
                     None => break,
                 },
                 _ = ping.tick() => if sink.send(Message::Ping(Default::default())).await.is_err() { break },
+                update = updates.recv() => match update {
+                    Ok(text) => if sink.send(Message::Text(text.into())).await.is_err() { break },
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                },
             }
         }
     });
     while let Some(Ok(message)) = stream.next().await {
         let Message::Text(text) = message else { continue };
         let Ok(value) = serde_json::from_str::<Value>(&text) else { continue };
+        if value["type"] == "enrich" {
+            if let Ok(request) = serde_json::from_value::<EnrichRequest>(value) {
+                let _ = replies.send(app.enricher.request(request));
+            }
+            continue;
+        }
         app.hub.lock().unwrap().receive(&user, &hello.device_id, &value);
     }
     app.hub.lock().unwrap().leave(&user, &hello.device_id, connection);

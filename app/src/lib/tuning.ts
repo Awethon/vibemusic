@@ -238,6 +238,12 @@ export const SEARCH = Object.freeze({
 
 export const QUEUE_DRAG = Object.freeze({ startDistancePx: 4 });
 
+export const GENRE_EVIDENCE = Object.freeze({
+	fileTagWeight: 1,
+	minTagShare: 0.34,
+	minWeight: 1
+});
+
 export const GENRE_PLAYLISTS = Object.freeze({
 	rootMinSongs: 30,
 	rootMinArtists: 2,
@@ -245,13 +251,18 @@ export const GENRE_PLAYLISTS = Object.freeze({
 	subMinArtists: 5,
 	maxParentShare: 0.7,
 	maxSiblingShare: 0.8,
+	maxPickedShare: 0.5,
 	maxPlaylists: 24,
 	songCap: 100,
-	songsPerArtistPerBlock: 3,
-	artistBlockSize: 50,
-	likeBonus: 2,
-	albumPlaysWeight: 0.25,
-	tieBreakWeight: 0.01
+	minSongSeconds: 75,
+	fanPower: 0.2,
+	artistShareCap: 0.15,
+	artistPlaysBoost: 0.15,
+	artistGap: 3,
+	playsWeight: 0.5,
+	likeBonus: 1,
+	unknownPopularityShare: 0.5,
+	weeklyNoise: 0.4
 });
 
 export const HISTORY = Object.freeze({ maxLength: 16 });
@@ -274,6 +285,12 @@ export const REMOTE = Object.freeze({
 	playbackResyncMs: 10000,
 	positionJumpSeconds: 1.5,
 	queuePublishDelayMs: 50
+});
+
+export const ENRICHMENT = Object.freeze({
+	applyDelayMs: 1000,
+	applyIntervalMs: 30000,
+	requestIntervalMs: 6 * 60 * 60 * 1000
 });
 
 export const LIBRARY_SYNC = Object.freeze({

@@ -1,6 +1,6 @@
 import { TREE_VERSION } from '../genres/genres.ts';
 
-export const SCHEMA_VERSION = `6.${TREE_VERSION}`;
+export const SCHEMA_VERSION = `7.${TREE_VERSION}`;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -19,7 +19,9 @@ create table album (
 	updated text not null,
 	play_count integer not null,
 	play_date text not null,
-	starred integer not null
+	starred integer not null,
+	raw_genres text not null,
+	release_group text not null
 );
 create index album_artist on album (artist_id, year desc);
 create table album_credit (artist_id text not null, album_id text not null, position integer not null, name text not null, name_order text not null, primary key (artist_id, album_id)) without rowid;
@@ -47,7 +49,8 @@ create table track (
 	bit_rate integer not null,
 	play_count integer not null,
 	play_date text not null,
-	starred integer not null
+	starred integer not null,
+	raw_genres text not null
 );
 create index track_album on track (album_id, disc_no, track_no);
 create table track_genre (genre text not null, track_id text not null, direct integer not null, primary key (genre, track_id)) without rowid;
@@ -69,9 +72,15 @@ create table playlist (
 create index playlist_artist on playlist (artist_id);
 create table playlist_track (playlist_id text not null, position integer not null, track_id text not null, primary key (playlist_id, position)) without rowid;
 create table palette (album_id text primary key, colors text not null) without rowid;
+create table mb_release_group (id text primary key, artists text, tags text) without rowid;
+create table mb_artist (id text primary key, tags text) without rowid;
+create table deezer_artist (artist_id text primary key, deezer_id integer, name text, fans integer, top text) without rowid;
+create table enrichment_state (key text primary key, value text not null) without rowid;
 create table search_key (kind text not null, text text not null, ref text not null);
 create virtual table search using fts5 (kind unindexed, ref unindexed, text, tokenize = 'trigram remove_diacritics 1');
 create index search_key_prefix on search_key (kind, text);
 `;
 
 export const normalizeForSearch = (text: string) => text.toLowerCase().replaceAll('ё', 'е').normalize('NFKC');
+
+export const KEPT_TABLES = ['palette', 'mb_release_group', 'mb_artist', 'deezer_artist', 'enrichment_state'] as const;
