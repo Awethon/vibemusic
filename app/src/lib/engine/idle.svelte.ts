@@ -44,16 +44,24 @@ function checkIdle() {
 	enterIdleOrRest();
 }
 
+const wakeOnBrowseScroll = (event: Event) => {
+	if (event.target instanceof Element && event.target.closest('#chrome')) wakeFromIdle();
+};
+
 export function installIdleTracking() {
 	const options = { passive: true } as const;
 	addEventListener('pointermove', wakeFromIdle, options);
 	addEventListener('pointerdown', wakeFromIdle, { passive: true, capture: true });
+	addEventListener('touchmove', wakeFromIdle, options);
+	addEventListener('scroll', wakeOnBrowseScroll, { passive: true, capture: true });
 	addEventListener('wheel', wakeFromIdle, options);
 	addEventListener('keydown', wakeFromIdle, options);
 	const timer = setInterval(checkIdle, IDLE.checkIntervalMs);
 	return () => {
 		removeEventListener('pointermove', wakeFromIdle);
 		removeEventListener('pointerdown', wakeFromIdle, { capture: true });
+		removeEventListener('touchmove', wakeFromIdle);
+		removeEventListener('scroll', wakeOnBrowseScroll, { capture: true });
 		removeEventListener('wheel', wakeFromIdle);
 		removeEventListener('keydown', wakeFromIdle);
 		clearInterval(timer);
