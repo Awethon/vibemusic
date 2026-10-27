@@ -1,6 +1,6 @@
 import { createAnalysis, createIdleFeatures, OUTPUT_DELAY_SECONDS, type Analysis, type AudioFeatures } from '../visual/analysis.ts';
 
-type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null; startAt: number | null };
+type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null; startAt: number | null; pendingSeek: (() => void) | null; blocked: boolean };
 
 const START_TOLERANCE_SECONDS = 1;
 
@@ -33,7 +33,7 @@ export class AudioEngine {
 	private createDeck(): Deck {
 		const element = new Audio();
 		element.preload = 'auto';
-		const deck: Deck = { element, trackId: '', source: null, startAt: null };
+		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false };
 		element.addEventListener('playing', () => {
 			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > START_TOLERANCE_SECONDS) element.currentTime = deck.startAt;
 			deck.startAt = null;
@@ -84,6 +84,7 @@ export class AudioEngine {
 	}
 
 	get position() {
+		if (this.active.blocked && this.active.startAt !== null) return this.active.startAt;
 		return this.active.element.currentTime || 0;
 	}
 
@@ -114,6 +115,8 @@ export class AudioEngine {
 		}
 		this.analysis?.reset();
 		deck.startAt = null;
+		deck.blocked = false;
+		this.dropPendingSeek(deck);
 		if (options.startAt) this.seekDeck(deck, options.startAt);
 		else if (deck.element.currentTime) deck.element.currentTime = 0;
 		this.listener.changed();
@@ -137,29 +140,54 @@ export class AudioEngine {
 	}
 
 	private seekDeck(deck: Deck, seconds: number) {
+		this.dropPendingSeek(deck);
 		if (deck.element.paused) deck.startAt = seconds;
-		const apply = () => (deck.element.currentTime = seconds);
+		if (deck.blocked) return;
+		const apply = () => {
+			deck.pendingSeek = null;
+			deck.element.currentTime = seconds;
+		};
 		if (deck.element.readyState >= HTMLMediaElement.HAVE_METADATA) apply();
-		else deck.element.addEventListener('loadedmetadata', apply, { once: true });
+		else {
+			deck.pendingSeek = apply;
+			deck.element.addEventListener('loadedmetadata', apply, { once: true });
+		}
+	}
+
+	private dropPendingSeek(deck: Deck) {
+		if (deck.pendingSeek) deck.element.removeEventListener('loadedmetadata', deck.pendingSeek);
+		deck.pendingSeek = null;
+	}
+
+	private markBlocked(deck: Deck): StartResult {
+		deck.startAt ??= deck.element.currentTime;
+		deck.blocked = true;
+		this.dropPendingSeek(deck);
+		return 'blocked';
 	}
 
 	async resume(): Promise<StartResult> {
 		if (!this.active.trackId) return 'stopped';
 		const context = this.ensureGraph();
 		const resumed = context.state === 'suspended' ? context.resume() : Promise.resolve();
-		const element = this.active.element;
+		const deck = this.active;
+		const element = deck.element;
+		if (deck.blocked) {
+			deck.blocked = false;
+			element.load();
+		}
 		try {
 			await element.play();
 		} catch (error) {
 			if (error instanceof DOMException && error.name === 'AbortError') return 'stopped';
-			if (error instanceof DOMException && error.name === 'NotAllowedError') return 'blocked';
+			if (error instanceof DOMException && error.name === 'NotAllowedError') return this.markBlocked(deck);
 			this.listener.failed(error instanceof Error ? error.message : String(error));
 			return 'stopped';
 		}
 		await Promise.race([resumed.catch(() => {}), new Promise((resolve) => setTimeout(resolve, CONTEXT_RESUME_TIMEOUT_MS))]);
 		if (context.state === 'running') return 'playing';
 		element.pause();
-		return 'blocked';
+		return this.markBlocked(deck);
 	}
 
 	wake() {
