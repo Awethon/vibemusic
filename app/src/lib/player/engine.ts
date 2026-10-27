@@ -15,6 +15,7 @@ export type StartResult = 'playing' | 'blocked' | 'stopped';
 const MAX_DELAY_SECONDS = 1;
 const CONTEXT_RESUME_TIMEOUT_MS = 1500;
 
+const appleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 export class AudioEngine {
 	private readonly decks: [Deck, Deck];
@@ -25,6 +26,7 @@ export class AudioEngine {
 	private analysis: Analysis | null = null;
 	private level = 1;
 	private readonly idleFeatures = createIdleFeatures();
+	private readonly plain = appleMobile();
 
 	constructor(private readonly listener: EngineListener) {
 		this.decks = [this.createDeck(), this.createDeck()];
@@ -48,6 +50,7 @@ export class AudioEngine {
 	}
 
 	private ensureGraph() {
+		if (this.plain) return null;
 		if (this.context) return this.context;
 		const context = new AudioContext({ latencyHint: 'playback' });
 		const input = context.createGain();
@@ -124,6 +127,7 @@ export class AudioEngine {
 	}
 
 	prepare(trackId: string | null, url: string | null) {
+		if (this.plain) return;
 		const deck = this.standby;
 		if (!trackId || !url) {
 			if (deck.trackId) {
@@ -169,7 +173,7 @@ export class AudioEngine {
 	async resume(): Promise<StartResult> {
 		if (!this.active.trackId) return 'stopped';
 		const context = this.ensureGraph();
-		const resumed = context.state === 'suspended' ? context.resume() : Promise.resolve();
+		const resumed = context?.state === 'suspended' ? context.resume() : Promise.resolve();
 		const deck = this.active;
 		const element = deck.element;
 		if (deck.blocked) {
@@ -184,6 +188,7 @@ export class AudioEngine {
 			this.listener.failed(error instanceof Error ? error.message : String(error));
 			return 'stopped';
 		}
+		if (!context) return 'playing';
 		await Promise.race([resumed.catch(() => {}), new Promise((resolve) => setTimeout(resolve, CONTEXT_RESUME_TIMEOUT_MS))]);
 		if (context.state === 'running') return 'playing';
 		element.pause();
@@ -192,7 +197,7 @@ export class AudioEngine {
 
 	wake() {
 		const context = this.ensureGraph();
-		if (context.state === 'suspended') void context.resume().catch(() => {});
+		if (context?.state === 'suspended') void context.resume().catch(() => {});
 	}
 
 	pause() {
@@ -210,6 +215,7 @@ export class AudioEngine {
 
 	setLevel(level: number) {
 		this.level = level;
+		if (this.plain) for (const deck of this.decks) deck.element.volume = level;
 		if (this.output && this.context) this.output.gain.setTargetAtTime(level, this.context.currentTime, 0.01);
 	}
 
