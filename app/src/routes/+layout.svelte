@@ -30,6 +30,7 @@
 	import Background from '#lib/ui/Background.svelte';
 	import Capsule from '#lib/ui/Capsule.svelte';
 	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
+	import { installScreenEdges } from '#lib/ui/screenEdges.ts';
 	import { installBrokenImageRetry } from '#lib/ui/brokenImages.ts';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
 	import FirstSync from '#lib/ui/FirstSync.svelte';
@@ -69,7 +70,7 @@
 		const cleanups = untrack(() => {
 			setRailExpanded(ui.railExpanded, true);
 			applyFullScreenStyleClass();
-			return [installGestureRecognizer(), installIdleTracking(), installResizeRelayout()];
+			return [installGestureRecognizer(), installIdleTracking(), installResizeRelayout(), installScreenEdges()];
 		});
 		return () => cleanups.forEach((cleanup) => cleanup());
 	});
