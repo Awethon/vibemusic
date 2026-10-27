@@ -11,6 +11,7 @@
 	}
 
 	function down(event: PointerEvent) {
+		if (event.button !== 0) return;
 		const element = event.currentTarget as HTMLElement;
 		dragging = true;
 		setBodyClass('no-select', true);
@@ -19,7 +20,9 @@
 	}
 
 	function move(event: PointerEvent) {
-		if (dragging) onchange(ratioOf(event.currentTarget as HTMLElement, event));
+		if (!dragging) return;
+		if (event.buttons === 0) return release(event);
+		onchange(ratioOf(event.currentTarget as HTMLElement, event));
 	}
 
 	function release(event: PointerEvent) {
@@ -30,7 +33,7 @@
 	}
 </script>
 
-<div class="slider {className}" class:drag={dragging} {id} role="slider" tabindex="-1" aria-valuenow={Math.round(ratio * 100)} onpointerdown={down} onpointermove={move} onpointerup={release} onpointercancel={release}>
+<div class="slider {className}" class:drag={dragging} {id} role="slider" tabindex="-1" aria-valuenow={Math.round(ratio * 100)} onpointerdown={down} onpointermove={move} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
 	<div class="rail"><div class="fill" style:transform="scaleX({ratio})"></div></div>
 	<div class="knob" style:left="{ratio * 100}%"></div>
 </div>
