@@ -114,6 +114,55 @@ export const HOME = Object.freeze({
 
 export const ALBUM_PAGE = Object.freeze({ moreByCount: 12 });
 
+export const ARTIST_PAGE = Object.freeze({
+	similarCount: 12,
+	topSongCount: 10,
+	popularCount: 5
+});
+
+export const COVER_PX = Object.freeze({
+	fallback: 300,
+	row: 80,
+	card: 120,
+	panel: 160,
+	tile: 400,
+	tileQuarter: 200,
+	mosaicMini: 60,
+	ambient: 600,
+	albumPage: 700,
+	nowCanvas: 800,
+	nowClassic: 900,
+	mediaSession: 512,
+	playlistPage: 440,
+	artistPlaylist: 260,
+	glassWall: 240
+});
+
+export const GENRE_COVER = Object.freeze({
+	wallTiles: 16,
+	wallRowLength: 4,
+	tileToCoverRatio: 0.8,
+	miniTilePx: 60,
+	maxNamePx: 78,
+	nameWidthPx: 520,
+	letterWidthRatio: 0.74,
+	offMidLightnessPenalty: 1.6,
+	minSaturation: 0.45,
+	maxSaturation: 0.9,
+	maxDeepSaturation: 0.5,
+	accentLightness: 0.68,
+	deepLightness: 0.08,
+	deepAlpha: 0.7
+});
+
+export const SCROLL_RESTORE = Object.freeze({
+	settleMs: 400,
+	giveUpMs: 2500,
+	reachedPx: 2
+});
+
+export const GLASS_TUNER = Object.freeze({ wallCovers: 24 });
+
 export const QUEUE = Object.freeze({
 	visibleRowCap: 150,
 	fullScreenUpNextCount: 6,
@@ -121,17 +170,21 @@ export const QUEUE = Object.freeze({
 });
 
 export const PLAYBACK = Object.freeze({
-	audioStateHoldMs: 1500,
 	restartInsteadOfPreviousAfterSeconds: 4,
 	seekStepSeconds: 10,
-	initialVolume: 0.72
+	initialVolume: 0.72,
+	tickMs: 100,
+	startToleranceSeconds: 1,
+	contextResumeTimeoutMs: 1500
 });
 
 export const PALETTE = Object.freeze({
 	hoverPreviewRate: 3.4,
 	revertRate: 2.2,
 	trackChangeRate: 1.1,
-	revertDelayMs: 160
+	revertDelayMs: 160,
+	coverColors: 5,
+	coverSamplePx: 64
 });
 
 export const ACCENT = Object.freeze({
@@ -149,6 +202,8 @@ export const FIELD = Object.freeze({
 	intensityFollowRate: 1.4,
 	maxFrameSeconds: 0.1,
 	reducedMotionFrameIntervalMs: 500,
+	snapshotWidthPx: 192,
+	snapshotIntervalMs: 100,
 	pointer: Object.freeze([0.5, 0.5])
 });
 
@@ -191,6 +246,17 @@ export const LIBRARY_RULES = Object.freeze({
 
 export const HISTORY = Object.freeze({ maxLength: 16 });
 
+export const SCROBBLE = Object.freeze({
+	minTrackSeconds: 30,
+	afterSeconds: 240,
+	maxTickSeconds: 1
+});
+
+export const SAVED_QUEUE = Object.freeze({
+	saveDelayMs: 3000,
+	whilePlayingMs: 30000
+});
+
 export const REMOTE = Object.freeze({
 	reconnectMinMs: 1000,
 	reconnectMaxMs: 30000,
@@ -202,6 +268,7 @@ export const REMOTE = Object.freeze({
 
 export const LIBRARY_SYNC = Object.freeze({
 	pollIntervalMs: 60000,
+	pageSize: 5000,
 	snapshotWriteDelayMs: 2000,
 	fullSyncIntervalMs: 24 * 60 * 60 * 1000,
 	changePageSize: 2,

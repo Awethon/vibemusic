@@ -2,7 +2,7 @@
 	import { showPanelTab } from '../engine/panel.ts';
 	import { currentTrack, playerQueue, totalDuration } from '../player/player.svelte.ts';
 	import * as queue from '../player/queue.ts';
-	import { LYRICS, PANEL, QUEUE } from '../tuning.ts';
+	import { COVER_PX, LYRICS, PANEL, QUEUE } from '../tuning.ts';
 	import Cover from './Cover.svelte';
 	import { formatCount, longDuration } from './format.ts';
 	import LikeButton from './LikeButton.svelte';
@@ -40,7 +40,7 @@
 <aside id="panel" aria-label="Now playing and queue">
 	<header class="pn-head"><span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span></header>
 	<div class="pn-now">
-		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={160} eager /></button>
+		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={COVER_PX.panel} eager /></button>
 		<div class="pn-meta">
 			<p class="pn-title">{track?.title ?? ''}</p>
 			<p class="pn-sub">{#if track}<TrackLinks {track} />{/if}</p>

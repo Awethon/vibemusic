@@ -3,17 +3,17 @@ import { requireCredentials } from '../session.svelte.ts';
 import { patchLibrary } from './library.svelte.ts';
 import { medianCut } from './medianCut.ts';
 import { savedPalette } from './queries.ts';
+import { PALETTE } from '../tuning.ts';
 
-const SAMPLE_SIZE = 64;
 
 async function extract(albumId: string): Promise<string[]> {
-	const response = await fetch(coverUrl(requireCredentials(), albumId, SAMPLE_SIZE * 2));
-	const bitmap = await createImageBitmap(await response.blob(), { resizeWidth: SAMPLE_SIZE, resizeHeight: SAMPLE_SIZE });
-	const canvas = new OffscreenCanvas(SAMPLE_SIZE, SAMPLE_SIZE);
+	const response = await fetch(coverUrl(requireCredentials(), albumId, PALETTE.coverSamplePx * 2));
+	const bitmap = await createImageBitmap(await response.blob(), { resizeWidth: PALETTE.coverSamplePx, resizeHeight: PALETTE.coverSamplePx });
+	const canvas = new OffscreenCanvas(PALETTE.coverSamplePx, PALETTE.coverSamplePx);
 	const context = canvas.getContext('2d')!;
 	context.drawImage(bitmap, 0, 0);
 	bitmap.close();
-	return medianCut(context.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data);
+	return medianCut(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data);
 }
 
 const inFlight = new Map<string, Promise<string[]>>();

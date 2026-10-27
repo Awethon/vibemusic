@@ -69,14 +69,6 @@ export function settleLayout() {
 	liveLayout(MOTION.flipMs);
 }
 
-export function relayoutWithGlide(change: () => void) {
-	const previousPositions = captureTilePositions();
-	change();
-	flushSync();
-	relayoutAll();
-	playTileFlip(previousPositions, MOTION.flipMs);
-}
-
 export type AlphabetEntry = { label: string; index: number };
 
 export const alphabet = $state<{ entries: AlphabetEntry[]; current: number; jump: ((entryIndex: number) => void) | null }>({

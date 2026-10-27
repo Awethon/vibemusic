@@ -30,6 +30,15 @@ export type GlassParams = {
 
 export type GlassKey = keyof GlassParams;
 
+export const RENDER = Object.freeze({
+	blurDownscale: 2,
+	strongBlurDownscale: 4,
+	strongBlurFromPx: 14,
+	minBlurPx: 6,
+	blurStepPerPx: 3 / 16,
+	shininess: 60
+});
+
 export const BASE: GlassParams = {
 	thick: 40,
 	bevel: 5,

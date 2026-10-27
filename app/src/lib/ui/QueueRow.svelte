@@ -5,6 +5,7 @@
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
 	import { openMenu } from './menu.svelte.ts';
+	import { COVER_PX } from '../tuning.ts';
 
 	let { entry, queuedIndex, sourceIndex }: { entry: Entry; queuedIndex?: number; sourceIndex?: number } = $props();
 	const track = $derived(trackById(entry.trackId));
@@ -18,6 +19,6 @@
 	data-entry={entry.entryId}
 	oncontextmenu={(event) => openMenu(event, queueRowMenu(event.currentTarget as HTMLElement))}
 >
-	<Cover albumId={track?.albumId} size={80} />
+	<Cover albumId={track?.albumId} size={COVER_PX.row} />
 	<div><b>{track?.title ?? ''}</b><small>{track?.artist ?? ''} · {clock(track?.duration ?? 0)}</small></div>
 </li>

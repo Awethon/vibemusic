@@ -5,17 +5,16 @@
 	import { session } from '../session.svelte.ts';
 	import { genreTheme } from './genreTheme.ts';
 	import { playlistMetaLine } from './playlistText.ts';
+	import { COVER_PX, GENRE_COVER } from '../tuning.ts';
 
-	const WALL_TILES = 16;
-
-	let { playlist, mini = false, size = 300 }: { playlist: Playlist; mini?: boolean; size?: number } = $props();
+	let { playlist, mini = false, size = COVER_PX.fallback }: { playlist: Playlist; mini?: boolean; size?: number } = $props();
 
 	let colors = $state<string[]>([]);
 	const albumIds = $derived(playlist.mosaicAlbumIds);
-	const tiles = $derived(albumIds.length ? Array.from({ length: WALL_TILES }, (_, index) => albumIds[(index + Math.floor(index / 4)) % albumIds.length]) : []);
+	const tiles = $derived(albumIds.length ? Array.from({ length: GENRE_COVER.wallTiles }, (_, index) => albumIds[(index + Math.floor(index / GENRE_COVER.wallRowLength)) % albumIds.length]) : []);
 	const theme = $derived(genreTheme(colors));
-	const tileSize = $derived(mini ? 60 : Math.round(size * 0.8));
-	const nameSize = $derived(Math.min(78, 520 / (Math.max(1, playlist.name.length) * 0.74)));
+	const tileSize = $derived(mini ? GENRE_COVER.miniTilePx : Math.round(size * GENRE_COVER.tileToCoverRatio));
+	const nameSize = $derived(Math.min(GENRE_COVER.maxNamePx, GENRE_COVER.nameWidthPx / (Math.max(1, playlist.name.length) * GENRE_COVER.letterWidthRatio)));
 
 	$effect(() => {
 		const id = albumIds[0];

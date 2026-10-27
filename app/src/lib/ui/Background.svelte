@@ -6,8 +6,10 @@
 	import { FIELD, PALETTE } from '../tuning.ts';
 	import { createField, type Field } from '../visual/field.ts';
 	import { copyField } from '../visual/fieldSnapshot.ts';
-	import { accentFromPalette, blendAccent, type Rgb } from './accent.ts';
+	import type { Rgb } from '../color.ts';
+	import { accentFromPalette, blendAccent } from './accent.ts';
 	import { ui } from './state.svelte.ts';
+	import { scrimBackground } from './scrim.ts';
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let accent: Rgb = [217, 200, 255];
@@ -90,4 +92,4 @@
 </script>
 
 <canvas id="field" aria-hidden="true" bind:this={canvas}></canvas>
-<div id="scrim" aria-hidden="true"></div>
+<div id="scrim" aria-hidden="true" style:background={scrimBackground()}></div>

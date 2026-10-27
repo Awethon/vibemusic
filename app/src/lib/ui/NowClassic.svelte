@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { currentTrack, playerQueue } from '../player/player.svelte.ts';
-	import { LYRICS } from '../tuning.ts';
+	import { COVER_PX, LYRICS } from '../tuning.ts';
 	import Cover from './Cover.svelte';
 	import Icon from './Icon.svelte';
 	import LyricsLines from './LyricsLines.svelte';
@@ -18,7 +18,7 @@
 	</header>
 	<div class="cl-stage">
 		<div class="cl-left">
-			<Cover albumId={track?.albumId} size={900} eager />
+			<Cover albumId={track?.albumId} size={COVER_PX.nowClassic} eager />
 			<h1>{track?.title ?? ''}</h1>
 			<p>{#if track}<TrackLinks {track} />{/if}</p>
 		</div>

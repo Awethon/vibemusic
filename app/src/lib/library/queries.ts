@@ -66,8 +66,6 @@ export type AlbumSort = 'mostPlayed' | 'recentlyAdded' | 'byArtist' | 'az' | 'ne
 export type ArtistSort = 'mostAlbums' | 'az';
 export type Filters = { genres: string[]; decades: number[] };
 
-export const NO_FILTERS: Filters = { genres: [], decades: [] };
-
 type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; credits?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
 
 const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.genres, album.song_count as songCount,

@@ -6,14 +6,12 @@ import { newest, playlistSignature } from './build.ts';
 import type { SyncProgress } from './protocol.ts';
 import type { LibraryChanges, LibrarySnapshot, SyncState } from './snapshot.ts';
 
-const PAGE_SIZE = 5000;
-
 export async function fetchPlaylists(http: NavidromeHttp): Promise<NativePlaylist[]> {
-	return nativePlaylist.array().parse(await http.nativeAll('playlist?_sort=name&_order=ASC', PAGE_SIZE));
+	return nativePlaylist.array().parse(await http.nativeAll('playlist?_sort=name&_order=ASC', LIBRARY_SYNC.pageSize));
 }
 
 async function fetchPlaylistTracks(http: NavidromeHttp, playlist: NativePlaylist): Promise<NativePlaylistTrack[]> {
-	return nativePlaylistTrack.array().parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, PAGE_SIZE));
+	return nativePlaylistTrack.array().parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, LIBRARY_SYNC.pageSize));
 }
 
 export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: SyncProgress) => void = () => {}): Promise<LibrarySnapshot> {
@@ -34,8 +32,8 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 	const playlists = await timed('playlists', () => fetchPlaylists(http));
 	report({ playlistTotal: playlists.length });
 	const [albums, songs] = await Promise.all([
-		timed('albums', async () => nativeAlbum.array().parse(await http.nativeAll('album?missing=false&_sort=name&_order=ASC', PAGE_SIZE, (loaded, albumTotal) => report({ albums: loaded, albumTotal })))),
-		timed('songs', async () => nativeSong.array().parse(await http.nativeAll('song?missing=false&_sort=album&_order=ASC', PAGE_SIZE, (loaded, trackTotal) => report({ tracks: loaded, trackTotal }))))
+		timed('albums', async () => nativeAlbum.array().parse(await http.nativeAll('album?missing=false&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, albumTotal) => report({ albums: loaded, albumTotal })))),
+		timed('songs', async () => nativeSong.array().parse(await http.nativeAll('song?missing=false&_sort=album&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, trackTotal) => report({ tracks: loaded, trackTotal }))))
 	]);
 	const playlistTracks = await timed(
 		'playlist tracks',
@@ -81,7 +79,7 @@ async function fetchTotal(http: NavidromeHttp, path: string): Promise<number> {
 async function fetchAlbumSongs(http: NavidromeHttp, albumIds: string[]) {
 	const batches: string[][] = [];
 	for (let index = 0; index < albumIds.length; index += LIBRARY_SYNC.albumsPerSongRequest) batches.push(albumIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
-	const pages = await Promise.all(batches.map(async (ids) => nativeSong.array().parse(await http.nativeAll(`song?missing=false&${ids.map((id) => `album_id=${encodeURIComponent(id)}`).join('&')}&_sort=album&_order=ASC`, PAGE_SIZE))));
+	const pages = await Promise.all(batches.map(async (ids) => nativeSong.array().parse(await http.nativeAll(`song?missing=false&${ids.map((id) => `album_id=${encodeURIComponent(id)}`).join('&')}&_sort=album&_order=ASC`, LIBRARY_SYNC.pageSize))));
 	return pages.flat();
 }
 

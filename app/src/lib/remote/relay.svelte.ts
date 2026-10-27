@@ -25,7 +25,6 @@ export const relay = $state<{ connected: boolean; deviceId: string; devices: Dev
 let socket: WebSocket | null = null;
 let listener: (message: RelayMessage) => void = () => {};
 let retryMs: number = REMOTE.reconnectMinMs;
-let keepAlive: ReturnType<typeof setInterval> | undefined;
 
 function browserName(agent: string) {
 	if (/Edg\//.test(agent)) return 'Edge';
@@ -103,15 +102,7 @@ export async function startRelay(onMessage: (message: RelayMessage) => void) {
 	listener = onMessage;
 	relay.deviceId = await claimDeviceId();
 	connect();
-	keepAlive = setInterval(() => sendToRelay({ type: 'ping' }), REMOTE.keepAliveMs);
-}
-
-export function stopRelay() {
-	clearInterval(keepAlive);
-	const current = socket;
-	socket = null;
-	current?.close();
-	relay.connected = false;
+	setInterval(() => sendToRelay({ type: 'ping' }), REMOTE.keepAliveMs);
 }
 
 export function sendToRelay(message: object) {

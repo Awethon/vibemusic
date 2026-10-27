@@ -1,4 +1,4 @@
-import { lightVector, type GlassParams } from './params.ts';
+import { lightVector, RENDER, type GlassParams } from './params.ts';
 import { BLUR, GLASS, MAX_SHAPES, VERT } from './shaders.ts';
 
 export type GlassShape = { x: number; y: number; width: number; height: number; radius: number; alpha: number };
@@ -93,7 +93,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 	function blurred(frost: number, dpr: number): WebGLTexture {
 		const sigma = frost * dpr;
 		const [sceneWidth, sceneHeight] = sceneSize;
-		const scale = sigma < 14 ? 2 : 4;
+		const scale = sigma < RENDER.strongBlurFromPx ? RENDER.blurDownscale : RENDER.strongBlurDownscale;
 		const w = Math.max(1, Math.ceil(sceneWidth / scale));
 		const h = Math.max(1, Math.ceil(sceneHeight / scale));
 		if (!blur || blur.scale !== scale || blur.h.width !== w || blur.h.height !== h) {
@@ -102,11 +102,11 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 			blur = { scale, h: target(w, h, true), v: target(w, h, true) };
 			blurKey = '';
 		}
-		const effective = Math.max(sigma, 6 * dpr);
+		const effective = Math.max(sigma, RENDER.minBlurPx * dpr);
 		const key = `${effective}|${sceneVersion}`;
 		if (key === blurKey) return blur.v.tex;
 		blurKey = key;
-		const stepPx = (3 * effective) / 16;
+		const stepPx = effective * RENDER.blurStepPerPx;
 		const { program, u } = programs.blur;
 		context.useProgram(program);
 		context.activeTexture(context.TEXTURE0);
@@ -178,7 +178,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.uniform1f(u.uFlip, params.flip);
 		context.uniform3f(u.uLight, light[0], light[1], light[2]);
 		context.uniform1f(u.uSpec, params.spec);
-		context.uniform1f(u.uShin, 60);
+		context.uniform1f(u.uShin, RENDER.shininess);
 		context.uniform1f(u.uRefl, params.refl);
 		context.uniform1f(u.uIrid, params.irid);
 		context.uniform1f(u.uRim, params.rim);

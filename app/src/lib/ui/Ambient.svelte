@@ -2,7 +2,7 @@
 	import { prefersReducedMotion } from '../engine/dom.ts';
 	import { currentLyricIndex, lyricsState } from '../player/lyricsState.svelte.ts';
 	import { currentTrack } from '../player/player.svelte.ts';
-	import { LYRICS } from '../tuning.ts';
+	import { COVER_PX, LYRICS } from '../tuning.ts';
 	import Cover from './Cover.svelte';
 
 	const track = $derived(currentTrack());
@@ -31,7 +31,7 @@
 </script>
 
 <section id="ambient" aria-hidden="true">
-	<Cover albumId={track?.albumId} size={600} eager />
+	<Cover albumId={track?.albumId} size={COVER_PX.ambient} eager />
 	<div class="amb-text">
 		<p class="amb-artist">{track ? `${track.artist} — ${track.album}` : ''}</p>
 		<h2>{track?.title ?? ''}</h2>

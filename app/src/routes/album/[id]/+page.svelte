@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { albumById, albumsByArtist, albumTracks } from '#lib/library/queries.ts';
-	import { ALBUM_PAGE } from '#lib/tuning.ts';
+	import { ALBUM_PAGE, COVER_PX } from '#lib/tuning.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import Cover from '#lib/ui/Cover.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
@@ -28,7 +28,7 @@
 {#if album.value}
 	<section class="view album-layout" {@attach viewEnter}>
 		<div class="album-side">
-			<Cover albumId={album.value.id} size={700} eager />
+			<Cover albumId={album.value.id} size={COVER_PX.albumPage} eager />
 			<h1 class="display">{album.value.name}</h1>
 			<p class="sub">{#if album.value.credits.length > 1}{#each album.value.credits as credit, index (credit.id)}{#if index}{index === album.value.credits.length - 1 ? ' & ' : ', '}{/if}<a href={resolve('/artist/[id]', { id: credit.id })}>{credit.name}</a>{/each}{:else}<a href={resolve('/artist/[id]', { id: album.value.artistId })}>{album.value.artist}</a>{/if}{album.value.year ? ` · ${album.value.year}` : ''}</p>
 			<p class="genres">

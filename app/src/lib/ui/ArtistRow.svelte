@@ -5,6 +5,7 @@
 	import Cover from './Cover.svelte';
 	import { plural } from './format.ts';
 	import { openMenu } from './menu.svelte.ts';
+	import { COVER_PX } from '../tuning.ts';
 
 	let { artist }: { artist: Artist } = $props();
 </script>
@@ -21,6 +22,6 @@
 		<div class="meta">{plural(artist.albumCount, 'album')} · {plural(artist.trackCount, 'track')}{artist.firstYear ? ` · since ${artist.firstYear}` : ''}</div>
 	</div>
 	<div class="stack">
-		{#each artist.coverAlbumIds as albumId (albumId)}<Cover {albumId} size={120} />{/each}
+		{#each artist.coverAlbumIds as albumId (albumId)}<Cover {albumId} size={COVER_PX.card} />{/each}
 	</div>
 </a>

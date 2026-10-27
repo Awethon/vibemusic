@@ -1,7 +1,6 @@
 import { mainScroller } from '../engine/dom.ts';
+import { SCROLL_RESTORE } from '../tuning.ts';
 
-const SETTLE_MS = 400;
-const GIVE_UP_MS = 2500;
 const USER_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
 let active: (() => void) | null = null;
@@ -21,10 +20,10 @@ export function restoreMainScroll(target: number) {
 		const scroller = mainScroller();
 		if (scroller) {
 			scroller.scrollTop = target;
-			if (Math.abs(scroller.scrollTop - target) < 2) reachedAt ||= now;
+			if (Math.abs(scroller.scrollTop - target) < SCROLL_RESTORE.reachedPx) reachedAt ||= now;
 			else reachedAt = 0;
 		}
-		if ((reachedAt && now - reachedAt > SETTLE_MS) || now - started > GIVE_UP_MS) return stop();
+		if ((reachedAt && now - reachedAt > SCROLL_RESTORE.settleMs) || now - started > SCROLL_RESTORE.giveUpMs) return stop();
 		frame = requestAnimationFrame(step);
 	};
 	for (const type of USER_INPUT) addEventListener(type, stop, { capture: true, passive: true });

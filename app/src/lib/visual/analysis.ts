@@ -55,17 +55,6 @@ export type Analysis = {
 	disconnect(): void;
 };
 
-export type SyntheticPlayback = {
-	positionSeconds: number;
-	playing: boolean;
-	trackId: string | null;
-};
-
-export type SyntheticAnalysis = {
-	readonly features: Readonly<AudioFeatures>;
-	sample(nowMs: number, playback: SyntheticPlayback): Readonly<AudioFeatures>;
-};
-
 export function createIdleFeatures(): AudioFeatures {
 	return {
 		loudness: 0,
@@ -233,49 +222,4 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 			midAnalyser.disconnect();
 		}
 	};
-}
-
-function hashTrackId(text: string): number {
-	let hash = 2166136261;
-	for (let index = 0; index < text.length; index++) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
-	return hash >>> 0;
-}
-
-export function createSyntheticAnalysis(): SyntheticAnalysis {
-	const tuning = ANALYSIS_TUNING;
-	const bands = ANALYSIS_TUNING.bands;
-	const features = createIdleFeatures();
-	const nextFrameSeconds = createFrameClock();
-
-	function sample(nowMs: number, playback: SyntheticPlayback): Readonly<AudioFeatures> {
-		const dt = nextFrameSeconds(nowMs);
-		const position = playback.positionSeconds;
-		const bpm = 84 + ((hashTrackId(playback.trackId ?? 'x') % 48) | 0);
-		const phase = ((position * bpm) / 60) % 1;
-		const section = 0.55 + 0.45 * Math.sin(position * 0.09) * Math.sin(position * 0.031 + 1.1);
-		const on = playback.playing;
-		const level = on ? Math.max(0, section * (0.6 + 0.4 * Math.exp(-phase * 5))) : 0;
-		let impulse = 0;
-		if (on && phase < dt * (bpm / 60) * 1.01 && section > 0.35) {
-			impulse = 0.4 + 0.6 * section;
-			features.beats++;
-		}
-		features.level = level;
-		features.loudness = smooth(features.loudness, level, dt, tuning.loudnessAttackSeconds, tuning.loudnessReleaseSeconds);
-		features.intensity = smooth(features.intensity, on ? 0.2 + 0.7 * section : 0, dt, tuning.intensityAttackSeconds, tuning.intensityReleaseSeconds);
-		features.onset = Math.max(impulse, features.onset * Math.exp(-dt / tuning.onsetDecaySeconds));
-		features.bass = smooth(features.bass, on ? section * Math.exp(-phase * 4) : 0, dt, tuning.bandSplitAttackSeconds, tuning.bandSplitReleaseSeconds);
-		features.mid = smooth(features.mid, on ? 0.4 * section : 0, dt, tuning.bandSplitAttackSeconds, tuning.bandSplitReleaseSeconds);
-		features.treble = smooth(features.treble, on ? 0.25 * section : 0, dt, tuning.bandSplitAttackSeconds, tuning.bandSplitReleaseSeconds);
-		for (let band = 0; band < bands; band++) {
-			const x = band / (bands - 1);
-			const shape =
-				features.bass * Math.exp(-x * 6) + features.mid * Math.exp(-((x - 0.45) ** 2) * 18) + features.treble * x * 0.8;
-			features.spectrum[band] = Math.min(1, shape * (0.85 + 0.15 * Math.sin(position * 1.3 + band)));
-		}
-		features.real = false;
-		return features;
-	}
-
-	return { features, sample };
 }

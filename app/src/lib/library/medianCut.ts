@@ -1,4 +1,4 @@
-const COLOR_COUNT = 5;
+import { PALETTE } from '../tuning.ts';
 
 type Box = { pixels: number[][] };
 
@@ -16,7 +16,7 @@ const widestChannel = (box: Box) => [0, 1, 2].reduce((best, channel) => (channel
 
 const hex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
 
-export function medianCut(rgba: Uint8ClampedArray, count = COLOR_COUNT): string[] {
+export function medianCut(rgba: Uint8ClampedArray, count: number = PALETTE.coverColors): string[] {
 	const pixels: number[][] = [];
 	for (let offset = 0; offset < rgba.length; offset += 4) pixels.push([rgba[offset], rgba[offset + 1], rgba[offset + 2]]);
 	if (!pixels.length) return [];

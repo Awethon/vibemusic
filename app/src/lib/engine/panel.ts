@@ -80,7 +80,3 @@ export function snapPanel(open: boolean) {
 		element.style.transition = '';
 	}, durationMs + PANEL.transitionCleanupMarginMs);
 }
-
-export function syncPanelProgressWithClass() {
-	panel.progress = bodyHasClass('panel-open') ? 1 : 0;
-}

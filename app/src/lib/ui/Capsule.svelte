@@ -10,6 +10,7 @@
 	import { toggleFullScreen, togglePanel } from './shell.ts';
 	import Slider from './Slider.svelte';
 	import { ui } from './state.svelte.ts';
+	import { COVER_PX } from '../tuning.ts';
 
 	let scrubRatio = $state<number | null>(null);
 	const track = $derived(currentTrack());
@@ -24,7 +25,7 @@
 <div id="dock">
 	<div id="capsule" role="region" aria-label="Player">
 		<div class="cap-left">
-			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={120} eager /></button>
+			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={COVER_PX.card} eager /></button>
 			<div class="cap-meta">
 				<button class="cap-title" type="button" onclick={toggleFullScreen}>{track?.title ?? ''}</button>
 				<p class="cap-sub">{#if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}{#if remote}<span class="cap-device"> · on {deviceLabel(relay.active)}</span>{/if}</p>

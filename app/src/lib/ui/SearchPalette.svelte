@@ -3,7 +3,7 @@
 	import { history } from '../history.svelte.ts';
 	import { albumsByIds, albumTracks, artistById, playlistById, search, type Album, type Artist, type Playlist, type Track } from '../library/queries.ts';
 	import { playTracks } from '../player/player.svelte.ts';
-	import { SEARCH } from '../tuning.ts';
+	import { COVER_PX, SEARCH } from '../tuning.ts';
 	import { openAlbum, openArtist, openPlaylist } from './actions.ts';
 	import Cover from './Cover.svelte';
 	import { plural } from './format.ts';
@@ -124,7 +124,7 @@
 							<div><b>{result.item.name}</b><small>Artist · {plural(result.item.albumCount, 'album')}</small></div>
 							<em>Open</em>
 						{:else if result.kind === 'album'}
-							<Cover albumId={result.item.id} size={80} />
+							<Cover albumId={result.item.id} size={COVER_PX.row} />
 							<div><b>{result.item.name}</b><small>Album · {result.item.artist}{result.item.year ? ` · ${result.item.year}` : ''}</small></div>
 							<em>Open</em>
 						{:else if result.kind === 'playlist'}
@@ -132,7 +132,7 @@
 							<div><b>{result.item.name}</b><small>{playlistKindLabel(result.item)} · {plural(result.item.songCount, 'track')}</small></div>
 							<em>Open</em>
 						{:else}
-							<Cover albumId={result.item.albumId} size={80} />
+							<Cover albumId={result.item.albumId} size={COVER_PX.row} />
 							<div><b>{result.item.title}</b><small>{result.item.artist} · {result.item.album}</small></div>
 							<em>Play</em>
 						{/if}

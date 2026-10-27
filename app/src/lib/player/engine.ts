@@ -1,8 +1,7 @@
+import { PLAYBACK } from '../tuning.ts';
 import { createAnalysis, createIdleFeatures, OUTPUT_DELAY_SECONDS, type Analysis, type AudioFeatures } from '../visual/analysis.ts';
 
 type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null; startAt: number | null; pendingSeek: (() => void) | null; blocked: boolean };
-
-const START_TOLERANCE_SECONDS = 1;
 
 export type EngineListener = {
 	ended(): void;
@@ -13,7 +12,6 @@ export type EngineListener = {
 export type StartResult = 'playing' | 'blocked' | 'stopped';
 
 const MAX_DELAY_SECONDS = 1;
-const CONTEXT_RESUME_TIMEOUT_MS = 1500;
 
 const appleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
@@ -37,7 +35,7 @@ export class AudioEngine {
 		element.preload = 'auto';
 		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false };
 		element.addEventListener('playing', () => {
-			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > START_TOLERANCE_SECONDS) element.currentTime = deck.startAt;
+			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > PLAYBACK.startToleranceSeconds) element.currentTime = deck.startAt;
 			deck.startAt = null;
 		});
 		const fromActive = (handler: () => void) => () => {
@@ -189,7 +187,7 @@ export class AudioEngine {
 			return 'stopped';
 		}
 		if (!context) return 'playing';
-		await Promise.race([resumed.catch(() => {}), new Promise((resolve) => setTimeout(resolve, CONTEXT_RESUME_TIMEOUT_MS))]);
+		await Promise.race([resumed.catch(() => {}), new Promise((resolve) => setTimeout(resolve, PLAYBACK.contextResumeTimeoutMs))]);
 		if (context.state === 'running') return 'playing';
 		element.pause();
 		return this.markBlocked(deck);

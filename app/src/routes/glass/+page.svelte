@@ -7,11 +7,11 @@
 	import { openMenu } from '#lib/ui/menu.svelte.ts';
 	import Slider from '#lib/ui/Slider.svelte';
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
+	import { COVER_PX, GLASS_TUNER } from '#lib/tuning.ts';
 
-	const WALL_COVERS = 24;
 	const LAB_URL = 'https://awethon.com/liquid-glass-lab/';
 
-	const covers = live(async () => (await albumWall('mostPlayed', { genres: [], decades: [] })).slice(0, WALL_COVERS), []);
+	const covers = live(async () => (await albumWall('mostPlayed', { genres: [], decades: [] })).slice(0, GLASS_TUNER.wallCovers), []);
 	let link = $state('');
 	let linkNote = $state('');
 
@@ -101,6 +101,6 @@
 		<button type="button" class="ghost gt-menu" onclick={sampleMenu}>Open a sample menu</button>
 	</div>
 	<div class="gt-wall" aria-hidden="true">
-		{#each covers.value as album (album.id)}<Cover albumId={album.id} size={240} />{/each}
+		{#each covers.value as album (album.id)}<Cover albumId={album.id} size={COVER_PX.glassWall} />{/each}
 	</div>
 </section>

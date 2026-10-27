@@ -14,8 +14,6 @@ export function longDuration(seconds: number): string {
 
 export const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString('en')} ${count === 1 ? one : many}`;
 
-export const countLabel = (count: number, cap: number) => (count > cap ? `${cap}+` : String(count));
-
 export function alphabetBucket(text: string): string {
 	const first = text.trim().charAt(0).toUpperCase();
 	if (!first) return '#';

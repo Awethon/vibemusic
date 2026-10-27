@@ -1,13 +1,13 @@
 import type { Track } from '../library/queries.ts';
 import { coverUrl } from '../navidrome/credentials.ts';
 import { session } from '../session.svelte.ts';
+import { COVER_PX } from '../tuning.ts';
 
-type Handlers = { play(): void; pause(): void; next(): void; previous(): void; seek(seconds: number): void };
+export type MediaHandlers = { play(): void; pause(): void; next(): void; previous(): void; seek(seconds: number): void };
 
-const ARTWORK_SIZE = 512;
 let shownTrackId = '';
 
-export function installMediaSession(handlers: Handlers) {
+export function installMediaSession(handlers: MediaHandlers) {
 	if (!('mediaSession' in navigator)) return;
 	const media = navigator.mediaSession;
 	media.setActionHandler('play', handlers.play);
@@ -29,7 +29,7 @@ export function updateMediaSession(track: Track | null, playing: boolean, positi
 			title: track.title,
 			artist: track.artist,
 			album: track.album,
-			artwork: [{ src: coverUrl(session.credentials, track.albumId, ARTWORK_SIZE), sizes: `${ARTWORK_SIZE}x${ARTWORK_SIZE}` }]
+			artwork: [{ src: coverUrl(session.credentials, track.albumId, COVER_PX.mediaSession), sizes: `${COVER_PX.mediaSession}x${COVER_PX.mediaSession}` }]
 		});
 	}
 	if (track && duration > 0 && position <= duration) media.setPositionState({ duration, position, playbackRate: 1 });

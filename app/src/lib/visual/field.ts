@@ -1,3 +1,4 @@
+import { hexToRgb, hslToUnitRgb, relativeLuminance, rgbToHsl } from '../color.ts';
 import type { AudioFeatures } from './analysis';
 
 export type FieldRenderer = 'webgpu' | 'webgl2' | 'none';
@@ -67,7 +68,16 @@ export const FIELD_RENDER_TUNING = Object.freeze({
 	modes: 8,
 	firstModeWave: 0.32,
 	modeWaveRatio: 0.756,
-	modePhaseStep: 1.7
+	modePhaseStep: 1.7,
+	palette: Object.freeze({
+		saturationGain: 1.5,
+		saturationLift: 0.05,
+		lightnessGain: 0.95,
+		lightnessLift: 0.04,
+		minLightness: 0.12,
+		maxLightness: 0.5,
+		maxLuminance: 0.2
+	})
 });
 
 export type FieldFeatures = Pick<AudioFeatures, 'loudness' | 'intensity' | 'onset' | 'bass' | 'mid' | 'treble' | 'spectrum'>;
@@ -229,43 +239,17 @@ function ease(previous: number, next: number, dt: number, up: number, down: numb
 	return previous + (next - previous) * (1 - Math.exp(-dt / (next > previous ? up : down)));
 }
 
-function hueToChannel(p: number, q: number, t: number): number {
-	if (t < 0) t += 1;
-	if (t > 1) t -= 1;
-	if (t < 1 / 6) return p + (q - p) * 6 * t;
-	if (t < 1 / 2) return q;
-	if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-	return p;
-}
-
 function writePaletteColor(hex: string, out: Float32Array, offset: number) {
-	const packed = parseInt(hex.slice(1), 16);
-	const r = ((packed >> 16) & 255) / 255;
-	const g = ((packed >> 8) & 255) / 255;
-	const b = (packed & 255) / 255;
-	const max = Math.max(r, g, b);
-	const min = Math.min(r, g, b);
-	let hue = 0;
-	let saturation = 0;
-	let lightness = (max + min) / 2;
-	const delta = max - min;
-	if (delta > 0) {
-		saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
-		hue = max === r ? (g - b) / delta + (g < b ? 6 : 0) : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
-		hue /= 6;
-	}
-	saturation = Math.min(1, saturation * 1.5 + 0.05);
-	lightness = Math.min(0.5, Math.max(0.12, lightness * 0.95 + 0.04));
-	const q = lightness < 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
-	const p = 2 * lightness - q;
-	const red = hueToChannel(p, q, hue + 1 / 3);
-	const green = hueToChannel(p, q, hue);
-	const blue = hueToChannel(p, q, hue - 1 / 3);
-	const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-	const scale = luminance > 0.2 ? 0.2 / luminance : 1;
-	out[offset] = red * scale;
-	out[offset + 1] = green * scale;
-	out[offset + 2] = blue * scale;
+	const shaping = FIELD_RENDER_TUNING.palette;
+	const [hue, saturation, lightness] = rgbToHsl(hexToRgb(hex));
+	const vivid = Math.min(1, saturation * shaping.saturationGain + shaping.saturationLift);
+	const level = Math.min(shaping.maxLightness, Math.max(shaping.minLightness, lightness * shaping.lightnessGain + shaping.lightnessLift));
+	const rgb = hslToUnitRgb([hue, vivid, level]);
+	const luminance = relativeLuminance(rgb);
+	const scale = luminance > shaping.maxLuminance ? shaping.maxLuminance / luminance : 1;
+	out[offset] = rgb[0] * scale;
+	out[offset + 1] = rgb[1] * scale;
+	out[offset + 2] = rgb[2] * scale;
 }
 
 async function createWebGpuBackend(canvas: HTMLCanvasElement): Promise<{ backend: Backend | null; touchedCanvas: boolean }> {

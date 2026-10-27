@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { fixedRowMeasure } from '#lib/engine/geometry.ts';
 	import { playlistById, playlistTracks } from '#lib/library/queries.ts';
-	import { LAYOUT } from '#lib/tuning.ts';
+	import { COVER_PX, LAYOUT } from '#lib/tuning.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
 	import PlaylistMosaic from '#lib/ui/PlaylistMosaic.svelte';
@@ -32,7 +32,7 @@
 {#if playlist.value}
 	<section class="view" {@attach viewEnter}>
 		<div class="pl-head">
-			<PlaylistMosaic playlist={playlist.value} size={440} />
+			<PlaylistMosaic playlist={playlist.value} size={COVER_PX.playlistPage} />
 			<div>
 				<p class="eyebrow">{playlistKindLabel(playlist.value)}</p>
 				<h1 class="display">{playlist.value.name}</h1>

@@ -11,8 +11,8 @@
 	import TrackList from '#lib/ui/TrackList.svelte';
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
+	import { ARTIST_PAGE, COVER_PX } from '#lib/tuning.ts';
 
-	const POPULAR_COUNT = 5;
 
 	const id = $derived(page.params.id ?? '');
 	const artist = live(() => artistById(id), null);
@@ -38,12 +38,12 @@
 		let active = true;
 		void artistInfo(current.id, current.name).then(async (info) => {
 			const [popularTracks, similarArtists] = await Promise.all([
-				tracksByIds(info.topTrackIds.slice(0, POPULAR_COUNT)),
+				tracksByIds(info.topTrackIds.slice(0, ARTIST_PAGE.popularCount)),
 				Promise.all(info.similarArtistIds.map((similarId) => artistById(similarId)))
 			]);
 			if (!active) return;
 			biography = info.biography;
-			popular = popularTracks.slice(0, POPULAR_COUNT);
+			popular = popularTracks.slice(0, ARTIST_PAGE.popularCount);
 			similar = similarArtists.filter((candidate): candidate is Artist => !!candidate);
 		});
 		return () => {
@@ -71,7 +71,7 @@
 				<div>
 					<h2 class="section-title">Popular</h2>
 					{#if thisIs.value}
-						<TrackList tracks={thisIs.value.tracks.slice(0, POPULAR_COUNT)} sourceName={thisIs.value.playlist.name} listKey="playlist:{thisIs.value.playlist.id}" showAlbum />
+						<TrackList tracks={thisIs.value.tracks.slice(0, ARTIST_PAGE.popularCount)} sourceName={thisIs.value.playlist.name} listKey="playlist:{thisIs.value.playlist.id}" showAlbum />
 					{:else}
 						<TrackList tracks={popular} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
 					{/if}
@@ -79,7 +79,7 @@
 				{#if thisIs.value}
 					{@const playlist = thisIs.value.playlist}
 					<div class="this-is-card">
-						<a href={resolve('/playlist/[id]', { id: playlist.id })} data-id={playlist.id}><PlaylistMosaic {playlist} size={260} /></a>
+						<a href={resolve('/playlist/[id]', { id: playlist.id })} data-id={playlist.id}><PlaylistMosaic {playlist} size={COVER_PX.artistPlaylist} /></a>
 						<a class="t" href={resolve('/playlist/[id]', { id: playlist.id })}>{playlist.name}</a>
 						<span class="s">{playlistMetaLine(playlist)}</span>
 						<PlayButton tracks={thisIs.value.tracks} sourceName={playlist.name} listKey="playlist:{playlist.id}" />
