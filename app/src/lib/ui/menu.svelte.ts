@@ -24,7 +24,8 @@ export function closeMenu() {
 export function closeAllMenus() {
 	menu.open = false;
 	ui.settingsOpen = false;
+	ui.devicesOpen = false;
 	ui.filterPopover = null;
 }
 
-export const anyMenuOpen = () => menu.open || ui.settingsOpen || !!ui.filterPopover;
+export const anyMenuOpen = () => menu.open || ui.settingsOpen || ui.devicesOpen || !!ui.filterPopover;

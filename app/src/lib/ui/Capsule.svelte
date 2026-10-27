@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { currentTrack, player, playNextTrack, playPreviousTrack, seekTo, setVolume, toggleMute, togglePlay } from '../player/player.svelte.ts';
+	import { deviceById, isActiveElsewhere, relay } from '../remote/relay.svelte.ts';
+	import { deviceIcon, deviceLabel } from '../remote/devices.ts';
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
 	import Icon from './Icon.svelte';
@@ -15,6 +17,8 @@
 	const position = $derived(scrubRatio !== null ? scrubRatio * duration : player.position);
 	const seekRatio = $derived(duration ? Math.min(1, position / duration) : 0);
 	const level = $derived(player.muted ? 0 : player.volume);
+	const remote = $derived(isActiveElsewhere());
+	const showDevices = $derived(relay.connected && (relay.devices.length > 1 || remote));
 </script>
 
 <div id="dock">
@@ -23,7 +27,7 @@
 			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={120} eager /></button>
 			<div class="cap-meta">
 				<button class="cap-title" type="button" onclick={toggleFullScreen}>{track?.title ?? ''}</button>
-				<p class="cap-sub">{#if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}</p>
+				<p class="cap-sub">{#if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}{#if remote}<span class="cap-device"> · on {deviceLabel(relay.active)}</span>{/if}</p>
 			</div>
 			<LikeButton className="cap-like" />
 		</div>
@@ -52,6 +56,7 @@
 		<div class="cap-right">
 			<button class="icon-btn" type="button" aria-label="Mute" onclick={toggleMute}><Icon name={level === 0 ? 'mute' : 'vol'} /></button>
 			<Slider ratio={level} className="vol" onchange={setVolume} />
+			{#if showDevices}<button class="icon-btn" class:on={ui.devicesOpen} id="bDevice" type="button" aria-label="Devices" onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button>{/if}
 			<button class="icon-btn" class:on={ui.panelOpen} id="bPanel" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel()}><Icon name="queue" /></button>
 			<button class="icon-btn" type="button" aria-label="Full screen" onclick={toggleFullScreen}><Icon name={ui.fullScreen ? 'collapse' : 'expand'} /></button>
 		</div>

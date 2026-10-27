@@ -5,7 +5,9 @@ import { tracksByIds, type Track } from '../library/queries.ts';
 import { rememberPlayedList } from '../history.svelte.ts';
 import { checkConnection, isUnreachable, onReconnect } from '../connection.svelte.ts';
 import { showToast } from '../ui/state.svelte.ts';
-import { CONNECTION, PLAYBACK } from '../tuning.ts';
+import { CONNECTION, PLAYBACK, REMOTE } from '../tuning.ts';
+import { deviceLabel } from '../remote/devices.ts';
+import { activeIsOnline, isActiveElsewhere, relay, sendToRelay, startRelay, type RelayMessage } from '../remote/relay.svelte.ts';
 import { AudioEngine } from './engine.ts';
 import * as queue from './queue.ts';
 import { updateMediaSession, installMediaSession } from './mediaSession.ts';
@@ -21,6 +23,25 @@ const PENDING_SCROBBLES_KEY = 'vibemusic.pendingScrobbles';
 
 type PendingScrobble = { trackId: string; albumId: string; time: number };
 
+export type Command =
+	| { kind: 'playList'; trackIds: string[]; startIndex: number; sourceName: string; listKey: string }
+	| { kind: 'togglePlay' }
+	| { kind: 'next' }
+	| { kind: 'previous' }
+	| { kind: 'seek'; seconds: number }
+	| { kind: 'volume'; volume: number }
+	| { kind: 'mute'; muted: boolean }
+	| { kind: 'queueNext' | 'queueLast'; trackIds: string[]; sourceName: string }
+	| { kind: 'playQueuedAt' | 'playSourceNow'; index: number }
+	| { kind: 'edit'; edit: queue.QueueEdit }
+	| { kind: 'liked'; trackId: string; starred: boolean };
+
+type Playback = { trackId: string; playing: boolean; position: number; duration: number; volume: number; muted: boolean; starred: boolean };
+
+const CLAIMING_COMMANDS = new Set<Command['kind']>(['playList', 'togglePlay', 'next', 'previous', 'playQueuedAt', 'playSourceNow', 'seek']);
+
+const storedVolume = () => Number(localStorage.getItem(VOLUME_KEY) ?? PLAYBACK.initialVolume);
+
 const queueState = queue.emptyQueue();
 const trackCache = new Map<string, Track>();
 
@@ -31,7 +52,7 @@ export const player = $state({
 	buffering: false,
 	position: 0,
 	duration: 0,
-	volume: Number(localStorage.getItem(VOLUME_KEY) ?? PLAYBACK.initialVolume),
+	volume: storedVolume(),
 	muted: false,
 	error: ''
 });
@@ -55,8 +76,24 @@ export function totalDuration(entries: readonly queue.Entry[]): number {
 
 export const currentTrack = (): Track | null => trackById(playerQueue().currentTrackId) ?? null;
 
+let mirroring = false;
+let mirroredAt = 0;
+let mirroredPosition = 0;
+let mirrorSequence = 0;
+let resumeAt = { trackId: '', position: 0 };
+let publishedPlayback = '';
+let publishedAt = 0;
+let publishedPosition = 0;
+let announced = false;
+let queuePublishTimer: ReturnType<typeof setTimeout> | undefined;
+
+const publishing = () => relay.connected && relay.active === relay.deviceId;
+
 function queueChanged() {
 	player.queueRevision += 1;
+	if (!publishing()) return;
+	clearTimeout(queuePublishTimer);
+	queuePublishTimer = setTimeout(publishQueue, REMOTE.queuePublishDelayMs);
 }
 
 const engine = new AudioEngine({
@@ -114,12 +151,19 @@ function remember(tracks: Track[]) {
 }
 
 function refresh() {
+	if (mirroring) return;
 	if (engine.playing && !engine.buffering) failedInRow = 0;
 	player.playing = engine.playing;
 	player.buffering = engine.buffering;
 	player.position = engine.position;
 	player.duration = engine.duration || currentTrack()?.duration || 0;
 	updateMediaSession(currentTrack(), player.playing, player.position, player.duration);
+	if (publishing() && (playbackSignature() !== publishedPlayback || positionJumped())) publishPlayback();
+}
+
+function positionJumped() {
+	const expected = publishedPosition + (player.playing ? (Date.now() - publishedAt) / 1000 : 0);
+	return Math.abs(player.position - expected) > REMOTE.positionJumpSeconds;
 }
 
 function applyLevel() {
@@ -219,7 +263,13 @@ function tick() {
 	const now = performance.now();
 	const elapsed = lastTickAt ? (now - lastTickAt) / 1000 : 0;
 	lastTickAt = now;
+	if (mirroring) {
+		if (player.playing) player.position = Math.min(player.duration || Infinity, mirroredPosition + (now - mirroredAt) / 1000);
+		updateMediaSession(currentTrack(), player.playing, player.position, player.duration);
+		return;
+	}
 	refresh();
+	if (publishing() && player.playing && Date.now() - publishedAt > REMOTE.playbackResyncMs) publishPlayback();
 	const track = currentTrack();
 	if (!track || !player.playing) return;
 	listenedSeconds += Math.min(elapsed, 1);
@@ -237,8 +287,12 @@ export function startPlayer() {
 	void sendPendingScrobbles();
 	setInterval(tick, TICK_MS);
 	installMediaSession({
-		play: () => void engine.resume(),
-		pause: () => engine.pause(),
+		play: () => {
+			if (!player.playing) togglePlay();
+		},
+		pause: () => {
+			if (player.playing) togglePlay();
+		},
 		next: playNextTrack,
 		previous: playPreviousTrack,
 		seek: seekTo
@@ -253,7 +307,7 @@ export async function restoreSavedQueue() {
 		const ids = saved?.entry?.map((entry) => entry.id) ?? [];
 		if (!ids.length) return;
 		const tracks = await tracksByIds(ids);
-		if (!tracks.length || queueState.currentTrackId) return;
+		if (!tracks.length || queueState.currentTrackId || mirroring) return;
 		remember(tracks);
 		const known = tracks.map((track) => track.id);
 		const currentIndex = Math.max(0, known.indexOf(saved?.current ?? ''));
@@ -265,10 +319,288 @@ export async function restoreSavedQueue() {
 	}
 }
 
+function playbackSnapshot(): Playback {
+	return {
+		trackId: queueState.currentTrackId,
+		playing: player.playing,
+		position: player.position,
+		duration: player.duration,
+		volume: player.volume,
+		muted: player.muted,
+		starred: currentTrack()?.starred ?? false
+	};
+}
+
+function playbackSignature() {
+	const { trackId, playing, duration, volume, muted, starred } = playbackSnapshot();
+	return [trackId, playing, Math.round(duration), volume, muted, starred].join('|');
+}
+
+function publishPlayback() {
+	publishedPlayback = playbackSignature();
+	publishedAt = Date.now();
+	publishedPosition = player.position;
+	sendToRelay({ type: 'playback', playback: playbackSnapshot() });
+}
+
+function publishQueue() {
+	if (publishing()) sendToRelay({ type: 'queue', queue: queue.copyQueue(queueState) });
+}
+
+async function ensureTracks(trackIds: string[]) {
+	const missing = trackIds.filter((trackId) => !trackCache.has(trackId));
+	if (missing.length) remember(await tracksByIds(missing));
+}
+
+async function mirrorQueue(snapshot: queue.QueueState | null) {
+	if (!snapshot) return;
+	const sequence = ++mirrorSequence;
+	await ensureTracks(queue.queuedTrackIds(snapshot));
+	if (sequence !== mirrorSequence || !mirroring) return;
+	queue.replaceQueue(queueState, snapshot);
+	queueChanged();
+}
+
+function mirrorPlayback(playback: Playback | null, ageMs: number) {
+	if (!playback) return;
+	player.playing = playback.playing && activeIsOnline();
+	player.buffering = false;
+	player.duration = playback.duration;
+	player.volume = playback.volume;
+	player.muted = playback.muted;
+	mirroredPosition = playback.position + (player.playing ? ageMs / 1000 : 0);
+	mirroredAt = performance.now();
+	player.position = mirroredPosition;
+	const cached = trackCache.get(playback.trackId);
+	if (cached && cached.starred !== playback.starred) {
+		trackCache.set(playback.trackId, { ...cached, starred: playback.starred });
+		player.trackRevision += 1;
+	}
+}
+
+function enterMirror() {
+	if (mirroring) return;
+	mirroring = true;
+	engine.pause();
+	clearTimeout(queuePublishTimer);
+}
+
+function leaveMirror() {
+	if (!mirroring) return;
+	mirroring = false;
+	resumeAt = { trackId: queueState.currentTrackId, position: player.position };
+	if (engine.trackId === resumeAt.trackId) engine.seek(resumeAt.position);
+	player.volume = storedVolume();
+	player.muted = false;
+	applyLevel();
+}
+
+function predict(command: Command) {
+	const restartClock = (playing: boolean, position: number) => {
+		player.playing = playing;
+		mirroredPosition = position;
+		mirroredAt = performance.now();
+		player.position = position;
+	};
+	const predicted = (effect: queue.QueueEffect) => {
+		queueChanged();
+		if (effect === 'play' || effect === 'restart') restartClock(true, 0);
+	};
+	switch (command.kind) {
+		case 'playList':
+			return predicted(queue.playList(queueState, command.trackIds, command.startIndex, command.sourceName, command.listKey));
+		case 'togglePlay':
+			return restartClock(!player.playing, player.position);
+		case 'next':
+			return predicted(queue.playNext(queueState));
+		case 'previous':
+			return predicted(queue.playPrevious(queueState, player.position, PLAYBACK.restartInsteadOfPreviousAfterSeconds));
+		case 'seek':
+			return restartClock(player.playing, command.seconds);
+		case 'volume':
+			player.volume = command.volume;
+			player.muted = false;
+			return;
+		case 'mute':
+			player.muted = command.muted;
+			return;
+		case 'queueNext':
+			return predicted(queue.queueTracksNext(queueState, command.trackIds, command.sourceName));
+		case 'queueLast':
+			return predicted(queue.queueTracksLast(queueState, command.trackIds, command.sourceName));
+		case 'playQueuedAt':
+			return predicted(queue.playQueuedAt(queueState, command.index));
+		case 'playSourceNow':
+			return predicted(queue.playSourceNow(queueState, command.index));
+		case 'edit':
+			queue.applyEdit(queueState, command.edit);
+			return queueChanged();
+		case 'liked':
+			return;
+	}
+}
+
+function run(command: Command) {
+	switch (command.kind) {
+		case 'playList':
+			return apply(queue.playList(queueState, command.trackIds, command.startIndex, command.sourceName, command.listKey));
+		case 'togglePlay': {
+			if (!queueState.currentTrackId) return;
+			if (engine.playing) {
+				engine.pause();
+				void saveQueue();
+			} else if (engine.trackId === queueState.currentTrackId && !player.error) void engine.resume();
+			else void startCurrent(true, engine.trackId === queueState.currentTrackId ? engine.position : resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
+			return;
+		}
+		case 'next':
+			return apply(queue.playNext(queueState));
+		case 'previous':
+			return apply(queue.playPrevious(queueState, engine.position, PLAYBACK.restartInsteadOfPreviousAfterSeconds));
+		case 'seek':
+			engine.seek(command.seconds);
+			refresh();
+			if (publishing()) publishPlayback();
+			return scheduleSave();
+		case 'volume':
+			player.volume = Math.min(1, Math.max(0, command.volume));
+			player.muted = false;
+			localStorage.setItem(VOLUME_KEY, String(player.volume));
+			applyLevel();
+			return refresh();
+		case 'mute':
+			player.muted = command.muted;
+			applyLevel();
+			return refresh();
+		case 'queueNext':
+			return apply(queue.queueTracksNext(queueState, command.trackIds, command.sourceName));
+		case 'queueLast':
+			return apply(queue.queueTracksLast(queueState, command.trackIds, command.sourceName));
+		case 'playQueuedAt':
+			return apply(queue.playQueuedAt(queueState, command.index));
+		case 'playSourceNow':
+			return apply(queue.playSourceNow(queueState, command.index));
+		case 'edit':
+			queue.applyEdit(queueState, command.edit);
+			queueChanged();
+			prepareNext();
+			return scheduleSave();
+		case 'liked': {
+			const cached = trackCache.get(command.trackId);
+			if (cached) {
+				trackCache.set(command.trackId, { ...cached, starred: command.starred });
+				player.trackRevision += 1;
+			}
+			return refresh();
+		}
+	}
+}
+
+function perform(command: Command) {
+	if (mirroring && activeIsOnline()) {
+		sendToRelay({ type: 'command', command });
+		predict(command);
+		return;
+	}
+	if (CLAIMING_COMMANDS.has(command.kind) && relay.connected && relay.active !== relay.deviceId) {
+		leaveMirror();
+		sendToRelay({ type: 'claim' });
+	}
+	run(command);
+}
+
+async function obey(command: Command) {
+	if ('trackIds' in command) await ensureTracks(command.trackIds);
+	run(command);
+}
+
+async function takeOver(snapshot: queue.QueueState | null, playback: Playback | null, ageMs: number) {
+	mirrorSequence += 1;
+	leaveMirror();
+	showToast('Playing in this tab');
+	if (!snapshot?.currentTrackId) return;
+	await ensureTracks(queue.queuedTrackIds(snapshot));
+	queue.replaceQueue(queueState, snapshot);
+	queueChanged();
+	const playing = playback?.playing ?? false;
+	const position = (playback?.position ?? 0) + (playing ? ageMs / 1000 : 0);
+	await startCurrent(playing, playback?.trackId === snapshot.currentTrackId ? position : 0);
+}
+
+function release(to: string, handoff: boolean) {
+	const playback = { ...playbackSnapshot(), position: engine.position || player.position };
+	engine.pause();
+	if (handoff) sendToRelay({ type: 'handoff', to, queue: queue.copyQueue(queueState), playback });
+	enterMirror();
+	mirrorPlayback({ ...playback, playing: handoff && playback.playing }, 0);
+	const name = deviceLabel(to);
+	if (handoff && name) showToast(`Moved playback to ${name}`);
+}
+
+function announceIfActive() {
+	if (!publishing()) {
+		announced = false;
+		return;
+	}
+	if (announced) return;
+	announced = true;
+	publishQueue();
+	publishPlayback();
+}
+
+function onRelayMessage(message: RelayMessage) {
+	switch (message.type) {
+		case 'welcome':
+			announced = false;
+			if (isActiveElsewhere()) {
+				enterMirror();
+				void mirrorQueue(message.queue as queue.QueueState | null);
+				mirrorPlayback(message.playback as Playback | null, message.ageMs);
+			} else if (!relay.active && player.playing) sendToRelay({ type: 'claim' });
+			announceIfActive();
+			return;
+		case 'devices':
+			if (isActiveElsewhere()) {
+				enterMirror();
+				if (!activeIsOnline()) player.playing = false;
+			}
+			announceIfActive();
+			return;
+		case 'queue':
+			if (mirroring) void mirrorQueue(message.queue as queue.QueueState);
+			return;
+		case 'playback':
+			if (mirroring) mirrorPlayback(message.playback as Playback, message.ageMs);
+			return;
+		case 'command':
+			if (!mirroring) void obey(message.command as Command);
+			return;
+		case 'release':
+			return release(message.to, message.handoff);
+		case 'takeover':
+			void takeOver(message.queue as queue.QueueState | null, message.playback as Playback | null, message.ageMs);
+			return;
+	}
+}
+
+export function startRemoteControl() {
+	void startRelay(onRelayMessage);
+}
+
+export function playOn(deviceId: string) {
+	if (deviceId === relay.active) return;
+	if (deviceId === relay.deviceId && !activeIsOnline()) {
+		void takeOver(queue.copyQueue(queueState), { ...playbackSnapshot(), playing: true }, 0);
+		sendToRelay({ type: 'claim' });
+		return;
+	}
+	sendToRelay({ type: 'transfer', to: deviceId });
+}
+
 export function playTracks(tracks: Track[], startIndex: number, sourceName: string, listKey: string) {
 	remember(tracks);
 	rememberPlayedList(listKey);
-	apply(queue.playList(queueState, tracks.map((track) => track.id), startIndex, sourceName, listKey));
+	perform({ kind: 'playList', trackIds: tracks.map((track) => track.id), startIndex, sourceName, listKey });
 }
 
 export function isPlayingList(listKey: string) {
@@ -286,61 +618,35 @@ export function playTrackInList(tracks: Track[], index: number, sourceName: stri
 }
 
 export function togglePlay() {
-	if (!queueState.currentTrackId) return;
-	if (engine.playing) {
-		engine.pause();
-		void saveQueue();
-	} else if (engine.trackId && !player.error) void engine.resume();
-	else void startCurrent(true, engine.trackId === queueState.currentTrackId ? engine.position : 0);
+	if (queueState.currentTrackId) perform({ kind: 'togglePlay' });
 }
 
-export function playNextTrack() {
-	apply(queue.playNext(queueState));
-}
+export const playNextTrack = () => perform({ kind: 'next' });
 
-export function playPreviousTrack() {
-	apply(queue.playPrevious(queueState, engine.position, PLAYBACK.restartInsteadOfPreviousAfterSeconds));
-}
+export const playPreviousTrack = () => perform({ kind: 'previous' });
 
-export function seekTo(seconds: number) {
-	engine.seek(seconds);
-	refresh();
-	scheduleSave();
-}
+export const seekTo = (seconds: number) => perform({ kind: 'seek', seconds });
 
-export const seekBy = (seconds: number) => seekTo(engine.position + seconds);
+export const seekBy = (seconds: number) => seekTo(player.position + seconds);
 
-export function setVolume(volume: number) {
-	player.volume = Math.min(1, Math.max(0, volume));
-	player.muted = false;
-	localStorage.setItem(VOLUME_KEY, String(player.volume));
-	applyLevel();
-}
+export const setVolume = (volume: number) => perform({ kind: 'volume', volume: Math.min(1, Math.max(0, volume)) });
 
-export function toggleMute() {
-	player.muted = !player.muted;
-	applyLevel();
-}
+export const toggleMute = () => perform({ kind: 'mute', muted: !player.muted });
 
 export function queueNext(tracks: Track[], sourceName: string) {
 	remember(tracks);
-	apply(queue.queueTracksNext(queueState, tracks.map((track) => track.id), sourceName));
+	perform({ kind: 'queueNext', trackIds: tracks.map((track) => track.id), sourceName });
 }
 
 export function queueLast(tracks: Track[], sourceName: string) {
 	remember(tracks);
-	apply(queue.queueTracksLast(queueState, tracks.map((track) => track.id), sourceName));
+	perform({ kind: 'queueLast', trackIds: tracks.map((track) => track.id), sourceName });
 }
 
-export const playQueuedAt = (index: number) => apply(queue.playQueuedAt(queueState, index));
-export const playSourceNow = (index: number) => apply(queue.playSourceNow(queueState, index));
+export const playQueuedAt = (index: number) => perform({ kind: 'playQueuedAt', index });
+export const playSourceNow = (index: number) => perform({ kind: 'playSourceNow', index });
 
-export function editQueue(edit: (state: queue.QueueState) => void) {
-	edit(queueState);
-	queueChanged();
-	prepareNext();
-	scheduleSave();
-}
+export const editQueue = (edit: queue.QueueEdit) => perform({ kind: 'edit', edit });
 
 export async function toggleLike(track: Track) {
 	const starred = !track.starred;
@@ -351,7 +657,9 @@ export async function toggleLike(track: Track) {
 		trackCache.set(track.id, { ...cached, starred });
 		player.trackRevision += 1;
 	}
+	if (mirroring) sendToRelay({ type: 'command', command: { kind: 'liked', trackId: track.id, starred } satisfies Command });
+	else refresh();
 }
 
 export const sampleAudio = (nowMs: number) => engine.sample(nowMs);
-export const audioLive = () => engine.live && player.playing;
+export const audioLive = () => !mirroring && engine.live && player.playing;

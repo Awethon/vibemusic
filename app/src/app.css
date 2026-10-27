@@ -1343,3 +1343,46 @@ body.island-right { --edge-l: min(var(--safe-l), 12px); }
 	#panel { top: max(8px, var(--safe-t)); bottom: max(8px, var(--safe-b)); }
 	#dock { bottom: max(8px, var(--safe-b)); }
 }
+
+#remoteBanner {
+  position: absolute;
+  top: calc(var(--safe-t) + 14px);
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 12px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  border: 1px solid var(--line-2);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  backdrop-filter: blur(16px);
+  transform: translate(-50%, calc(-64px - var(--safe-t)));
+  transition: transform 0.5s var(--ease);
+}
+body.remote #remoteBanner { transform: translate(-50%, 0); }
+#remoteBanner b { color: var(--ink); font-weight: 600; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+#remoteBanner button { margin-left: 4px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-2); }
+#remoteBanner button:hover { background: var(--ink); color: #111; }
+body.remote #bDevice { color: var(--accent); --ic: var(--accent); --ia: 1; }
+.cap-sub .cap-device { color: var(--accent); }
+
+#devices { width: 320px; padding: 10px; transform-origin: bottom right; }
+.dev { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 12px; }
+.dev:hover { background: var(--hover); }
+.dev .di { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.07); color: var(--ink-2); --ic: var(--ink); --ia: 0.72; }
+.dev .di svg { width: 17px; height: 17px; color: var(--ic); opacity: var(--ia); }
+.dev b { display: block; font-weight: 600; font-size: 13.5px; }
+.dev small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 1px; }
+.dev.cur .di { background: var(--accent); color: #111; --ic: #111; --ia: 1; }
+.dev.cur small { color: var(--accent); }
+.dev.offline { opacity: 0.55; }
+.dev button { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-2); transition: background 0.15s, color 0.15s; }
+.dev button:hover { background: var(--ink); color: #111; }
+.dev .eqi { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+.dev .eqi i { width: 3px; background: var(--accent); animation: eq 0.8s ease-in-out infinite alternate; transform-origin: bottom; height: 100%; }
+.dev .eqi i:nth-child(2) { animation-delay: -0.3s; }
+.dev .eqi i:nth-child(3) { animation-delay: -0.55s; }

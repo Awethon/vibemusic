@@ -191,6 +191,15 @@ export const LIBRARY_RULES = Object.freeze({
 
 export const HISTORY = Object.freeze({ maxLength: 16 });
 
+export const REMOTE = Object.freeze({
+	reconnectMinMs: 1000,
+	reconnectMaxMs: 30000,
+	keepAliveMs: 25000,
+	playbackResyncMs: 10000,
+	positionJumpSeconds: 1.5,
+	queuePublishDelayMs: 50
+});
+
 export const LIBRARY_SYNC = Object.freeze({
 	pollIntervalMs: 60000,
 	snapshotWriteDelayMs: 2000,

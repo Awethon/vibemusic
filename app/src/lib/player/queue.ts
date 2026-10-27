@@ -13,9 +13,18 @@ export type QueueState = {
 
 export type QueueEffect = 'play' | 'restart' | 'stop' | 'none';
 
+export type QueueEdit =
+	| { op: 'moveQueuedToTop'; index: number }
+	| { op: 'removeQueued'; index: number }
+	| { op: 'removeSource'; index: number }
+	| { op: 'clearQueued' }
+	| { op: 'moveSourceToPlayNext'; index: number }
+	| { op: 'reorder'; fromUserQueue: boolean; from: number; to: number };
+
+const entryPrefix = Math.random().toString(36).slice(2, 8);
 let lastEntryNumber = 0;
 
-const createEntry = (trackId: string): Entry => ({ entryId: `entry-${++lastEntryNumber}`, trackId });
+const createEntry = (trackId: string): Entry => ({ entryId: `entry-${entryPrefix}-${++lastEntryNumber}`, trackId });
 const createEntries = (trackIds: string[]) => trackIds.map(createEntry);
 
 export const emptyQueue = (): QueueState => ({
@@ -137,3 +146,20 @@ export function savedOrder(state: QueueState): { trackIds: string[]; currentInde
 export function restoreQueue(state: QueueState, trackIds: string[], currentIndex: number, sourceName: string) {
 	playList(state, trackIds, currentIndex, sourceName, '');
 }
+
+export function applyEdit(state: QueueState, edit: QueueEdit) {
+	if (edit.op === 'moveQueuedToTop') moveQueuedToTop(state, edit.index);
+	else if (edit.op === 'removeQueued') removeQueuedAt(state, edit.index);
+	else if (edit.op === 'removeSource') removeSourceAt(state, edit.index);
+	else if (edit.op === 'clearQueued') clearQueued(state);
+	else if (edit.op === 'moveSourceToPlayNext') moveSourceToPlayNext(state, edit.index);
+	else reorderUpNext(state, edit.fromUserQueue, edit.from, edit.to);
+}
+
+export const copyQueue = (state: QueueState): QueueState => ({ ...state, sourceQueue: state.sourceQueue.map((entry) => ({ ...entry })), userQueue: state.userQueue.map((entry) => ({ ...entry })) });
+
+export function replaceQueue(state: QueueState, next: QueueState) {
+	Object.assign(state, copyQueue(next));
+}
+
+export const queuedTrackIds = (state: QueueState) => [...new Set([state.currentTrackId, ...state.sourceQueue.map((entry) => entry.trackId), ...state.userQueue.map((entry) => entry.trackId)].filter(Boolean))];

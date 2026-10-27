@@ -24,8 +24,7 @@ export function sessionExpired() {
 
 export function signOut() {
 	forgetCredentials();
-	session.credentials = null;
-	session.expired = false;
+	location.reload();
 }
 
 export function requireCredentials(): Credentials {

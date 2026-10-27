@@ -17,6 +17,7 @@ export const ui = $state({
 	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
 	searchOpen: false,
 	settingsOpen: false,
+	devicesOpen: false,
 	filterPopover: null as { kind: FilterKind } | null,
 	queuePressed: false,
 	toast: '',

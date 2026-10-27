@@ -22,7 +22,10 @@
 	import { library, resyncLibrary, startLibrary } from '#lib/library/library.svelte.ts';
 	import { recentlyPlayedAlbums } from '#lib/library/queries.ts';
 	import { loadLyricsFor } from '#lib/player/lyricsState.svelte.ts';
-	import { currentTrack, player, playNextTrack, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, togglePlay } from '#lib/player/player.svelte.ts';
+	import { currentTrack, player, playNextTrack, playOn, playPreviousTrack, restoreSavedQueue, seekBy, startPlayer, startRemoteControl, togglePlay } from '#lib/player/player.svelte.ts';
+	import { deviceLabel } from '#lib/remote/devices.ts';
+	import { activeIsOnline, isActiveElsewhere, relay } from '#lib/remote/relay.svelte.ts';
+	import DevicesPopover from '#lib/ui/DevicesPopover.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { HISTORY, PLAYBACK } from '#lib/tuning.ts';
 	import AlphabetNav from '#lib/ui/AlphabetNav.svelte';
@@ -85,11 +88,16 @@
 		if (library.status !== 'ready' || restored) return;
 		restored = true;
 		void restoreSavedQueue();
+		startRemoteControl();
 		if (!history.items.length) void recentlyPlayedAlbums(HISTORY.maxLength).then((albums) => seedHistory(albums.map((album) => album.id)));
 	});
 
 	$effect(() => {
 		setBodyClass('is-playing', player.playing);
+	});
+
+	$effect(() => {
+		setBodyClass('remote', isActiveElsewhere());
 	});
 
 	$effect(() => {
@@ -206,9 +214,15 @@
 	<Capsule />
 	<GlassLayer level="popups" />
 	<SettingsPopover />
+	<DevicesPopover />
 	<FilterPopover />
 	<ContextMenu />
 	<SearchPalette />
+	<div id="remoteBanner" aria-hidden={!isActiveElsewhere()}>
+		<span class="pulse"></span>
+		<span>{#if activeIsOnline()}Playing on <b>{deviceLabel(relay.active)}</b> · this tab is a remote{:else}<b>{deviceLabel(relay.active)}</b> is offline{/if}</span>
+		<button type="button" onclick={() => playOn(relay.deviceId)}>Play here</button>
+	</div>
 	<ConnectionNote />
 	<Toast />
 {/if}

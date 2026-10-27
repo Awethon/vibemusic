@@ -4,13 +4,14 @@ import { lookup } from 'node:dns/promises';
 import { defineConfig } from 'vitest/config';
 
 const navidrome = process.env.NAVIDROME_URL ?? 'http://127.0.0.1:4534';
+const relay = process.env.RELAY_URL ?? 'http://127.0.0.1:4600';
 const building = process.argv.includes('build');
 
 async function navidromeProxy() {
 	const navidromeUrl = new URL(navidrome);
 	const { address } = await lookup(navidromeUrl.hostname, { family: 4 });
 	const target = `${navidromeUrl.protocol}//${address}${navidromeUrl.port ? `:${navidromeUrl.port}` : ''}`;
-	return Object.fromEntries(['/auth', '/api', '/rest'].map((path) => [path, { target, headers: { host: navidromeUrl.host } }]));
+	return { ...Object.fromEntries(['/auth', '/api', '/rest'].map((path) => [path, { target, headers: { host: navidromeUrl.host } }])), '/relay': { target: relay, ws: true } };
 }
 
 const proxied = building ? {} : await navidromeProxy();
