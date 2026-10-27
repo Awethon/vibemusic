@@ -1,6 +1,7 @@
 import type { Database } from '@sqlite.org/sqlite-wasm';
 import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
-import { LIBRARY_RULES } from '../tuning.ts';
+import { createGenreResolver, withAncestors, type GenreResolver } from '../genres/genres.ts';
+import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
 import { normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
 
@@ -42,27 +43,42 @@ function deleteWhereIn(db: Database, sql: string, ids: string[]) {
 
 function insertAlbums(db: Database, albums: NativeAlbum[]) {
 	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0]));
-	eachBound(db, 'insert or ignore into album_genre values (?,?)', albums.flatMap((album) => albumGenresOf(album).map((genre) => [genre, album.id])));
 	eachBound(db, 'insert or ignore into album_credit values (?,?,?,?,?)', albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order])));
 	eachBound(db, 'insert into search values (?,?,?)', albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]));
 }
 
 function removeAlbums(db: Database, ids: string[]) {
 	deleteWhereIn(db, 'delete from album where id = ?', ids);
-	deleteWhereIn(db, 'delete from album_genre where album_id = ?', ids);
 	deleteWhereIn(db, 'delete from album_credit where album_id = ?', ids);
 	deleteWhereIn(db, "delete from search where kind = 'album' and ref = ?", ids);
 	const trackIds = ids.flatMap((id) => db.selectValues('select id from track where album_id = ?', [id]) as string[]);
 	removeTracks(db, trackIds);
 }
 
-function insertTracks(db: Database, songs: NativeSong[]) {
+const songGenresOf = (song: NativeSong) => {
+	const names = song.genres.map((genre) => genre.name).filter(Boolean);
+	return names.length ? names : song.genre ? [song.genre] : [];
+};
+
+function insertTracks(db: Database, songs: NativeSong[], albums: NativeAlbum[], resolver: GenreResolver) {
 	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0]));
+	const albumGenres = new Map(albums.map((album) => [album.id, albumGenresOf(album)]));
+	eachBound(
+		db,
+		'insert or ignore into track_genre values (?,?,?)',
+		songs.flatMap((song) => {
+			const raw = songGenresOf(song);
+			const direct = resolver.genresOf(raw.length ? raw : (albumGenres.get(song.albumId) ?? []));
+			const broader = direct.flatMap(withAncestors).filter((genre) => !direct.includes(genre));
+			return [...direct.map((genre) => [genre, song.id, 1]), ...broader.map((genre) => [genre, song.id, 0])];
+		})
+	);
 	eachBound(db, 'insert into search values (?,?,?)', songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)]));
 }
 
 function removeTracks(db: Database, ids: string[]) {
 	deleteWhereIn(db, 'delete from track where id = ?', ids);
+	deleteWhereIn(db, 'delete from track_genre where track_id = ?', ids);
 	deleteWhereIn(db, "delete from search where kind = 'track' and ref = ?", ids);
 }
 
@@ -112,37 +128,38 @@ function rebuildArtists(db: Database) {
 	`);
 }
 
+function rebuildAlbumGenres(db: Database) {
+	db.exec(`
+		delete from album_genre;
+		insert into album_genre select distinct track_genre.genre, track.album_id from track_genre join track on track.id = track_genre.track_id;
+		update album set genres = coalesce((select json_group_array(genre) from (select track_genre.genre from track_genre join track on track.id = track_genre.track_id
+			where track.album_id = album.id and track_genre.direct = 1 group by track_genre.genre order by count(*) desc, track_genre.genre)), '[]');
+	`);
+}
+
 function rebuildGenrePlaylists(db: Database) {
 	const genreIds = db.selectValues("select id from playlist where kind = 'genre'") as string[];
 	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', genreIds);
 	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", genreIds);
 	db.exec("delete from playlist where kind = 'genre'");
+	const rows = db.selectObjects(`select track.id, track.album_id as albumId, album.artist_id as artistId, track.play_count as plays, album.play_count as albumPlays,
+		track.starred, track.duration, (select json_group_array(genre) from track_genre where track_genre.track_id = track.id) as genres
+		from track join album on album.id = track.album_id where exists (select 1 from track_genre where track_genre.track_id = track.id)`);
+	const durations = new Map<string, number>();
+	const songs: GenreSong[] = rows.map((row) => {
+		durations.set(row.id as string, row.duration as number);
+		return { id: row.id as string, albumId: row.albumId as string, artistId: row.artistId as string, genres: JSON.parse(row.genres as string), plays: row.plays as number, albumPlays: row.albumPlays as number, starred: row.starred === 1 };
+	});
 	const insertPlaylist = db.prepare('insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)');
 	const insertPlaylistTrack = db.prepare('insert into playlist_track values (?,?,?)');
 	const insertSearch = db.prepare('insert into search values (?,?,?)');
-	const genres = db.selectObjects(`select genre, count(*) as albums from album_genre group by genre having count(*) >= ? order by albums desc, genre limit ?`, [
-		LIBRARY_RULES.genrePlaylistMinAlbums,
-		LIBRARY_RULES.genrePlaylistMaxCount
-	]);
-	for (const row of genres) {
-		const genre = row.genre as string;
-		const albumIds = db.selectValues(`select album.id from album_genre join album on album.id = album_genre.album_id where genre = ? order by album.play_count desc, album.name_order`, [genre]) as string[];
-		const trackIds: string[] = [];
-		let duration = 0;
-		let albumCount = 0;
-		for (const albumId of albumIds) {
-			if (trackIds.length >= LIBRARY_RULES.genrePlaylistTrackCap) break;
-			const tracks = db.selectObjects('select id, duration from track where album_id = ? order by disc_no, track_no', [albumId]);
-			albumCount += 1;
-			for (const track of tracks) {
-				trackIds.push(track.id as string);
-				duration += track.duration as number;
-			}
-		}
+	for (const { genre, songs: picked } of chooseGenres(songs)) {
 		const id = genrePlaylistId(genre);
-		insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, trackIds.length, duration, '', '', 1, '']).stepReset();
+		const albumCount = new Set(picked.map((song) => song.albumId)).size;
+		const duration = picked.reduce((total, song) => total + (durations.get(song.id) ?? 0), 0);
+		insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, picked.length, duration, '', '', 1, '']).stepReset();
 		insertSearch.bind(['playlist', id, normalizeForSearch(genre)]).stepReset();
-		trackIds.forEach((trackId, position) => insertPlaylistTrack.bind([id, position, trackId]).stepReset());
+		picked.forEach((song, position) => insertPlaylistTrack.bind([id, position, song.id]).stepReset());
 	}
 	insertPlaylist.finalize();
 	insertPlaylistTrack.finalize();
@@ -152,6 +169,7 @@ function rebuildGenrePlaylists(db: Database) {
 function rebuildDerived(db: Database) {
 	db.exec("update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where kind != 'genre'");
 	rebuildArtists(db);
+	rebuildAlbumGenres(db);
 	rebuildGenrePlaylists(db);
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
@@ -167,7 +185,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 	db.exec(SCHEMA);
 	db.transaction(() => {
 		insertAlbums(db, snapshot.albums);
-		insertTracks(db, snapshot.songs);
+		insertTracks(db, snapshot.songs, snapshot.albums, createGenreResolver());
 		insertPlaylists(db, snapshot.playlists);
 		insertPlaylistTracks(db, snapshot.playlistTracks);
 		rebuildDerived(db);
@@ -196,7 +214,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			removeAlbums(db, ids);
 			insertAlbums(db, changes.albums.filter((album) => !album.missing));
 			removeTracks(db, changes.albumSongs.map((song) => song.id));
-			insertTracks(db, changes.albumSongs);
+			insertTracks(db, changes.albumSongs, changes.albums, createGenreResolver(db.selectValues('select distinct genre from track_genre') as string[]));
 		}
 		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats);
 		if (playlistsChanged) {

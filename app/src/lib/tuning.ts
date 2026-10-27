@@ -238,10 +238,20 @@ export const SEARCH = Object.freeze({
 
 export const QUEUE_DRAG = Object.freeze({ startDistancePx: 4 });
 
-export const LIBRARY_RULES = Object.freeze({
-	genrePlaylistMinAlbums: 3,
-	genrePlaylistMaxCount: 8,
-	genrePlaylistTrackCap: 240
+export const GENRE_PLAYLISTS = Object.freeze({
+	rootMinSongs: 30,
+	rootMinArtists: 2,
+	subMinSongs: 50,
+	subMinArtists: 5,
+	maxParentShare: 0.7,
+	maxSiblingShare: 0.8,
+	maxPlaylists: 24,
+	songCap: 100,
+	songsPerArtistPerBlock: 3,
+	artistBlockSize: 50,
+	likeBonus: 2,
+	albumPlaysWeight: 0.25,
+	tieBreakWeight: 0.01
 });
 
 export const HISTORY = Object.freeze({ maxLength: 16 });

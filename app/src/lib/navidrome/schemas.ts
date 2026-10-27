@@ -41,6 +41,8 @@ export const nativeSong = z.object({
 	duration: optionalNumber,
 	suffix: optionalString,
 	bitRate: optionalNumber,
+	genre: optionalString,
+	genres: z.array(z.object({ name: z.string() })).nullish().transform((value) => value ?? []),
 	playCount: optionalNumber,
 	playDate: optionalDate,
 	starred: z.boolean().nullish().transform((value) => value ?? false),

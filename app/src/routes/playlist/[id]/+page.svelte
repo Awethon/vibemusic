@@ -23,7 +23,7 @@
 	const updateLine = $derived.by(() => {
 		const current = playlist.value;
 		if (current?.kind === 'smart') return `Updates automatically${current.updated ? ` · refreshed ${relativeTime(current.updated)}` : ''}`;
-		if (current?.kind === 'genre') return `Built from your ${current.genre} albums · updates automatically`;
+		if (current?.kind === 'genre') return `Your top ${current.genre} songs, a few from each artist · updates automatically`;
 		if (current?.kind === 'artist') return 'Their most popular tracks you own · updated weekly';
 		return '';
 	});

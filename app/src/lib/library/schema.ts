@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -48,6 +48,8 @@ create table track (
 	starred integer not null
 );
 create index track_album on track (album_id, disc_no, track_no);
+create table track_genre (genre text not null, track_id text not null, direct integer not null, primary key (genre, track_id)) without rowid;
+create index track_genre_track on track_genre (track_id);
 create table playlist (
 	id text primary key,
 	name text not null,
