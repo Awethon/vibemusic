@@ -1362,7 +1362,7 @@ body.island-right { --edge-l: min(var(--safe-l), 12px); }
   transform: translate(-50%, calc(-64px - var(--safe-t)));
   transition: transform 0.5s var(--ease);
 }
-body.remote #remoteBanner { transform: translate(-50%, 0); }
+body.remote #remoteBanner, body.tap-to-play #remoteBanner { transform: translate(-50%, 0); }
 #remoteBanner b { color: var(--ink); font-weight: 600; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 #remoteBanner button { margin-left: 4px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-2); }

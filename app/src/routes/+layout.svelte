@@ -98,6 +98,7 @@
 
 	$effect(() => {
 		setBodyClass('remote', isActiveElsewhere());
+		setBodyClass('tap-to-play', player.waitingForTap && !isActiveElsewhere());
 	});
 
 	$effect(() => {
@@ -218,10 +219,16 @@
 	<FilterPopover />
 	<ContextMenu />
 	<SearchPalette />
-	<div id="remoteBanner" aria-hidden={!isActiveElsewhere()}>
+	<div id="remoteBanner" aria-hidden={!isActiveElsewhere() && !player.waitingForTap}>
 		<span class="pulse"></span>
-		<span>{#if activeIsOnline()}Playing on <b>{deviceLabel(relay.active)}</b> · this tab is a remote{:else}<b>{deviceLabel(relay.active)}</b> is offline{/if}</span>
-		<button type="button" onclick={() => playOn(relay.deviceId)}>Play here</button>
+		{#if !isActiveElsewhere()}
+			<span>Tap anywhere to start playing here</span>
+		{:else}
+			<span
+				>{#if !activeIsOnline()}<b>{deviceLabel(relay.active)}</b> is offline{:else if player.waitingForTap}Tap the screen on <b>{deviceLabel(relay.active)}</b> to start playing there{:else}Playing on <b>{deviceLabel(relay.active)}</b> · this tab is a remote{/if}</span
+			>
+			<button type="button" onclick={() => playOn(relay.deviceId)}>Play here</button>
+		{/if}
 	</div>
 	<ConnectionNote />
 	<Toast />

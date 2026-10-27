@@ -22,6 +22,7 @@
 		const here = device.id === relay.deviceId;
 		if (device.id === relay.active) {
 			if (!device.online) return 'Offline';
+			if (player.waitingForTap) return here ? 'Tap anywhere to start' : 'Waiting for a tap';
 			return `${player.playing ? 'Playing' : 'Paused'}${here ? ' in this tab' : ''}`;
 		}
 		return here ? 'This tab' : 'Ready';

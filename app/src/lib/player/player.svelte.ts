@@ -36,7 +36,7 @@ export type Command =
 	| { kind: 'edit'; edit: queue.QueueEdit }
 	| { kind: 'liked'; trackId: string; starred: boolean };
 
-type Playback = { trackId: string; playing: boolean; position: number; duration: number; volume: number; muted: boolean; starred: boolean };
+type Playback = { trackId: string; playing: boolean; position: number; duration: number; volume: number; muted: boolean; starred: boolean; waiting: boolean };
 
 const CLAIMING_COMMANDS = new Set<Command['kind']>(['playList', 'togglePlay', 'next', 'previous', 'playQueuedAt', 'playSourceNow', 'seek']);
 
@@ -54,6 +54,7 @@ export const player = $state({
 	duration: 0,
 	volume: storedVolume(),
 	muted: false,
+	waitingForTap: false,
 	error: ''
 });
 
@@ -153,6 +154,7 @@ function remember(tracks: Track[]) {
 function refresh() {
 	if (mirroring) return;
 	if (engine.playing && !engine.buffering) failedInRow = 0;
+	if (engine.playing) player.waitingForTap = false;
 	player.playing = engine.playing;
 	player.buffering = engine.buffering;
 	player.position = engine.position;
@@ -181,7 +183,8 @@ async function startCurrent(autoplay = true, startAt = 0) {
 	player.error = '';
 	listenedSeconds = 0;
 	scrobbled = false;
-	await engine.load(trackId, streamUrl(requireCredentials(), trackId), { autoplay, startAt });
+	const started = await engine.load(trackId, streamUrl(requireCredentials(), trackId), { autoplay, startAt });
+	if (started === 'blocked') waitForTap();
 	prepareNext();
 	refresh();
 	if (autoplay) void navidrome().subsonic('scrobble', { id: trackId, submission: 'false' }).catch(() => {});
@@ -286,6 +289,7 @@ export function startPlayer() {
 	});
 	void sendPendingScrobbles();
 	setInterval(tick, TICK_MS);
+	for (const type of ['pointerdown', 'keydown']) addEventListener(type, onGesture, { capture: true });
 	installMediaSession({
 		play: () => {
 			if (!player.playing) togglePlay();
@@ -319,6 +323,23 @@ export async function restoreSavedQueue() {
 	}
 }
 
+function waitForTap() {
+	player.waitingForTap = true;
+	refresh();
+}
+
+async function resumeEngine() {
+	if ((await engine.resume()) === 'blocked') waitForTap();
+}
+
+function onGesture(event: Event) {
+	if (mirroring) return;
+	engine.unlock();
+	if (!player.waitingForTap || (event.target as Element | null)?.closest?.('.cap-ctrl')) return;
+	player.waitingForTap = false;
+	void resumeEngine();
+}
+
 function playbackSnapshot(): Playback {
 	return {
 		trackId: queueState.currentTrackId,
@@ -327,13 +348,14 @@ function playbackSnapshot(): Playback {
 		duration: player.duration,
 		volume: player.volume,
 		muted: player.muted,
-		starred: currentTrack()?.starred ?? false
+		starred: currentTrack()?.starred ?? false,
+		waiting: player.waitingForTap
 	};
 }
 
 function playbackSignature() {
-	const { trackId, playing, duration, volume, muted, starred } = playbackSnapshot();
-	return [trackId, playing, Math.round(duration), volume, muted, starred].join('|');
+	const { trackId, playing, duration, volume, muted, starred, waiting } = playbackSnapshot();
+	return [trackId, playing, Math.round(duration), volume, muted, starred, waiting].join('|');
 }
 
 function publishPlayback() {
@@ -368,6 +390,7 @@ function mirrorPlayback(playback: Playback | null, ageMs: number) {
 	player.duration = playback.duration;
 	player.volume = playback.volume;
 	player.muted = playback.muted;
+	player.waitingForTap = playback.waiting && activeIsOnline();
 	mirroredPosition = playback.position + (player.playing ? ageMs / 1000 : 0);
 	mirroredAt = performance.now();
 	player.position = mirroredPosition;
@@ -392,6 +415,7 @@ function leaveMirror() {
 	if (engine.trackId === resumeAt.trackId) engine.seek(resumeAt.position);
 	player.volume = storedVolume();
 	player.muted = false;
+	player.waitingForTap = false;
 	applyLevel();
 }
 
@@ -449,7 +473,7 @@ function run(command: Command) {
 			if (engine.playing) {
 				engine.pause();
 				void saveQueue();
-			} else if (engine.trackId === queueState.currentTrackId && !player.error) void engine.resume();
+			} else if (engine.trackId === queueState.currentTrackId && !player.error) void resumeEngine();
 			else void startCurrent(true, engine.trackId === queueState.currentTrackId ? engine.position : resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
 			return;
 		}
@@ -517,7 +541,6 @@ async function obey(command: Command) {
 async function takeOver(snapshot: queue.QueueState | null, playback: Playback | null, ageMs: number) {
 	mirrorSequence += 1;
 	leaveMirror();
-	showToast('Playing in this tab');
 	if (!snapshot?.currentTrackId) return;
 	await ensureTracks(queue.queuedTrackIds(snapshot));
 	queue.replaceQueue(queueState, snapshot);
@@ -525,6 +548,7 @@ async function takeOver(snapshot: queue.QueueState | null, playback: Playback | 
 	const playing = playback?.playing ?? false;
 	const position = (playback?.position ?? 0) + (playing ? ageMs / 1000 : 0);
 	await startCurrent(playing, playback?.trackId === snapshot.currentTrackId ? position : 0);
+	if (!player.waitingForTap) showToast('Playing in this tab');
 }
 
 function release(to: string, handoff: boolean) {
