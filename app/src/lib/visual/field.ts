@@ -106,7 +106,7 @@ uniform vec4 uB;
 uniform vec4 uC[5];
 uniform vec4 uM[5];
 out vec4 outColor;
-float hs(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float hs(vec2 q){uvec2 c=uvec2(ivec2(floor(q)));uint h=(c.x*0x8da6b343u)^(c.y*0xd8163841u);h^=h>>16u;h*=0x7feb352du;h^=h>>15u;h*=0x846ca68bu;h^=h>>16u;return float(h>>8u)*(1.0/16777216.0);}
 float vn(vec2 p){vec2 i=floor(p);vec2 f=fract(p);vec2 u=f*f*(3.0-2.0*f);float a=hs(i);float b=hs(i+vec2(1.0,0.0));float c=hs(i+vec2(0.0,1.0));float d=hs(i+vec2(1.0,1.0));return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);}
 float fbm(vec2 p){float v=0.0;float a=0.5;for(int i=0;i<5;i++){v+=a*vn(p);p=mat2(1.6,1.2,-1.2,1.6)*p+vec2(3.1,1.7);a*=0.5;}return v;}
 vec2 vib(vec2 x){
@@ -158,7 +158,7 @@ struct U { a: vec4f, b: vec4f, c: array<vec4f, 5>, m: array<vec4f, 5> };
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
   return vec4f(p[i], 0.0, 1.0);
 }
-fn hs(q: vec2f) -> f32 { var p = fract(q * vec2f(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+fn hs(q: vec2f) -> f32 { let c = vec2u(vec2i(floor(q))); var h = (c.x * 0x8da6b343u) ^ (c.y * 0xd8163841u); h ^= h >> 16u; h *= 0x7feb352du; h ^= h >> 15u; h *= 0x846ca68bu; h ^= h >> 16u; return f32(h >> 8u) * (1.0 / 16777216.0); }
 fn vn(p: vec2f) -> f32 {
   let i = floor(p); let f = fract(p); let w = f * f * (3.0 - 2.0 * f);
   let a = hs(i); let b = hs(i + vec2f(1.0, 0.0)); let c = hs(i + vec2f(0.0, 1.0)); let d = hs(i + vec2f(1.0, 1.0));
