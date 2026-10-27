@@ -2,9 +2,9 @@ import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.or
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
-import { buildLibrary, readMeta } from './build.ts';
+import { applyChanges, buildLibrary, readMeta, readSyncState } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
-import { fetchLibrary, fetchSnapshotFile } from './fetch.ts';
+import { fetchChanges, fetchLibrary, fetchSnapshotFile } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
 
@@ -126,6 +126,18 @@ async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ me
 	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes, steps: snapshot.steps ?? {} } };
 }
 
+async function syncChanges(http: NavidromeHttp): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
+	const meta = db && readMeta(db);
+	const sync = db && readSyncState(db);
+	if (!meta || !sync || Date.now() - Date.parse(sync.fullSyncAt) > LIBRARY_SYNC.fullSyncIntervalMs) return null;
+	const changes = await fetchChanges(http, sync, meta.albums);
+	if (!changes || !db) return null;
+	const result = applyChanges(db, meta, sync, changes, new Date().toISOString());
+	if (changes.totals && (changes.totals.albums !== result.meta.albums || changes.totals.tracks !== result.meta.tracks)) return null;
+	if (result.changed) await writeSnapshot(db);
+	return result;
+}
+
 function requireDatabase(): Database {
 	if (!db) throw new Error('Library not loaded');
 	return db;
@@ -143,9 +155,11 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 		case 'sync': {
 			let token = request.credentials.token;
 			const http = new NavidromeHttp(request.credentials, (renewed) => (token = renewed));
+			const incremental = request.full ? null : await syncChanges(http);
+			if (incremental) return { ...incremental, token, timings: null };
 			const started = performance.now();
 			const snapshot = await fetchLibrary(http, (progress) => self.postMessage({ id, progress } satisfies WorkerReply));
-			return { ...(await install(snapshot, performance.now() - started)), token };
+			return { ...(await install(snapshot, performance.now() - started)), token, changed: true };
 		}
 		case 'loadFile': {
 			const started = performance.now();

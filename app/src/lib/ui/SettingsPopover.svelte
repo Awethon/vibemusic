@@ -75,7 +75,7 @@
 		}}><span>Tune liquid glass<small>Looks, shape, optics and light</small></span></button
 	>
 	<p class="pop-title">Library</p>
-	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary()}>
+	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary(true)}>
 		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
 	</button>
 	{#if import.meta.env.DEV && library.timings}<p class="set-foot">Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(library.timings.fetchMs)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}</p>{/if}

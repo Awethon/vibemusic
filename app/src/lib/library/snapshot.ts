@@ -1,12 +1,30 @@
 import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
 
 export type LibrarySnapshot = {
-	version: string;
 	albums: NativeAlbum[];
 	songs: NativeSong[];
 	playlists: NativePlaylist[];
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
 	steps?: Record<string, number>;
+};
+
+export type SyncMarks = { albumImported: string; albumPlayed: string; albumStarred: string; songPlayed: string; songStarred: string };
+
+export type LibraryChanges = {
+	marks: SyncMarks;
+	albums: NativeAlbum[];
+	albumSongs: NativeSong[];
+	albumStats: NativeAlbum[];
+	songStats: NativeSong[];
+	playlists: NativePlaylist[];
+	playlistTracks: Map<string, NativePlaylistTrack[]>;
+	totals: { albums: number; tracks: number } | null;
+};
+
+export type SyncState = {
+	marks: SyncMarks;
+	playlists: Record<string, string>;
+	fullSyncAt: string;
 };
 
 export type LibraryMeta = {

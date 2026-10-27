@@ -1,8 +1,7 @@
 import { onReconnect, reportReachable, reportUnreachable } from '../connection.svelte.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
-import { navidrome, renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
+import { renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
-import { fetchLibraryVersion } from './fetch.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import { coverAlbumOverrides } from '../navidrome/credentials.ts';
@@ -11,7 +10,7 @@ import type { LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
-type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync' } | { kind: 'need-snapshot' };
+type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync'; full: boolean } | { kind: 'need-snapshot' };
 
 export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null; progress: SyncProgress | null }>({
 	status: 'idle',
@@ -24,7 +23,7 @@ export const library = $state<{ status: Status; meta: LibraryMeta | null; revisi
 	progress: null
 });
 
-const SYNTHETIC_LIBRARY = { version: 'synthetic-1', snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
+const SYNTHETIC_LIBRARY = { snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
 const syntheticLibrary = import.meta.env.DEV && new URLSearchParams(location.search).get('lib') === 'synthetic';
 
 let worker: Worker | null = null;
@@ -74,23 +73,26 @@ function failed(error: unknown) {
 	if (!library.meta) library.status = 'error';
 }
 
-async function syncNow() {
+async function syncNow(full: boolean) {
 	if (!library.meta) library.status = 'syncing';
-	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()) });
+	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()), full });
 	reportReachable();
 	renewToken(result.token);
-	library.timings = result.timings;
 	library.progress = null;
+	if (result.timings) library.timings = result.timings;
+	if (!result.changed) {
+		library.meta = result.meta;
+		return;
+	}
 	loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
 }
 
-async function checkForChanges(force = false) {
+async function checkForChanges(full = false) {
 	if (syncing) return syncing;
 	syncing = (async () => {
 		try {
-			const version = await fetchLibraryVersion(navidrome());
-			if (force || !library.meta || library.meta.version !== version) await syncNow();
+			await syncNow(full);
 			library.error = '';
 		} catch (error) {
 			failed(error);
@@ -121,7 +123,7 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 			failed(error);
 		}
 	} else if (message.kind === 'resync') {
-		if (library.leader) await checkForChanges(true);
+		if (library.leader) await checkForChanges(message.full);
 	} else if (message.kind === 'need-snapshot') {
 		if (!library.leader || !library.meta) return;
 		await call({ kind: 'persist' });
@@ -135,7 +137,7 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 async function startSyntheticLibrary() {
 	const covers = (await (await fetch(SYNTHETIC_LIBRARY.coversUrl)).json()) as Record<string, string>;
 	for (const [albumId, coverAlbumId] of Object.entries(covers)) coverAlbumOverrides.set(albumId, coverAlbumId);
-	if (library.meta?.version === SYNTHETIC_LIBRARY.version) return;
+	if (library.meta) return;
 	library.status = 'syncing';
 	const result = await call({ kind: 'loadFile', url: SYNTHETIC_LIBRARY.snapshotUrl });
 	library.timings = result.timings;
@@ -172,9 +174,9 @@ export async function startLibrary() {
 	});
 }
 
-export async function resyncLibrary() {
-	if (library.leader) await checkForChanges(true);
-	else channel?.postMessage({ kind: 'resync' } satisfies ChannelMessage);
+export async function resyncLibrary(full = false) {
+	if (library.leader) await checkForChanges(full);
+	else channel?.postMessage({ kind: 'resync', full } satisfies ChannelMessage);
 }
 
 export async function query<Row>(sql: string, params: SqlParam[] = []): Promise<Row[]> {

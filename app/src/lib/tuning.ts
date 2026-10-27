@@ -193,5 +193,10 @@ export const HISTORY = Object.freeze({ maxLength: 16 });
 
 export const LIBRARY_SYNC = Object.freeze({
 	pollIntervalMs: 60000,
-	snapshotWriteDelayMs: 2000
+	snapshotWriteDelayMs: 2000,
+	fullSyncIntervalMs: 24 * 60 * 60 * 1000,
+	changePageSize: 2,
+	albumsPerSongRequest: 40,
+	fullSyncChangedAlbumShare: 0.3,
+	fullSyncChangedAlbumMin: 50
 });
