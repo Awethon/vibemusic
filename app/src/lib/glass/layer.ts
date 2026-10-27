@@ -1,5 +1,5 @@
 import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
-import type { GlassParams } from './params.ts';
+import { glassMargin, type GlassParams } from './params.ts';
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
 
@@ -34,7 +34,7 @@ function surfaces(selector: string): GlassShape[] {
 }
 
 function regionAround(shapes: GlassShape[], params: GlassParams): Region {
-	const margin = Math.max(60, params.shadowBlur * 1.5 + params.shadowDist + params.thick * 1.5 + 12);
+	const margin = glassMargin(params);
 	const left = Math.max(0, Math.min(...shapes.map((shape) => shape.x)) - margin);
 	const top = Math.max(0, Math.min(...shapes.map((shape) => shape.y)) - margin);
 	const right = Math.min(innerWidth, Math.max(...shapes.map((shape) => shape.x + shape.width)) + margin);
@@ -55,7 +55,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	let dpr = 0;
 	let pageDirty = true;
 	let lastShapes = '';
-	let lastRegion = '';
+	let lastRegions: string[] = [];
 	let lastParams = '';
 	let fieldVersion = -1;
 	let frame = 0;
@@ -79,7 +79,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		dpr = 0;
 		pageDirty = true;
 		lastShapes = '';
-		lastRegion = '';
+		lastRegions = [];
 	};
 	const onLost = (event: Event) => {
 		event.preventDefault();
@@ -132,19 +132,23 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 			lastShapes = '';
 			return;
 		}
-		const region = regionAround(shapes, current);
-		const regionKey = `${region.x},${region.y},${region.width},${region.height}`;
-		const repaint = pageDirty || regionKey !== lastRegion || fieldVersion !== fieldSnapshot.version || pageAnimating();
+		const regions = shapes.map((shape) => regionAround([shape], current));
+		const regionKeys = regions.map((region) => `${region.x},${region.y},${region.width},${region.height}`);
+		const sceneStale = pageDirty || fieldVersion !== fieldSnapshot.version || pageAnimating();
 		const shapesKey = JSON.stringify(shapes);
-		if (!repaint && shapesKey === lastShapes && paramsKey === lastParams) return;
-		if (repaint) {
-			paintBackdrop(paint, region, dpr, above);
-			gl.setScene(paint.canvas);
-			pageDirty = false;
-			lastRegion = regionKey;
-			fieldVersion = fieldSnapshot.version;
-		}
-		gl.render(current, shapes, region, region, dpr);
+		if (!sceneStale && regionKeys.join('|') === lastRegions.join('|') && shapesKey === lastShapes && paramsKey === lastParams) return;
+		gl.keepSlots(shapes.length);
+		gl.clear();
+		shapes.forEach((shape, index) => {
+			if (sceneStale || regionKeys[index] !== lastRegions[index]) {
+				paintBackdrop(paint, regions[index], dpr, above);
+				gl.setScene(paint.canvas, index);
+			}
+			gl.render(current, shapes, shape, regions[index], dpr, index);
+		});
+		pageDirty = false;
+		lastRegions = regionKeys;
+		fieldVersion = fieldSnapshot.version;
 		if (level === 'player') dispatchEvent(new Event(PLAYER_RENDERED));
 		lastShapes = shapesKey;
 		lastParams = paramsKey;

@@ -1,4 +1,4 @@
-import { lightVector, RENDER, type GlassParams } from './params.ts';
+import { glassMargin, lightVector, RENDER, type GlassParams } from './params.ts';
 import { BLUR, GLASS, MAX_SHAPES, VERT } from './shaders.ts';
 
 export type GlassShape = { x: number; y: number; width: number; height: number; radius: number; alpha: number };
@@ -66,11 +66,9 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.deleteFramebuffer(item.fbo);
 	}
 
-	const scene = texture(true);
-	let sceneSize = [1, 1];
-	let blur: { scale: number; h: Target; v: Target } | null = null;
-	let blurKey = '';
-	let sceneVersion = 0;
+	type Slot = { scene: WebGLTexture; size: [number, number]; version: number; blur: { scale: number; h: Target; v: Target } | null; blurKey: string };
+	const slots: Slot[] = [];
+	const slotAt = (index: number) => (slots[index] ??= { scene: texture(true), size: [1, 1], version: 0, blur: null, blurKey: '' });
 	let width = 0;
 	let height = 0;
 
@@ -81,31 +79,43 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		canvas.height = height;
 	}
 
-	function setScene(source: HTMLCanvasElement) {
-		context.bindTexture(context.TEXTURE_2D, scene);
+	function releaseSlot(slot: Slot) {
+		release(slot.blur?.h ?? null);
+		release(slot.blur?.v ?? null);
+		context.deleteTexture(slot.scene);
+	}
+
+	function keepSlots(count: number) {
+		for (const slot of slots.splice(count)) releaseSlot(slot);
+	}
+
+	function setScene(source: HTMLCanvasElement, index = 0) {
+		const slot = slotAt(index);
+		context.bindTexture(context.TEXTURE_2D, slot.scene);
 		context.pixelStorei(context.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, source);
 		context.generateMipmap(context.TEXTURE_2D);
-		sceneSize = [source.width, source.height];
-		sceneVersion += 1;
+		slot.size = [source.width, source.height];
+		slot.version += 1;
 	}
 
-	function blurred(frost: number, dpr: number): WebGLTexture {
+	function blurred(slot: Slot, frost: number, dpr: number): WebGLTexture {
 		const sigma = frost * dpr;
-		const [sceneWidth, sceneHeight] = sceneSize;
+		const [sceneWidth, sceneHeight] = slot.size;
 		const scale = sigma < RENDER.strongBlurFromPx ? RENDER.blurDownscale : RENDER.strongBlurDownscale;
 		const w = Math.max(1, Math.ceil(sceneWidth / scale));
 		const h = Math.max(1, Math.ceil(sceneHeight / scale));
-		if (!blur || blur.scale !== scale || blur.h.width !== w || blur.h.height !== h) {
-			release(blur?.h ?? null);
-			release(blur?.v ?? null);
-			blur = { scale, h: target(w, h, true), v: target(w, h, true) };
-			blurKey = '';
+		if (!slot.blur || slot.blur.scale !== scale || slot.blur.h.width !== w || slot.blur.h.height !== h) {
+			release(slot.blur?.h ?? null);
+			release(slot.blur?.v ?? null);
+			slot.blur = { scale, h: target(w, h, true), v: target(w, h, true) };
+			slot.blurKey = '';
 		}
+		const blur = slot.blur;
 		const effective = Math.max(sigma, RENDER.minBlurPx * dpr);
-		const key = `${effective}|${sceneVersion}`;
-		if (key === blurKey) return blur.v.tex;
-		blurKey = key;
+		const key = `${effective}|${slot.version}`;
+		if (key === slot.blurKey) return blur.v.tex;
+		slot.blurKey = key;
 		const stepPx = effective * RENDER.blurStepPerPx;
 		const { program, u } = programs.blur;
 		context.useProgram(program);
@@ -114,7 +124,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.viewport(0, 0, w, h);
 		context.uniform2f(u.uDst, w, h);
 		context.bindFramebuffer(context.FRAMEBUFFER, blur.h.fbo);
-		context.bindTexture(context.TEXTURE_2D, scene);
+		context.bindTexture(context.TEXTURE_2D, slot.scene);
 		context.uniform2f(u.uStep, stepPx / sceneWidth, 0);
 		context.uniform1f(u.uLod, Math.log2(Math.max(stepPx, 1)));
 		context.drawArrays(context.TRIANGLES, 0, 3);
@@ -136,13 +146,15 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.clear(context.COLOR_BUFFER_BIT);
 	}
 
-	function render(params: GlassParams, shapes: GlassShape[], region: Region, bounds: Region, dpr: number) {
-		const blurTex = blurred(params.frost, dpr);
+	function render(params: GlassParams, shapes: GlassShape[], drawn: GlassShape, region: Region, dpr: number, index = 0) {
+		const slot = slotAt(index);
+		const blurTex = blurred(slot, params.frost, dpr);
 		const { program, u } = programs.glass;
-		clear();
+		context.bindFramebuffer(context.FRAMEBUFFER, null);
+		context.viewport(0, 0, width, height);
 		context.useProgram(program);
 		context.activeTexture(context.TEXTURE0);
-		context.bindTexture(context.TEXTURE_2D, scene);
+		context.bindTexture(context.TEXTURE_2D, slot.scene);
 		context.uniform1i(u.uScene, 0);
 		context.activeTexture(context.TEXTURE1);
 		context.bindTexture(context.TEXTURE_2D, blurTex);
@@ -162,7 +174,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 				shown.flatMap((shape) => [Math.min(shape.radius, shape.width / 2, shape.height / 2) * dpr, shape.alpha])
 			);
 		}
-		context.uniform4f(u.uBounds, bounds.x * dpr, bounds.y * dpr, (bounds.x + bounds.width) * dpr, (bounds.y + bounds.height) * dpr);
+		context.uniform4f(u.uBounds, region.x * dpr, region.y * dpr, (region.x + region.width) * dpr, (region.y + region.height) * dpr);
 		const light = lightVector(params);
 		context.uniform1f(u.uMerge, 0);
 		context.uniform1f(u.uThick, params.thick * dpr);
@@ -189,19 +201,27 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.uniform1f(u.uCaustic, params.caustic);
 		context.uniform4f(u.uTint, TINT[0], TINT[1], TINT[2], params.tintA);
 		context.uniform1f(u.uSat, params.sat);
-		context.drawArrays(context.TRIANGLES, 0, 3);
+		const margin = glassMargin(params);
+		const left = Math.max(0, Math.floor((drawn.x - margin) * dpr));
+		const right = Math.min(width, Math.ceil((drawn.x + drawn.width + margin) * dpr));
+		const top = Math.max(0, Math.floor((drawn.y - margin) * dpr));
+		const bottom = Math.min(height, Math.ceil((drawn.y + drawn.height + margin) * dpr));
+		if (right > left && bottom > top) {
+			context.enable(context.SCISSOR_TEST);
+			context.scissor(left, height - bottom, right - left, bottom - top);
+			context.drawArrays(context.TRIANGLES, 0, 3);
+			context.disable(context.SCISSOR_TEST);
+		}
 		context.activeTexture(context.TEXTURE0);
 	}
 
 	function dispose(loseContext: boolean) {
-		release(blur?.h ?? null);
-		release(blur?.v ?? null);
-		context.deleteTexture(scene);
+		keepSlots(0);
 		for (const { program } of Object.values(programs)) context.deleteProgram(program);
 		if (loseContext) context.getExtension('WEBGL_lose_context')?.loseContext();
 	}
 
-	return { resize, setScene, render, clear, dispose };
+	return { resize, setScene, render, clear, keepSlots, dispose };
 }
 
 export type GlassRenderer = NonNullable<ReturnType<typeof createGlassRenderer>>;

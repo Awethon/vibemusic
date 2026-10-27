@@ -30,6 +30,8 @@ export type GlassParams = {
 
 export type GlassKey = keyof GlassParams;
 
+export const glassMargin = (params: GlassParams) => Math.max(60, params.shadowBlur * 1.5 + params.shadowDist + params.thick * 1.5 + 12);
+
 export const RENDER = Object.freeze({
 	blurDownscale: 2,
 	strongBlurDownscale: 4,
