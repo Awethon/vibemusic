@@ -14,6 +14,13 @@ export const genreKey = (text: string) =>
 		.filter(Boolean);
 
 const nodes = tree as Record<string, Node>;
+
+export const TREE_VERSION = (() => {
+	const text = JSON.stringify(tree);
+	let value = 2166136261;
+	for (let index = 0; index < text.length; index++) value = Math.imul(value ^ text.charCodeAt(index), 16777619);
+	return (value >>> 0).toString(36);
+})();
 const byKey = new Map<string, string>();
 for (const [name, node] of Object.entries(nodes)) for (const label of [name, ...(node.aliases ?? [])]) byKey.set(genreKey(label).join(''), name);
 

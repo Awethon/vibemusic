@@ -1,4 +1,6 @@
-export const SCHEMA_VERSION = 6;
+import { TREE_VERSION } from '../genres/genres.ts';
+
+export const SCHEMA_VERSION = `6.${TREE_VERSION}`;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
