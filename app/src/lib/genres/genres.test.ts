@@ -30,8 +30,9 @@ describe('genre resolver', () => {
 
 describe('genre tree', () => {
 	it('puts a subgenre under every broader genre', () => {
-		expect(withAncestors('Nu Metal').toSorted()).toEqual(['Alternative', 'Alternative Metal', 'Metal', 'Nu Metal']);
+		expect(withAncestors('Nu Metal').toSorted()).toEqual(['Alternative', 'Alternative Metal', 'Nu Metal', 'Rock']);
 		expect(withAncestors('Zeuhl')).toEqual(['Zeuhl']);
+		expect(withAncestors('Symphonic Metal')).toContain('Metal');
 	});
 
 	it('only names parents that exist', () => {
