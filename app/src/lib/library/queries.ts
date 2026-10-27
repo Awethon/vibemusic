@@ -186,8 +186,11 @@ async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: s
 	return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
 }
 
-export const tracksByIds = (ids: string[]) =>
-	inChunks(ids, (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
+export async function tracksByIds(ids: string[]) {
+	const found = await inChunks([...new Set(ids)], (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
+	const byId = new Map(found.map((track) => [track.id, track]));
+	return ids.map((id) => byId.get(id)).filter((track): track is Track => !!track);
+}
 
 export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind != 'artist' order by name collate nocase`);
 

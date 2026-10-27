@@ -38,7 +38,7 @@
 		let active = true;
 		void artistInfo(current.id, current.name).then(async (info) => {
 			const [popularTracks, similarArtists] = await Promise.all([
-				tracksByIds(info.topTrackIds.slice(0, ARTIST_PAGE.popularCount)),
+				tracksByIds(info.topTrackIds),
 				Promise.all(info.similarArtistIds.map((similarId) => artistById(similarId)))
 			]);
 			if (!active) return;
