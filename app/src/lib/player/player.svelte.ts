@@ -86,6 +86,7 @@ let publishedPlayback = '';
 let publishedAt = 0;
 let publishedPosition = 0;
 let announced = false;
+let takingOver = false;
 let queuePublishTimer: ReturnType<typeof setTimeout> | undefined;
 
 const publishing = () => relay.connected && relay.active === relay.deviceId;
@@ -289,7 +290,7 @@ export function startPlayer() {
 	});
 	void sendPendingScrobbles();
 	setInterval(tick, TICK_MS);
-	for (const type of ['pointerdown', 'keydown']) addEventListener(type, onGesture, { capture: true });
+	for (const type of ['click', 'touchend', 'keydown']) addEventListener(type, onGesture, { capture: true });
 	installMediaSession({
 		play: () => {
 			if (!player.playing) togglePlay();
@@ -334,7 +335,7 @@ async function resumeEngine() {
 
 function onGesture(event: Event) {
 	if (mirroring) return;
-	engine.unlock();
+	engine.wake();
 	if (!player.waitingForTap || (event.target as Element | null)?.closest?.('.cap-ctrl')) return;
 	player.waitingForTap = false;
 	void resumeEngine();
@@ -542,9 +543,16 @@ async function takeOver(snapshot: queue.QueueState | null, playback: Playback | 
 	mirrorSequence += 1;
 	leaveMirror();
 	if (!snapshot?.currentTrackId) return;
-	await ensureTracks(queue.queuedTrackIds(snapshot));
-	queue.replaceQueue(queueState, snapshot);
+	takingOver = true;
+	try {
+		await ensureTracks(queue.queuedTrackIds(snapshot));
+		queue.replaceQueue(queueState, snapshot);
+	} finally {
+		takingOver = false;
+	}
 	queueChanged();
+	announced = false;
+	announceIfActive();
 	const playing = playback?.playing ?? false;
 	const position = (playback?.position ?? 0) + (playing ? ageMs / 1000 : 0);
 	await startCurrent(playing, playback?.trackId === snapshot.currentTrackId ? position : 0);
@@ -562,6 +570,7 @@ function release(to: string, handoff: boolean) {
 }
 
 function announceIfActive() {
+	if (takingOver) return;
 	if (!publishing()) {
 		announced = false;
 		return;
