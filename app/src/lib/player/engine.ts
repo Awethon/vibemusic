@@ -1,6 +1,8 @@
 import { createAnalysis, createIdleFeatures, OUTPUT_DELAY_SECONDS, type Analysis, type AudioFeatures } from '../visual/analysis.ts';
 
-type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null };
+type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null; startAt: number | null };
+
+const START_TOLERANCE_SECONDS = 1;
 
 export type EngineListener = {
 	ended(): void;
@@ -31,7 +33,11 @@ export class AudioEngine {
 	private createDeck(): Deck {
 		const element = new Audio();
 		element.preload = 'auto';
-		const deck: Deck = { element, trackId: '', source: null };
+		const deck: Deck = { element, trackId: '', source: null, startAt: null };
+		element.addEventListener('playing', () => {
+			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > START_TOLERANCE_SECONDS) element.currentTime = deck.startAt;
+			deck.startAt = null;
+		});
 		const fromActive = (handler: () => void) => () => {
 			if (this.decks[this.activeDeck] === deck) handler();
 		};
@@ -107,6 +113,7 @@ export class AudioEngine {
 			previous.trackId = '';
 		}
 		this.analysis?.reset();
+		deck.startAt = null;
 		if (options.startAt) this.seekDeck(deck, options.startAt);
 		else if (deck.element.currentTime) deck.element.currentTime = 0;
 		this.listener.changed();
@@ -130,6 +137,7 @@ export class AudioEngine {
 	}
 
 	private seekDeck(deck: Deck, seconds: number) {
+		if (deck.element.paused) deck.startAt = seconds;
 		const apply = () => (deck.element.currentTime = seconds);
 		if (deck.element.readyState >= HTMLMediaElement.HAVE_METADATA) apply();
 		else deck.element.addEventListener('loadedmetadata', apply, { once: true });

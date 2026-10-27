@@ -130,6 +130,21 @@ impl Hub {
     pub fn receive(&mut self, user: &str, device_id: &str, message: &Value) {
         let Some(room) = self.rooms.get_mut(user) else { return };
         let is_active = room.active.as_deref() == Some(device_id);
+        if message["type"] != "ping" {
+            let playback = &message["playback"];
+            tracing::debug!(
+                device = &device_id[..device_id.len().min(8)],
+                kind = message["type"].as_str().unwrap_or(""),
+                is_active,
+                active = room.active.as_deref().map(|id| &id[..id.len().min(8)]).unwrap_or(""),
+                track = playback["trackId"].as_str().unwrap_or(""),
+                playing = playback["playing"].as_bool(),
+                waiting = playback["waiting"].as_bool(),
+                position = playback["position"].as_f64().map(|position| position.round()),
+                command = message["command"]["kind"].as_str().unwrap_or(""),
+                "message"
+            );
+        }
         match message["type"].as_str() {
             Some("queue") if is_active => {
                 room.queue = Some(message["queue"].clone());

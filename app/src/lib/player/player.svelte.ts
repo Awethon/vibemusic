@@ -417,6 +417,7 @@ function leaveMirror() {
 	player.volume = storedVolume();
 	player.muted = false;
 	player.waitingForTap = false;
+	player.playing = engine.playing;
 	applyLevel();
 }
 
@@ -596,7 +597,7 @@ function onRelayMessage(message: RelayMessage) {
 			if (isActiveElsewhere()) {
 				enterMirror();
 				if (!activeIsOnline()) player.playing = false;
-			}
+			} else if (relay.active === relay.deviceId && mirroring) leaveMirror();
 			announceIfActive();
 			return;
 		case 'queue':
