@@ -31,6 +31,7 @@
 	import Capsule from '#lib/ui/Capsule.svelte';
 	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
 	import { installScreenEdges } from '#lib/ui/screenEdges.ts';
+	import { restoreMainScroll } from '#lib/ui/scrollRestore.ts';
 	import { installBrokenImageRetry } from '#lib/ui/brokenImages.ts';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
 	import FirstSync from '#lib/ui/FirstSync.svelte';
@@ -48,10 +49,15 @@
 	import { applyFullScreenStyleClass, setFullScreen, toggleFullScreen, togglePanel, togglePanelTab } from '#lib/ui/shell.ts';
 	import { ui } from '#lib/ui/state.svelte.ts';
 	import Toast from '#lib/ui/Toast.svelte';
-	import type { LayoutProps } from './$types';
+	import type { LayoutProps, Snapshot } from './$types';
 
 	let { children }: LayoutProps = $props();
 	let main = $state<HTMLElement | null>(null);
+
+	export const snapshot: Snapshot<number> = {
+		capture: () => main?.scrollTop ?? 0,
+		restore: (scrollTop) => restoreMainScroll(scrollTop)
+	};
 	let started = false;
 	let restored = false;
 	const signedIn = $derived(!!session.credentials && !session.expired);
