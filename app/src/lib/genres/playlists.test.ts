@@ -30,6 +30,10 @@ describe('genre playlists', () => {
 		expect(chosen(songs('Nu Metal', 80, 6))).toEqual(['Alternative']);
 	});
 
+	it('keeps the narrower of two broad genres that mostly overlap, even when the wider one is bigger', () => {
+		expect(chosen([...songs('Nu Metal', 100, 6), ...songs('Hard Rock', 10, 2)])).toEqual(['Alternative']);
+	});
+
 	it('gives a subgenre its own playlist when it is a distinct slice', () => {
 		expect(chosen([...songs('Hip-Hop', 200, 10), ...songs('Trap', 60, 6)])).toEqual(['Hip-Hop', 'Trap']);
 	});

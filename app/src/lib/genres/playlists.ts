@@ -1,5 +1,5 @@
 import { GENRE_PLAYLISTS } from '../tuning.ts';
-import { parentsOf, withAncestors } from './genres.ts';
+import { descendantCount, parentsOf, withAncestors } from './genres.ts';
 import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
 
 export type GenreSong = { id: string; title: string; duration: number; albumId: string; artistId: string; genres: string[]; plays: number; starred: boolean; fans: number | null; popularity: number | null };
@@ -37,7 +37,7 @@ export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS)
 			else byGenre.set(genre, [song]);
 		}
 	}
-	const candidates = [...byGenre].filter(([genre, members]) => qualifies(genre, members, rules)).toSorted(([a, aSongs], [b, bSongs]) => withAncestors(a).length - withAncestors(b).length || bSongs.length - aSongs.length || a.localeCompare(b));
+	const candidates = [...byGenre].filter(([genre, members]) => qualifies(genre, members, rules)).toSorted(([a, aSongs], [b, bSongs]) => withAncestors(a).length - withAncestors(b).length || descendantCount(a) - descendantCount(b) || bSongs.length - aSongs.length || a.localeCompare(b));
 	const chosen: { genre: string; ids: Set<string>; picked: Set<string>; best: GenreSong[] }[] = [];
 	for (const [genre, members] of candidates) {
 		if (chosen.length >= rules.maxPlaylists) break;

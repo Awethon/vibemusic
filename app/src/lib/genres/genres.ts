@@ -79,3 +79,24 @@ export function withAncestors(name: string): string[] {
 export const parentsOf = (name: string) => nodes[name]?.parents ?? [];
 
 export type GenreResolver = ReturnType<typeof createGenreResolver>;
+
+const children = new Map<string, string[]>();
+for (const [name, node] of Object.entries(nodes)) for (const parent of node.parents ?? []) children.set(parent, [...(children.get(parent) ?? []), name]);
+
+const breadth = new Map<string, number>();
+
+export function descendantCount(name: string): number {
+	const cached = breadth.get(name);
+	if (cached !== undefined) return cached;
+	const found = new Set<string>();
+	const visit = (current: string) => {
+		for (const child of children.get(current) ?? []) {
+			if (found.has(child)) continue;
+			found.add(child);
+			visit(child);
+		}
+	};
+	visit(name);
+	breadth.set(name, found.size);
+	return found.size;
+}
