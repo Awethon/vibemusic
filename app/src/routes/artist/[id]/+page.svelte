@@ -59,12 +59,12 @@
 				<p class="eyebrow">Artist</p>
 				<h1 class="display">{artist.value.name}</h1>
 				<p class="sub">{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}{artist.value.firstYear ? ` · since ${artist.value.firstYear}` : ''}</p>
+				<div style:margin="20px 0 8px"><PlayButton tracks={tracks.value} sourceName={artist.value.name} listKey="artist:{id}" label="Play all" /></div>
 				{#if biography}
 					<p class="bio" class:open={expanded}>{biography}</p>
 					<button class="ghost" type="button" onclick={() => (expanded = !expanded)}>{expanded ? 'Show less' : 'Read more'}</button>
 				{/if}
 			</div>
-			<PlayButton tracks={tracks.value} sourceName={artist.value.name} listKey="artist:{id}" label="Play all" />
 		</div>
 		{#if thisIs.value || popular.length}
 			<div class="popular-block" class:with-playlist={!!thisIs.value}>
