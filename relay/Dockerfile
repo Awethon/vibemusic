@@ -2,6 +2,7 @@ FROM rust:1-slim AS build
 WORKDIR /relay
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY fonts ./fonts
 RUN cargo build --release --locked
 
 FROM debian:trixie-slim
