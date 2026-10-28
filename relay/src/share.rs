@@ -7,7 +7,7 @@ use serde_json::Value;
 
 const MARKER: &str = "window.__SHARE_INFO__ = ";
 const TIMEOUT: Duration = Duration::from_secs(15);
-const COVER_QUERY: &str = "size=600&square=true";
+const COVER_QUERY: &str = "size=300&square=true";
 const COVER_ATTEMPTS: usize = 2;
 
 pub struct Shares {
@@ -111,7 +111,7 @@ pub fn preview_page(info: &Value, id: &str, host: &str) -> String {
     ];
     if let Some(image) = image {
         head.push(format!(r#"<meta property="og:image" content="{}">"#, escape(&image)));
-        head.push(r#"<meta property="og:image:width" content="600"><meta property="og:image:height" content="600">"#.to_owned());
+        head.push(r#"<meta property="og:image:width" content="300"><meta property="og:image:height" content="300">"#.to_owned());
     }
     format!("<!doctype html><html><head><meta charset=\"utf-8\">{}</head><body><a href=\"{}\">{}</a></body></html>", head.join(""), escape(&url), escape(&title))
 }
@@ -135,7 +135,7 @@ mod tests {
         let page = preview_page(&info, "ab", "music.example.com");
         assert!(page.contains(r#"<meta property="og:title" content="Undertow · Glass Harbor">"#));
         assert!(page.contains(r#"<meta property="og:description" content="Second Wind &lt;Live&gt; · 4:12">"#));
-        assert!(page.contains(r#"<meta property="og:image" content="https://music.example.com/share/img/t.k?size=600&amp;square=true">"#));
+        assert!(page.contains(r#"<meta property="og:image" content="https://music.example.com/share/img/t.k?size=300&amp;square=true">"#));
         let several = serde_json::json!({ "description": "", "tracks": [{ "title": "A", "artist": "X", "duration": 90.0 }, { "title": "B", "artist": "Y", "duration": 90.0 }] });
         assert!(preview_page(&several, "cd", "h").contains(r#"content="2 tracks · 3 min""#));
         let single = serde_json::json!({ "tracks": [{ "id": "t", "title": "Lantern", "artist": "Low Tide", "album": "Lantern", "duration": 283.4 }] });
