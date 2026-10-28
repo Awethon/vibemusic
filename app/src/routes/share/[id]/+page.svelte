@@ -3,6 +3,7 @@
 	import { medianCut } from '#lib/library/medianCut.ts';
 	import { PALETTE } from '#lib/tuning.ts';
 	import { accentFromPalette } from '#lib/ui/accent.ts';
+	import { setFaviconAccent } from '#lib/ui/favicon.svelte.ts';
 	import { clock } from '#lib/ui/format.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import Slider from '#lib/ui/Slider.svelte';
@@ -100,7 +101,11 @@
 		if (!track) return;
 		let current = true;
 		void coverAccent(coverUrl(track.id, PALETTE.coverSamplePx * 2)).then(
-			(color) => current && color && (accent = color),
+			(color) => {
+				if (!current || !color) return;
+				accent = color;
+				setFaviconAccent(color);
+			},
 			() => {}
 		);
 		return () => (current = false);

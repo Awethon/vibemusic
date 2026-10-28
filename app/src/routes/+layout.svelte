@@ -8,7 +8,6 @@
 	import '@fontsource/unbounded/500.css';
 	import '@fontsource/unbounded/700.css';
 	import '../app.css';
-	import favicon from '#lib/assets/favicon.svg';
 	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -24,6 +23,7 @@
 	import Capsule from '#lib/ui/Capsule.svelte';
 	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
+	import { favicon } from '#lib/ui/favicon.svelte.ts';
 	import DevicesPopover from '#lib/ui/DevicesPopover.svelte';
 	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import GlassLayer from '#lib/ui/GlassLayer.svelte';
@@ -90,7 +90,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href={favicon.href} />
 	<title>{currentTrack() ? `${currentTrack()?.title} · ${currentTrack()?.artist}` : 'vibemusic'}</title>
 </svelte:head>
 

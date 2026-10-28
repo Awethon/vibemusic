@@ -8,6 +8,7 @@
 	import { copyField } from '../visual/fieldSnapshot.ts';
 	import type { Rgb } from '../color.ts';
 	import { accentFromPalette, blendAccent } from './accent.ts';
+	import { setFaviconAccent } from './favicon.svelte.ts';
 	import { ui } from './state.svelte.ts';
 	import { scrimBackground } from './scrim.ts';
 
@@ -18,12 +19,14 @@
 
 	$effect(() => {
 		const id = albumId;
-		if (!id) return;
+		if (!id) return setFaviconAccent(null);
 		followTrackPalette(id);
 		let current = true;
 		void albumPalette(id)
 			.then((colors) => {
-				if (current) accentTarget = accentFromPalette(colors) ?? accentTarget;
+				if (!current) return;
+				accentTarget = accentFromPalette(colors) ?? accentTarget;
+				setFaviconAccent(`rgb(${accentTarget.map(Math.round).join(' ')})`);
 			})
 			.catch(() => {});
 		return () => {
