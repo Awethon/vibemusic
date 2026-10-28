@@ -5,7 +5,7 @@
 	import Bento from '#lib/ui/Bento.svelte';
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
-	import TrackList from '#lib/ui/TrackList.svelte';
+	import { player, playerQueue, playTrackInList } from '#lib/player/player.svelte.ts';
 
 	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists', artist: 'Artist playlists' };
 	const playlists = live(allPlaylists, []);
@@ -24,10 +24,19 @@
 </script>
 
 <section class="view" {@attach viewEnter}>
-	<div class="vhead"><div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div></div>
+	<div class="vhead">
+		<div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div>
+		{#if stations.value.length}
+			<div class="radio-row" role="group" aria-label="Radio">
+				<span class="radio-label">Radio</span>
+				{#each stations.value as station, index (station.id)}
+					{@const on = playerQueue().currentTrackId === station.id}
+					<button class="radio-chip" class:on type="button" title={station.artist} onclick={() => playTrackInList(stations.value, index, 'Radio', 'radio')}>
+						{#if on && player.playing}<span class="live-badge"><i></i></span>{/if}{station.title}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
 	{#if blocks.length}<Bento {blocks} />{/if}
-	{#if stations.value.length}
-		<h2 class="section-title">Radio</h2>
-		<TrackList tracks={stations.value} sourceName="Radio" listKey="radio" alwaysShowArtist />
-	{/if}
 </section>

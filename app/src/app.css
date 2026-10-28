@@ -1678,3 +1678,13 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 	.share-meta p { margin-top: 2px; font-size: 13px; }
 	.share-queue { top: calc(44px + var(--safe-t)); bottom: calc(84px + var(--safe-b)); }
 }
+
+.radio-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; max-width: 50%; }
+
+.radio-label { margin-right: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+
+.radio-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(16px); font-size: 13px; font-weight: 500; color: var(--ink-2); transition: background 0.2s, color 0.2s; }
+
+.radio-chip:hover { color: var(--ink); background: rgba(255, 255, 255, 0.1); }
+
+.radio-chip.on { color: var(--ink); border-color: var(--line-2); }
