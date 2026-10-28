@@ -68,5 +68,7 @@ export const coverAlbumOverrides = new Map<string, string>();
 export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>
 	subsonicUrl(credentials, 'getCoverArt', { id: `al-${coverAlbumOverrides.get(albumId) ?? albumId}`, size });
 
+export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size });
+
 export const playlistCoverUrl = (credentials: Credentials, playlistId: string, image: string, size: number) =>
 	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}`, size, v: image });

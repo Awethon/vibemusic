@@ -2,10 +2,11 @@
 	import { resolve } from '$app/paths';
 	import type { Artist } from '../library/queries.ts';
 	import { artistMenu } from './actions.ts';
+	import ArtistPhoto from './ArtistPhoto.svelte';
 	import Cover from './Cover.svelte';
 	import { plural } from './format.ts';
 	import { openMenu } from './menu.svelte.ts';
-	import { COVER_PX } from '../tuning.ts';
+	import { ARTIST_LIST, COVER_PX } from '../tuning.ts';
 
 	let { artist }: { artist: Artist } = $props();
 </script>
@@ -22,6 +23,10 @@
 		<div class="meta">{plural(artist.albumCount, 'album')} · {plural(artist.trackCount, 'track')}{artist.firstYear ? ` · since ${artist.firstYear}` : ''}</div>
 	</div>
 	<div class="stack">
-		{#each artist.coverAlbumIds as albumId (albumId)}<Cover {albumId} size={COVER_PX.card} />{/each}
+		{#if ARTIST_LIST.photos}
+			<ArtistPhoto artistId={artist.id} fallbackAlbumId={artist.newestAlbumId} size={COVER_PX.card} />
+		{:else}
+			{#each artist.coverAlbumIds as albumId (albumId)}<Cover {albumId} size={COVER_PX.card} />{/each}
+		{/if}
 	</div>
 </a>

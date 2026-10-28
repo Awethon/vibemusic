@@ -120,6 +120,8 @@ export const ARTIST_PAGE = Object.freeze({
 	popularCount: 5
 });
 
+export const ARTIST_LIST = Object.freeze({ photos: true });
+
 export const COVER_PX = Object.freeze({
 	fallback: 300,
 	row: 80,
