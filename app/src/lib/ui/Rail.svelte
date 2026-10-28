@@ -10,6 +10,7 @@
 		const route = page.route.id ?? '/';
 		if (route.startsWith('/artist')) return 'artists';
 		if (route.startsWith('/playlist')) return 'playlists';
+		if (route.startsWith('/timeline')) return 'timeline';
 		return 'home';
 	});
 	const foldLabel = $derived(ui.railExpanded ? 'Fold sidebar' : 'Expand sidebar');
@@ -22,6 +23,7 @@
 		<a class="nav" class:active={section === 'home'} href={resolve('/')} title="Your Music"><span class="ni"><Icon name="home" /></span><span class="nl">Your Music</span></a>
 		<a class="nav" class:active={section === 'artists'} href={resolve('/artists')} title="Artists"><span class="ni"><Icon name="mic" /></span><span class="nl">Artists</span></a>
 		<a class="nav" class:active={section === 'playlists'} href={resolve('/playlists')} title="Playlists"><span class="ni"><Icon name="lists" /></span><span class="nl">Playlists</span></a>
+		<a class="nav" class:active={section === 'timeline'} href={resolve('/timeline')} title="Timeline"><span class="ni"><Icon name="timeline" /></span><span class="nl">Timeline</span></a>
 	</div>
 	<div class="rail-foot">
 		{#if library.status === 'syncing'}<span class="nav sync-note"><span class="nl">Syncing library…</span></span>{/if}

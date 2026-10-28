@@ -122,6 +122,20 @@ export const ARTIST_PAGE = Object.freeze({
 
 export const ARTIST_LIST = Object.freeze({ photos: true });
 
+export const TIMELINE = Object.freeze({
+	minAlbumsForLane: 3,
+	coverPx: 64,
+	gapPx: 10,
+	padPx: 28,
+	emptyYearPx: 22,
+	laneHeightPx: 86,
+	labelWidthPx: 200,
+	headerHeightPx: 64,
+	tailPx: 240,
+	dragThresholdPx: 5,
+	markRoomPx: 72
+});
+
 export const COVER_PX = Object.freeze({
 	fallback: 300,
 	row: 80,

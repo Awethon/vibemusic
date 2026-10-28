@@ -1,3 +1,4 @@
+import type { TimelineAlbum } from '../engine/timeline.ts';
 import { normalizeForSearch } from './schema.ts';
 import { query } from './library.svelte.ts';
 import type { SqlParam } from './protocol.ts';
@@ -291,6 +292,16 @@ export async function search(text: string, limits: { artists: number; albums: nu
 		tracksByIds(trackIds)
 	]);
 	return { artists: foundArtists, albums: foundAlbums, playlists: foundPlaylists, tracks: foundTracks };
+}
+
+export const timelineAlbums = () => query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year, created from album order by year, created');
+
+export async function paletteLeads(): Promise<Map<string, string>> {
+	const rows = await query<{ albumId: string; colors: string }>('select album_id as albumId, colors from palette');
+	return new Map(rows.flatMap((row) => {
+		const lead = (JSON.parse(row.colors) as string[])[0];
+		return lead ? [[row.albumId, lead] as const] : [];
+	}));
 }
 
 export async function savedPalette(albumId: string): Promise<string[] | null> {
