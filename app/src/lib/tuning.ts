@@ -252,7 +252,7 @@ export const GENRE_PLAYLISTS = Object.freeze({
 	rootMinSongs: 30,
 	rootMinArtists: 2,
 	subMinSongs: 50,
-	subMinArtists: 5,
+	subMinArtists: 3,
 	maxParentShare: 0.7,
 	maxSiblingShare: 0.8,
 	maxPickedShare: 0.5,
