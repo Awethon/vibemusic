@@ -1396,13 +1396,20 @@ body.remote #bDevice { color: var(--accent); --ic: var(--accent); --ia: 1; }
 .dev .eqi i:nth-child(2) { animation-delay: -0.3s; }
 .dev .eqi i:nth-child(3) { animation-delay: -0.55s; }
 
-.tl-view { max-width: none; }
+.tl-view { max-width: none; height: 100%; display: flex; flex-direction: column; }
 
-.tl { position: relative; }
+.tl-title { margin-bottom: 18px; font-size: clamp(32px, 3vw, 44px); }
+
+body.timeline-view #dock { display: none; }
+
+body.timeline-view #main { padding-bottom: 28px; }
+
+.tl { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 .tl-scroll {
 	position: relative;
-	height: max(360px, calc(100dvh - 330px));
+	flex: 1;
+	min-height: 320px;
 	overflow: auto;
 	border-radius: 18px;
 	background: var(--glass);
@@ -1424,9 +1431,9 @@ body.remote #bDevice { color: var(--accent); --ic: var(--accent); --ia: 1; }
 
 .tl-grid i.major { background: rgba(255, 255, 255, 0.07); }
 
-.tl-head { position: sticky; top: 0; z-index: 3; height: var(--hh); background: linear-gradient(to bottom, rgba(10, 10, 14, 0.82), rgba(10, 10, 14, 0)); }
+.tl-head { position: sticky; top: 0; z-index: 3; height: var(--hh); background: linear-gradient(to bottom, rgba(10, 10, 14, 0.5), rgba(10, 10, 14, 0)); }
 
-.tl-corner { position: sticky; left: 0; width: var(--lw); height: 100%; background: linear-gradient(to right, rgb(12, 12, 16) 72%, rgba(12, 12, 16, 0)); }
+.tl-corner { position: sticky; left: 0; width: var(--lw); height: 100%; background: rgba(16, 13, 19, 0.5); backdrop-filter: blur(18px) saturate(1.2); border-right: 1px solid var(--line); }
 
 .tl-mark { position: absolute; top: 14px; display: flex; flex-direction: column; gap: 2px; padding-left: 8px; white-space: nowrap; pointer-events: none; }
 
@@ -1457,7 +1464,9 @@ body.remote #bDevice { color: var(--accent); --ic: var(--accent); --ia: 1; }
 	width: var(--lw);
 	height: 100%;
 	padding: 0 18px 0 20px;
-	background: linear-gradient(to right, rgba(10, 10, 14, 0.92) 72%, rgba(10, 10, 14, 0));
+	background: rgba(16, 13, 19, 0.4);
+	backdrop-filter: blur(18px) saturate(1.2);
+	border-right: 1px solid var(--line);
 }
 
 .tl-label b { font-weight: 500; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

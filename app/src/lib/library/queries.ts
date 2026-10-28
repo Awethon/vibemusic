@@ -294,7 +294,7 @@ export async function search(text: string, limits: { artists: number; albums: nu
 	return { artists: foundArtists, albums: foundAlbums, playlists: foundPlaylists, tracks: foundTracks };
 }
 
-export const timelineAlbums = () => query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year, created from album order by year, created');
+export const timelineAlbums = () => query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year from album order by year, name');
 
 export async function paletteLeads(): Promise<Map<string, string>> {
 	const rows = await query<{ albumId: string; colors: string }>('select album_id as albumId, colors from palette');

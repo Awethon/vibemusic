@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
+	import { setBodyClass } from '#lib/engine/dom.ts';
 	import { resolve } from '$app/paths';
-	import { laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes, type TimelineAxis } from '#lib/engine/timeline.ts';
+	import { laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes } from '#lib/engine/timeline.ts';
 	import { albumById, paletteLeads, timelineAlbums } from '#lib/library/queries.ts';
 	import { COVER_PX, TIMELINE } from '#lib/tuning.ts';
 	import { albumMenu, openAlbum } from '#lib/ui/actions.ts';
@@ -9,16 +10,9 @@
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 	import { openMenu } from '#lib/ui/menu.svelte.ts';
-	import SortChips from '#lib/ui/SortChips.svelte';
-
-	const axes = [
-		['released', 'Released'],
-		['added', 'Added']
-	] as const satisfies readonly (readonly [TimelineAxis, string])[];
 
 	const albums = live(timelineAlbums, []);
 	const leads = live(paletteLeads, new Map<string, string>());
-	let axis = $state<TimelineAxis>('released');
 	let scroller = $state<HTMLDivElement>();
 	let minimap = $state<HTMLCanvasElement>();
 	let scrollLeft = $state(0);
@@ -28,7 +22,7 @@
 
 	const lanes = $derived(timelineLanes(albums.value, TIMELINE.minAlbumsForLane, 'Elsewhere'));
 	const layout = $derived(
-		layoutTimeline(lanes, axis, { cover: TIMELINE.coverPx, gap: TIMELINE.gapPx, pad: TIMELINE.padPx, empty: TIMELINE.emptyYearPx, start: TIMELINE.labelWidthPx + 16, tail: TIMELINE.tailPx })
+		layoutTimeline(lanes, { cover: TIMELINE.coverPx, gap: TIMELINE.gapPx, pad: TIMELINE.padPx, empty: TIMELINE.emptyYearPx, start: TIMELINE.labelWidthPx + 16, tail: TIMELINE.tailPx })
 	);
 	const marks = $derived(markedBuckets(layout.buckets, TIMELINE.markRoomPx));
 	const byId = $derived(new Map(albums.value.map((album) => [album.id, album])));
@@ -37,8 +31,6 @@
 		const focus = scrollLeft + TIMELINE.labelWidthPx + (viewWidth - TIMELINE.labelWidthPx) * 0.3;
 		return layout.buckets.find((bucket) => bucket.x + bucket.width > focus)?.era ?? '';
 	});
-	const placed = $derived(layout.positions.size);
-	const summary = $derived(`${plural(placed, 'album')} · ${plural(lanes.filter((lane) => lane.artistId).length, 'artist')} with their own lane`);
 
 	function drawMinimap() {
 		const canvas = minimap;
@@ -66,6 +58,11 @@
 	});
 
 	$effect(() => {
+		setBodyClass('timeline-view', true);
+		return () => setBodyClass('timeline-view', false);
+	});
+
+	$effect(() => {
 		const element = scroller;
 		if (!element) return;
 		const observer = new ResizeObserver(() => {
@@ -75,12 +72,6 @@
 		observer.observe(element);
 		return () => observer.disconnect();
 	});
-
-	function setAxis(next: TimelineAxis) {
-		if (next === axis) return;
-		axis = next;
-		requestAnimationFrame(() => scroller?.scrollTo({ left: 0 }));
-	}
 
 	function onWheel(event: WheelEvent) {
 		const element = scroller;
@@ -129,8 +120,7 @@
 		const album = byId.get(id);
 		if (!album || drag?.moved) return;
 		const box = target.getBoundingClientRect();
-		const added = new Date(album.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-		tip = { name: album.name, detail: `${album.artist}${album.year ? ` · ${album.year}` : ''}${axis === 'added' ? ` · added ${added}` : ''}`, x: box.left + box.width / 2, y: box.bottom + 8 };
+		tip = { name: album.name, detail: `${album.artist}${album.year ? ` · ${album.year}` : ''}`, x: box.left + box.width / 2, y: box.bottom + 8 };
 	}
 
 	function seekMinimap(event: PointerEvent) {
@@ -147,10 +137,7 @@
 </script>
 
 <section class="view tl-view" {@attach viewEnter}>
-	<div class="vhead">
-		<div><h1 class="display">Timeline</h1><p class="sub">{summary}</p></div>
-		<SortChips options={axes} value={axis} onchange={setAxis} />
-	</div>
+	<h1 class="display tl-title">Timeline</h1>
 	<div class="tl">
 		<div
 			class="tl-scroll"
