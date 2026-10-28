@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import tree from './tree.json';
-import { createGenreResolver, withAncestors } from './genres.ts';
+import { createGenreResolver, regionalGenres, withAncestors } from './genres.ts';
 
 describe('genre resolver', () => {
 	it('merges spellings and aliases into one genre', () => {
@@ -48,5 +48,13 @@ describe('genre tree', () => {
 			for (const alias of node.aliases ?? []) for (const resolved of genresOf([alias])) owners.set(alias, [...(owners.get(alias) ?? []), resolved !== name ? `${resolved} (not ${name})` : name]);
 		}
 		expect([...owners.values()].flat().filter((owner) => owner.includes('(not '))).toEqual([]);
+	});
+});
+
+describe('regional genres', () => {
+	it('files Russian artists under the Russian branch of their genre', () => {
+		expect(regionalGenres(withAncestors('Trap'), ['ES', 'RU'])).toEqual(['Russian Hip-Hop']);
+		expect(regionalGenres(withAncestors('Nu Metal'), ['RU'])).toEqual(['Russian Rock']);
+		expect(regionalGenres(withAncestors('Hip-Hop'), ['US', 'GB'])).toEqual([]);
 	});
 });

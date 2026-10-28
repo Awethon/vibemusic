@@ -37,11 +37,12 @@ export type LibraryMeta = {
 	playlists: number;
 };
 
-export type EnrichmentRequest = { since: number; releaseGroups: string[]; artists: { id: string; name: string; songs: string[] }[] };
+export type EnrichmentRequest = { since: number; releaseGroups: string[]; artists: { id: string; name: string; songs: string[] }[]; mbSearch: { id: string; name: string; albums: string[] }[] };
 
 export type Enrichment = {
 	at: number;
 	releaseGroups: Record<string, { artists: string[]; tags: [string, number][] } | null>;
-	mbArtists: Record<string, { tags: [string, number][] } | null>;
+	mbArtists: Record<string, { tags: [string, number][]; countries?: string[] | null } | null>;
+	artistMatches?: Record<string, string | null>;
 	deezer: Record<string, { id: number; name: string; fans: number; top: [string, number][]; albums?: [string, number][] | null } | null>;
 };

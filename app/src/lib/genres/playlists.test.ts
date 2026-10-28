@@ -38,6 +38,11 @@ describe('genre playlists', () => {
 		expect(chosen([...songs('Hip-Hop', 200, 10), ...songs('Trap', 60, 6)])).toEqual(['Hip-Hop', 'Trap']);
 	});
 
+	it('never makes a playlist for a hidden genre', () => {
+		const library = [...songs('Hip-Hop', 200, 10), ...songs('Trap', 60, 6)];
+		expect(chooseGenres(library, GENRE_PLAYLISTS, ['Trap']).map((playlist) => playlist.genre)).toEqual(['Hip-Hop']);
+	});
+
 	it('skips genres that are too small', () => {
 		expect(chosen([...songs('Hip-Hop', 40, 4), ...songs('Classical', 15, 2), ...songs('Jazz', 40, 1)])).toEqual(['Hip-Hop']);
 	});

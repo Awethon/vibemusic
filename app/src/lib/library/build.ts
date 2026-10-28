@@ -2,9 +2,9 @@ import type { Database } from '@sqlite.org/sqlite-wasm';
 import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
 import { deezerAlbumGenre } from '../genres/deezer.ts';
 import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
-import { createGenreResolver, withAncestors } from '../genres/genres.ts';
+import { createGenreResolver, regionalGenres, withAncestors } from '../genres/genres.ts';
 import { songRanks } from '../genres/titles.ts';
-import { GENRE_EVIDENCE, GENRE_PLAYLISTS } from '../tuning.ts';
+import { GENRE_EVIDENCE, GENRE_PLAYLISTS, HIDDEN_GENRE_PLAYLISTS } from '../tuning.ts';
 import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
 import { KEPT_TABLES, normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
@@ -123,16 +123,29 @@ function rebuildArtists(db: Database) {
 
 const parsedTags = (value: unknown): Tag[] | null => (typeof value === 'string' ? (JSON.parse(value) as Tag[]) : null);
 
+type MbArtistRow = { tags: Tag[] | null; countries: string[] };
+
+function musicBrainzArtists(db: Database) {
+	const artists = new Map(
+		db.selectObjects('select id, tags, countries from mb_artist').map((row) => [row.id as string, { tags: parsedTags(row.tags), countries: typeof row.countries === 'string' ? (JSON.parse(row.countries) as string[]) : [] } satisfies MbArtistRow])
+	);
+	const byAlbumArtist = new Map<string, string>(db.selectArrays('select artist_id, mbid from artist_match where mbid is not null') as [string, string][]);
+	const counted = db.selectArrays(`select album.artist_id, json_extract(mb_release_group.artists, '$[0]') as mbid, count(*) as albums from album
+		join mb_release_group on mb_release_group.id = album.release_group where mb_release_group.artists is not null group by album.artist_id, mbid order by albums desc`) as [string, string, number][];
+	for (const [artistId, mbid] of counted) if (!byAlbumArtist.has(artistId) && mbid) byAlbumArtist.set(artistId, mbid);
+	return { artists, byAlbumArtist };
+}
+
 function rebuildTrackGenres(db: Database) {
 	db.exec('delete from track_genre');
 	const resolver = createGenreResolver();
 	const albumTags = new Map<string, Tag[] | null>();
 	const storeGenres = new Map<string, string | null>();
-	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.name as albumName, album.raw_genres as albumGenres,
-		mb_release_group.tags as albumTags, mb_artist.tags as artistTags, deezer_artist.albums as deezerAlbums
+	const { artists, byAlbumArtist } = musicBrainzArtists(db);
+	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.name as albumName, album.raw_genres as albumGenres, album.artist_id as albumArtistId,
+		mb_release_group.tags as albumTags, json_extract(mb_release_group.artists, '$[0]') as groupArtist, deezer_artist.albums as deezerAlbums
 		from track join album on album.id = track.album_id
 		left join mb_release_group on mb_release_group.id = album.release_group
-		left join mb_artist on mb_artist.id = json_extract(mb_release_group.artists, '$[0]')
 		left join deezer_artist on deezer_artist.artist_id = album.artist_id`);
 	const insert = db.prepare('insert or ignore into track_genre values (?,?,?)');
 	for (const row of rows) {
@@ -140,14 +153,17 @@ function rebuildTrackGenres(db: Database) {
 		const albumId = row.albumId as string;
 		if (!albumTags.has(albumId)) albumTags.set(albumId, parsedTags(row.albumTags));
 		if (!storeGenres.has(albumId)) storeGenres.set(albumId, deezerAlbumGenre(typeof row.deezerAlbums === 'string' ? JSON.parse(row.deezerAlbums) : null, row.albumName as string));
+		const artist = artists.get(byAlbumArtist.get(row.albumArtistId as string) ?? '') ?? artists.get((row.groupArtist as string | null) ?? '');
 		const direct = genresFromEvidence(resolver, {
 			fileGenres: songGenres.length ? songGenres : (JSON.parse(row.albumGenres as string) as string[]),
 			albumTags: albumTags.get(albumId) ?? null,
-			artistTags: parsedTags(row.artistTags),
+			artistTags: artist?.tags ?? null,
 			storeGenre: storeGenres.get(albumId)
 		});
-		for (const genre of direct) insert.bind([genre, row.id as string, 1]).stepReset();
-		for (const genre of new Set(direct.flatMap(withAncestors))) if (!direct.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
+		const regional = regionalGenres(direct.flatMap(withAncestors), artist?.countries ?? []);
+		const all = [...new Set([...direct, ...regional])];
+		for (const genre of all) insert.bind([genre, row.id as string, 1]).stepReset();
+		for (const genre of new Set(all.flatMap(withAncestors))) if (!all.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
 	}
 	insert.finalize();
 }
@@ -215,7 +231,7 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
-const DERIVED_RULES = JSON.stringify({ algorithm: 8, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
+const DERIVED_RULES = JSON.stringify({ algorithm: 9, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS, hidden: HIDDEN_GENRE_PLAYLISTS });
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
@@ -330,13 +346,23 @@ export function enrichmentRequest(db: Database): EnrichmentRequest {
 		if (artist.songs.length < SONGS_PER_ARTIST && !artist.songs.includes(row.title as string)) artist.songs.push(row.title as string);
 		titles.set(row.id as string, artist);
 	}
-	return { since, releaseGroups, artists: [...titles].map(([id, artist]) => ({ id, ...artist })) };
+	const albumsByArtist = new Map<string, { name: string; albums: string[]; tagged: boolean }>();
+	for (const row of db.selectObjects("select artist_id as id, artist as name, name as album, release_group from album where artist_id != ''")) {
+		if (VARIOUS_ARTISTS.has((row.name as string).toLowerCase())) continue;
+		const artist = albumsByArtist.get(row.id as string) ?? { name: row.name as string, albums: [], tagged: false };
+		artist.albums.push(row.album as string);
+		artist.tagged ||= row.release_group !== '';
+		albumsByArtist.set(row.id as string, artist);
+	}
+	const mbSearch = [...albumsByArtist].filter(([, artist]) => !artist.tagged).map(([id, { name, albums }]) => ({ id, name, albums }));
+	return { since, releaseGroups, artists: [...titles].map(([id, artist]) => ({ id, ...artist })), mbSearch };
 }
 
 export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState, enrichment: Enrichment): LibraryMeta {
 	db.transaction(() => {
 		eachBound(db, 'insert or replace into mb_release_group values (?,?,?)', Object.entries(enrichment.releaseGroups).map(([id, group]) => [id, group && JSON.stringify(group.artists), group && JSON.stringify(group.tags)]));
-		eachBound(db, 'insert or replace into mb_artist values (?,?)', Object.entries(enrichment.mbArtists).map(([id, artist]) => [id, artist && JSON.stringify(artist.tags)]));
+		eachBound(db, 'insert or replace into mb_artist values (?,?,?)', Object.entries(enrichment.mbArtists).map(([id, artist]) => [id, artist && JSON.stringify(artist.tags), artist?.countries ? JSON.stringify(artist.countries) : null]));
+		eachBound(db, 'insert or replace into artist_match values (?,?)', Object.entries(enrichment.artistMatches ?? {}).map(([id, mbid]) => [id, mbid]));
 		eachBound(db, 'insert or replace into deezer_artist values (?,?,?,?,?,?)', Object.entries(enrichment.deezer).map(([id, artist]) => [id, artist && artist.id, artist && artist.name, artist && artist.fans, artist && JSON.stringify(artist.top), artist?.albums ? JSON.stringify(artist.albums) : null]));
 		db.exec({ sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))", bind: [enrichment.at] });
 		rebuildDerived(db);

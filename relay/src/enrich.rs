@@ -9,7 +9,7 @@ use tokio::sync::{Notify, broadcast};
 
 use crate::{deezer, musicbrainz};
 
-const MUSICBRAINZ_PAUSE: Duration = Duration::from_millis(1500);
+const MUSICBRAINZ_PAUSE: Duration = musicbrainz::PAUSE;
 const FAILURE_PAUSE: Duration = Duration::from_secs(10);
 const FLUSH_EVERY: Duration = Duration::from_secs(2);
 const SAVE_EVERY: Duration = Duration::from_secs(30);
@@ -35,6 +35,8 @@ pub struct ReleaseGroup {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MbArtist {
     pub tags: Vec<Tag>,
+    #[serde(default)]
+    pub countries: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -76,11 +78,12 @@ impl<T> Entry<T> {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 struct Cache {
     release_groups: HashMap<String, Entry<ReleaseGroup>>,
     mb_artists: HashMap<String, Entry<MbArtist>>,
     deezer: HashMap<String, Entry<DeezerArtist>>,
+    artist_matches: HashMap<String, Entry<String>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -91,9 +94,19 @@ pub struct ArtistRequest {
     pub songs: Vec<String>,
 }
 
+#[derive(Deserialize, Clone)]
+pub struct SearchRequest {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub albums: Vec<String>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnrichRequest {
+    #[serde(default)]
+    pub mb_search: Vec<SearchRequest>,
     #[serde(default)]
     pub since: u64,
     #[serde(default)]
@@ -105,6 +118,7 @@ pub struct EnrichRequest {
 enum MbJob {
     ReleaseGroup(String),
     Artist(String),
+    Search(SearchRequest),
 }
 
 #[derive(Default)]
@@ -112,15 +126,16 @@ struct Changes {
     release_groups: HashMap<String, Option<ReleaseGroup>>,
     mb_artists: HashMap<String, Option<MbArtist>>,
     deezer: HashMap<String, Option<DeezerArtist>>,
+    artist_matches: HashMap<String, Option<String>>,
 }
 
 impl Changes {
     fn is_empty(&self) -> bool {
-        self.release_groups.is_empty() && self.mb_artists.is_empty() && self.deezer.is_empty()
+        self.release_groups.is_empty() && self.mb_artists.is_empty() && self.deezer.is_empty() && self.artist_matches.is_empty()
     }
 
     fn message(&self, at: u64) -> Value {
-        json!({ "type": "enrichment", "at": at, "releaseGroups": self.release_groups, "mbArtists": self.mb_artists, "deezer": self.deezer })
+        json!({ "type": "enrichment", "at": at, "releaseGroups": self.release_groups, "mbArtists": self.mb_artists, "deezer": self.deezer, "artistMatches": self.artist_matches })
     }
 }
 
@@ -160,6 +175,7 @@ impl State {
         let key = match &job {
             MbJob::ReleaseGroup(id) => format!("rg:{id}"),
             MbJob::Artist(id) => format!("ar:{id}"),
+            MbJob::Search(search) => format!("se:{}", search.id),
         };
         if self.queued.insert(key) {
             self.musicbrainz.push_back((job, 0));
@@ -173,7 +189,16 @@ impl State {
     }
 
     fn needs_artist(&self, id: &str, now: u64) -> bool {
-        self.cache.mb_artists.get(id).is_none_or(|entry| !entry.fresh(now, MUSICBRAINZ_FRESH_MS))
+        self.cache.mb_artists.get(id).is_none_or(|entry| !entry.fresh(now, MUSICBRAINZ_FRESH_MS) || entry.value.as_ref().is_some_and(|artist| artist.countries.is_none()))
+    }
+
+    fn answer_artist(&mut self, id: &str, since: u64, now: u64, reply: &mut Changes) {
+        if let Some(found) = self.cache.mb_artists.get(id).filter(|found| found.at > since) {
+            reply.mb_artists.insert(id.to_owned(), found.value.clone());
+        }
+        if self.needs_artist(id, now) {
+            self.queue_musicbrainz(MbJob::Artist(id.to_owned()));
+        }
     }
 
     fn answer(&mut self, request: EnrichRequest, now: u64) -> Changes {
@@ -185,19 +210,31 @@ impl State {
                     if !entry.fresh(now, MUSICBRAINZ_FRESH_MS) {
                         self.queue_musicbrainz(MbJob::ReleaseGroup(id.clone()));
                     }
-                    if let Some(artist) = entry.value.as_ref().and_then(|group| group.artists.first()) {
-                        if let Some(found) = self.cache.mb_artists.get(artist).filter(|found| found.at > request.since) {
-                            reply.mb_artists.insert(artist.clone(), found.value.clone());
-                        }
-                        if self.needs_artist(artist, now) {
-                            self.queue_musicbrainz(MbJob::Artist(artist.clone()));
-                        }
+                    if let Some(artist) = entry.value.as_ref().and_then(|group| group.artists.first()).cloned() {
+                        self.answer_artist(&artist, request.since, now, &mut reply);
                     }
                     if entry.at > request.since {
                         reply.release_groups.insert(id, entry.value);
                     }
                 }
                 None => self.queue_musicbrainz(MbJob::ReleaseGroup(id)),
+            }
+        }
+        for search in request.mb_search.into_iter().filter(|search| !search.id.is_empty() && !search.name.trim().is_empty()).take(MAX_ARTISTS) {
+            let search = SearchRequest { id: clip(&search.id), name: clip(&search.name), albums: search.albums.iter().take(MAX_RELEASE_GROUPS).map(|title| clip(title)).collect() };
+            match self.cache.artist_matches.get(&search.id).cloned() {
+                Some(entry) => {
+                    if entry.at > request.since {
+                        reply.artist_matches.insert(search.id.clone(), entry.value.clone());
+                    }
+                    if let Some(mbid) = &entry.value {
+                        self.answer_artist(mbid, request.since, now, &mut reply);
+                    }
+                    if !entry.fresh(now, MUSICBRAINZ_FRESH_MS) {
+                        self.queue_musicbrainz(MbJob::Search(search));
+                    }
+                }
+                None => self.queue_musicbrainz(MbJob::Search(search)),
             }
         }
         for artist in request.artists.into_iter().filter(|artist| !artist.id.is_empty() && !artist.name.trim().is_empty()).take(MAX_ARTISTS) {
@@ -281,6 +318,19 @@ impl Enricher {
         state.unsaved = true;
     }
 
+    fn store_match(&self, id: String, value: Option<String>) {
+        let now = now_ms();
+        let mut state = self.state.lock().unwrap();
+        if let Some(mbid) = value.clone()
+            && state.needs_artist(&mbid, now)
+        {
+            state.queue_musicbrainz(MbJob::Artist(mbid));
+        }
+        state.changes.artist_matches.insert(id.clone(), value.clone());
+        state.cache.artist_matches.insert(id, Entry { at: now, value });
+        state.unsaved = true;
+    }
+
     fn store_deezer(&self, id: String, value: Option<DeezerArtist>) {
         let mut state = self.state.lock().unwrap();
         state.changes.deezer.insert(id.clone(), value.clone());
@@ -306,6 +356,21 @@ impl Enricher {
                         }
                         Fetched::Missing => {
                             self.store_release_group(id, None);
+                            false
+                        }
+                        Fetched::Failed => true,
+                    };
+                    (key, failed)
+                }
+                MbJob::Search(search) => {
+                    let key = format!("se:{}", search.id);
+                    let failed = match musicbrainz::find_artist(&self.client, &search.name, &search.albums).await {
+                        Fetched::Found(mbid) => {
+                            self.store_match(search.id.clone(), Some(mbid));
+                            false
+                        }
+                        Fetched::Missing => {
+                            self.store_match(search.id.clone(), None);
                             false
                         }
                         Fetched::Failed => true,
@@ -411,6 +476,7 @@ mod tests {
 
     fn request(since: u64) -> EnrichRequest {
         EnrichRequest {
+            mb_search: Vec::new(),
             since,
             release_groups: vec![GROUP.into(), "not-an-id".into()],
             artists: vec![ArtistRequest { id: "nd-1".into(), name: "Glass Harbor".into(), songs: vec!["Lighthouse".into()] }],

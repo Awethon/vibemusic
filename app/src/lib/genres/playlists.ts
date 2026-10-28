@@ -1,4 +1,4 @@
-import { GENRE_PLAYLISTS } from '../tuning.ts';
+import { GENRE_PLAYLISTS, HIDDEN_GENRE_PLAYLISTS } from '../tuning.ts';
 import { descendantCount, parentsOf, withAncestors } from './genres.ts';
 import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
 
@@ -28,7 +28,7 @@ function overlaps(ids: Set<string>, other: Set<string>) {
 	return shared;
 }
 
-export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS): GenrePlaylist[] {
+export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS, hidden: readonly string[] = HIDDEN_GENRE_PLAYLISTS): GenrePlaylist[] {
 	const byGenre = new Map<string, GenreSong[]>();
 	for (const song of songs) {
 		for (const genre of song.genres) {
@@ -37,7 +37,7 @@ export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS)
 			else byGenre.set(genre, [song]);
 		}
 	}
-	const candidates = [...byGenre].filter(([genre, members]) => qualifies(genre, members, rules)).toSorted(([a, aSongs], [b, bSongs]) => withAncestors(a).length - withAncestors(b).length || descendantCount(a) - descendantCount(b) || bSongs.length - aSongs.length || a.localeCompare(b));
+	const candidates = [...byGenre].filter(([genre, members]) => !hidden.includes(genre) && qualifies(genre, members, rules)).toSorted(([a, aSongs], [b, bSongs]) => withAncestors(a).length - withAncestors(b).length || descendantCount(a) - descendantCount(b) || bSongs.length - aSongs.length || a.localeCompare(b));
 	const chosen: { genre: string; ids: Set<string>; picked: Set<string>; best: GenreSong[] }[] = [];
 	for (const [genre, members] of candidates) {
 		if (chosen.length >= rules.maxPlaylists) break;

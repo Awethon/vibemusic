@@ -100,3 +100,11 @@ export function descendantCount(name: string): number {
 	breadth.set(name, found.size);
 	return found.size;
 }
+
+const REGIONAL: Record<string, Record<string, string>> = {
+	RU: { 'Hip-Hop': 'Russian Hip-Hop', Rock: 'Russian Rock', Pop: 'Russian Pop' }
+};
+
+export function regionalGenres(genres: string[], countries: string[]): string[] {
+	return countries.flatMap((country) => Object.entries(REGIONAL[country] ?? {}).flatMap(([genre, regional]) => (genres.includes(genre) ? [regional] : [])));
+}

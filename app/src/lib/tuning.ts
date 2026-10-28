@@ -248,6 +248,8 @@ export const GENRE_EVIDENCE = Object.freeze({
 	minWeight: 1
 });
 
+export const HIDDEN_GENRE_PLAYLISTS: readonly string[] = Object.freeze(['Nu Metal']);
+
 export const GENRE_PLAYLISTS = Object.freeze({
 	rootMinSongs: 30,
 	rootMinArtists: 2,
