@@ -529,7 +529,7 @@ body.now-open.idle #now { opacity: 0; }
 
 .mini:hover { background: var(--hover); }
 
-.mini img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+.mini img, .mini .cover-icon { flex: none; width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
 
 .mini b { display: block; font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -564,13 +564,13 @@ body.now-open.fs-minimal:not(.rest) #ambient { transition-delay: 0s; transform: 
 
 body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: none; }
 
-#ambient > img { width: clamp(180px, 18vw, 260px); aspect-ratio: 1; object-fit: cover; border-radius: 14px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8); }
+#ambient > img, #ambient > .cover-icon { flex: none; width: clamp(180px, 18vw, 260px); height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 14px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8); }
 
 .amb-text { min-width: 0; max-width: 900px; padding-bottom: 6px; }
 
 .amb-artist { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--ink-2); letter-spacing: 0.02em; text-shadow: var(--shadow-text); }
 
-#ambient h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(34px, 3.6vw, 56px); line-height: 1.04; letter-spacing: -0.03em; text-shadow: var(--shadow-text); }
+#ambient h2 { margin: 0; overflow-wrap: anywhere; font-family: var(--display); font-weight: 400; font-size: clamp(34px, 3.6vw, 56px); line-height: 1.04; letter-spacing: -0.03em; text-shadow: var(--shadow-text); }
 
 .amb-line { margin: 22px 0 0; font-family: var(--display); font-weight: 300; font-size: clamp(18px, 1.6vw, 24px); color: var(--ink-2); min-height: 1.3em; text-shadow: var(--shadow-text); transition: opacity 0.5s var(--ease), transform 0.5s var(--ease); }
 
@@ -1008,7 +1008,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .cl-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 6vw; align-items: center; padding: 0 3vw; }
 
-.cl-left img { width: min(42vh, 100%); aspect-ratio: 1; object-fit: cover; border-radius: 14px; box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05); }
+.cl-left img, .cl-left .cover-icon { width: min(42vh, 100%); height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 14px; box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05); }
 
 .cl-left h1 { margin: 28px 0 8px; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 2.6vw, 40px); line-height: 1.1; letter-spacing: -0.025em; text-shadow: var(--shadow-text); }
 

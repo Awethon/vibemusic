@@ -34,7 +34,7 @@
 <section id="ambient" aria-hidden="true">
 	<Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.ambient} eager />
 	<div class="amb-text">
-		<p class="amb-artist">{track ? `${track.artist} — ${track.album}` : ''}</p>
+		<p class="amb-artist">{track ? [track.artist, track.album].filter(Boolean).join(' — ') : ''}</p>
 		<h2>{track?.title ?? ''}</h2>
 		<p class="amb-line" class:swap={swapping}>{shown}</p>
 	</div>
