@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { medianCut } from '#lib/library/medianCut.ts';
+	import { PALETTE } from '#lib/tuning.ts';
+	import { accentFromPalette } from '#lib/ui/accent.ts';
 	import { clock } from '#lib/ui/format.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import Slider from '#lib/ui/Slider.svelte';
@@ -21,6 +24,7 @@
 	const initialVolume = storedVolume();
 	let volume = $state(initialVolume);
 	let queueOpen = $state(false);
+	let accent = $state('');
 
 	const audio = new Audio();
 	audio.preload = 'metadata';
@@ -82,6 +86,26 @@
 		navigator.mediaSession.setActionHandler('nexttrack', several ? next : null);
 	});
 
+	async function coverAccent(url: string) {
+		const bitmap = await createImageBitmap(await (await fetch(url)).blob(), { resizeWidth: PALETTE.coverSamplePx, resizeHeight: PALETTE.coverSamplePx });
+		const canvas = new OffscreenCanvas(PALETTE.coverSamplePx, PALETTE.coverSamplePx);
+		const context = canvas.getContext('2d')!;
+		context.drawImage(bitmap, 0, 0);
+		bitmap.close();
+		const rgb = accentFromPalette(medianCut(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data));
+		return rgb ? `rgb(${rgb.map(Math.round).join(' ')})` : '';
+	}
+
+	$effect(() => {
+		if (!track) return;
+		let current = true;
+		void coverAccent(coverUrl(track.id, PALETTE.coverSamplePx * 2)).then(
+			(color) => current && color && (accent = color),
+			() => {}
+		);
+		return () => (current = false);
+	});
+
 	function load(at: number, autoplay: boolean) {
 		const chosen = share?.tracks[at];
 		if (!chosen) return;
@@ -132,11 +156,11 @@
 	<title>{track ? `${track.title} · ${track.artist}` : share?.description || 'vibemusic'}</title>
 </svelte:head>
 
-<div class="share-page" class:queue-open={queueOpen && several}>
+<div class="share-page" class:queue-open={queueOpen && several} style:--accent={accent || undefined}>
 	{#if track}<div class="share-backdrop" style:background-image="url({coverUrl(track.id, 300)})" aria-hidden="true"></div>{/if}
 	<header class="share-top">
 		<span class="share-brand">vibe<span>music</span></span>
-		{#if share?.description}<span class="share-from">{share.description}</span>{/if}
+		{#if several && share?.description}<span class="share-from">{share.description}</span>{/if}
 	</header>
 
 	<main class="share-stage">
