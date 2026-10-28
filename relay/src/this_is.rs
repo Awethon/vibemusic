@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::account::{Account, AccountError};
+use crate::apple::{self, Apple};
 use crate::cover;
+use crate::deezer;
+use crate::enrich::Enricher;
 use crate::enrich::now_ms;
 
 const PREFIX: &str = "This is ";
@@ -21,7 +24,8 @@ pub struct Settings {
     password: String,
     min_tracks: usize,
     max_tracks: usize,
-    top_songs_pause: Duration,
+    apple_pause: Duration,
+    storefronts: Vec<String>,
     every_ms: u64,
     skip: HashSet<String>,
     state: Option<PathBuf>,
@@ -42,7 +46,8 @@ impl Settings {
             password,
             min_tracks: env_number("THIS_IS_MIN_TRACKS", 13),
             max_tracks: env_number("THIS_IS_MAX_TRACKS", 50),
-            top_songs_pause: Duration::from_millis(env_number("THIS_IS_TOP_SONGS_PAUSE_MS", 4000)),
+            apple_pause: Duration::from_millis(env_number("APPLE_PAUSE_MS", 3200)),
+            storefronts: std::env::var("APPLE_STOREFRONTS").unwrap_or_else(|_| "us,ru".into()).split(',').map(|code| code.trim().to_lowercase()).filter(|code| !code.is_empty()).collect(),
             every_ms: env_number::<u64>("THIS_IS_EVERY_HOURS", 168) * 60 * 60 * 1000,
             skip: std::env::var("THIS_IS_SKIP").unwrap_or_default().split(',').map(|name| name.trim().to_lowercase()).filter(|name| !name.is_empty()).collect(),
             state: (!state.is_empty()).then(|| PathBuf::from(state)),
@@ -70,13 +75,13 @@ impl State {
     }
 }
 
-pub fn start(settings: Settings) {
+pub fn start(settings: Settings, enricher: std::sync::Arc<Enricher>) {
     tokio::spawn(async move {
         let client = reqwest::Client::builder().timeout(Duration::from_secs(120)).build().expect("http client");
         loop {
             let mut state = State::load(&settings);
             if now_ms().saturating_sub(state.last_run) >= settings.every_ms {
-                match run(&client, &settings, &mut state).await {
+                match run(&client, &settings, &enricher, &mut state).await {
                     Ok(summary) => {
                         state.last_run = now_ms();
                         tracing::info!(%summary, "This is playlists refreshed");
@@ -112,35 +117,49 @@ pub fn album_artists(item: &Value) -> Vec<(String, String)> {
     if id.is_empty() || name.is_empty() { Vec::new() } else { vec![(id, name)] }
 }
 
-pub fn choose(top: &[String], songs: &[Value], max: usize) -> Vec<String> {
-    let owned: HashSet<&str> = songs.iter().map(|song| song["id"].as_str().unwrap_or_default()).collect();
-    let mut chosen: Vec<String> = Vec::new();
-    for id in top {
-        if owned.contains(id.as_str()) && !chosen.contains(id) {
-            chosen.push(id.clone());
+const FILLER: [&str; 9] = ["skit", "intro", "outro", "interlude", "prelude", "скит", "интро", "аутро", "интерлюдия"];
+const MIN_SONG_SECONDS: f64 = 75.0;
+
+fn is_filler(song: &Value) -> bool {
+    let title = text(song, "title").to_lowercase();
+    song["duration"].as_f64().is_some_and(|seconds| seconds < MIN_SONG_SECONDS) || title.split(|character: char| !character.is_alphanumeric()).any(|word| FILLER.contains(&word))
+}
+
+fn one_edition_each(songs: Vec<&Value>) -> Vec<&Value> {
+    let mut best: HashMap<String, &Value> = HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+    let preference = |song: &Value| (deezer::is_other_recording(&text(song, "title")), number(song, "year") == 0, number(song, "year"), -number(song, "playCount"));
+    for song in songs {
+        let title = text(song, "title");
+        let key = deezer::title_key(&title);
+        let key = if key.is_empty() { format!("id:{}", text(song, "id")) } else { key };
+        match best.get(&key) {
+            Some(kept) if preference(kept) <= preference(song) => {}
+            Some(_) => {
+                best.insert(key, song);
+            }
+            None => {
+                order.push(key.clone());
+                best.insert(key, song);
+            }
         }
     }
-    let mut rest: Vec<&Value> = songs.iter().filter(|song| !chosen.iter().any(|id| song["id"] == id.as_str())).collect();
-    rest.sort_by_key(|song| (-number(song, "playCount"), -number(song, "year"), number(song, "discNumber"), number(song, "trackNumber")));
-    chosen.extend(rest.into_iter().map(|song| text(song, "id")));
-    chosen.truncate(max);
-    chosen
+    order.into_iter().filter_map(|key| best.remove(&key)).collect()
+}
+
+pub fn choose(apple_top: &[(String, u64)], deezer_top: &[(String, u64)], songs: &[Value], max: usize) -> Vec<String> {
+    let mut chosen = one_edition_each(songs.iter().collect());
+    chosen.sort_by_key(|song| {
+        let title = text(song, "title");
+        let apple = deezer::song_rank(apple_top, &title);
+        let deezer = deezer::song_rank(deezer_top, &title);
+        (apple.is_none() && deezer.is_none() && is_filler(song), std::cmp::Reverse(apple.unwrap_or(0)), std::cmp::Reverse(deezer.unwrap_or(0)), -number(song, "playCount"), -number(song, "year"), number(song, "discNumber"), number(song, "trackNumber"))
+    });
+    chosen.into_iter().take(max).map(|song| text(song, "id")).collect()
 }
 
 pub fn comment(name: &str, count: usize) -> String {
     format!("{count} {name} tracks you own, most popular first · updated weekly · made by vibemusic")
-}
-
-async fn top_songs(account: &Account, name: &str, settings: &Settings) -> Vec<String> {
-    let reply = account.subsonic("getTopSongs", &[("artist", name.to_owned()), ("count", settings.max_tracks.to_string())]).await;
-    tokio::time::sleep(settings.top_songs_pause).await;
-    match reply {
-        Ok(reply) => reply["topSongs"]["song"].as_array().into_iter().flatten().map(|song| text(song, "id")).collect(),
-        Err(error) => {
-            tracing::warn!(%error, name, "no top songs");
-            Vec::new()
-        }
-    }
 }
 
 async fn cover_image(account: &Account, album_id: &str, size: u32) -> Result<RgbImage, AccountError> {
@@ -179,7 +198,7 @@ async fn save_playlist(account: &Account, existing: Option<&Value>, title: &str,
     }
 }
 
-async fn run(client: &reqwest::Client, settings: &Settings, state: &mut State) -> Result<String, AccountError> {
+async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher, state: &mut State) -> Result<String, AccountError> {
     let account = Account::sign_in(client.clone(), &settings.url, &settings.username, &settings.password).await?;
     let songs = account.all("song?_sort=album&_order=ASC").await?;
     let albums = account.all("album?_sort=name&_order=ASC").await?;
@@ -200,6 +219,7 @@ async fn run(client: &reqwest::Client, settings: &Settings, state: &mut State) -
     for list in albums_by_artist.values_mut() {
         list.sort_by_key(|album| std::cmp::Reverse((number(album, "maxYear"), text(album, "createdAt"))));
     }
+    let apple = Apple::new(client.clone(), settings.apple_pause, settings.storefronts.clone());
     let mut wanted: Vec<(String, String, Vec<String>)> = Vec::new();
     let mut artists: Vec<(&String, &Vec<Value>)> = songs_by_artist.iter().collect();
     artists.sort_by_key(|(id, _)| names[*id].to_lowercase());
@@ -209,9 +229,10 @@ async fn run(client: &reqwest::Client, settings: &Settings, state: &mut State) -
         if artist_songs.len() < settings.min_tracks || settings.skip.contains(&lower) || lower == "various artists" {
             continue;
         }
-        let top = top_songs(&account, name, settings).await;
-        tracing::debug!(name, top = top.len(), "top songs");
-        wanted.push((id.clone(), name.clone(), choose(&top, artist_songs, settings.max_tracks)));
+        let album_names: Vec<String> = albums_by_artist.get(id).map(|list| list.iter().map(|album| text(album, "name")).collect()).unwrap_or_default();
+        let top = apple.top_songs(name, &album_names).await;
+        tracing::debug!(name, top = top.len(), "apple top songs");
+        wanted.push((id.clone(), name.clone(), choose(&apple::ranked(&top), &enricher.deezer_top(id), artist_songs, settings.max_tracks)));
     }
     let playlists = account.all("playlist").await?;
     let ours: HashMap<String, &Value> = playlists
@@ -275,12 +296,35 @@ mod tests {
     #[test]
     fn puts_top_songs_first_then_the_most_played() {
         let songs = vec![
-            json!({ "id": "quiet", "playCount": 0, "year": 2010 }),
-            json!({ "id": "loved", "playCount": 9, "year": 2001 }),
-            json!({ "id": "hit", "playCount": 1, "year": 2001 }),
-            json!({ "id": "new", "playCount": 0, "year": 2020 }),
+            json!({ "id": "quiet", "title": "Quiet", "playCount": 0, "year": 2010 }),
+            json!({ "id": "loved", "title": "Loved", "playCount": 9, "year": 2001 }),
+            json!({ "id": "hit", "title": "Hit", "playCount": 1, "year": 2001 }),
+            json!({ "id": "new", "title": "New", "playCount": 0, "year": 2020 }),
         ];
-        let top = vec!["hit".to_owned(), "not-owned".to_owned(), "hit".to_owned()];
-        assert_eq!(choose(&top, &songs, 3), ["hit", "loved", "new"]);
+        let top = apple::ranked(&["Hit".to_owned(), "Not Owned".to_owned()]);
+        assert_eq!(choose(&top, &[], &songs, 3), ["hit", "loved", "new"]);
+    }
+
+    #[test]
+    fn ranks_by_deezer_when_apple_has_nothing_and_keeps_skits_last() {
+        let songs = vec![
+            json!({ "id": "intro", "title": "Северный ветер (интро)", "playCount": 3, "duration": 60.0 }),
+            json!({ "id": "skit", "title": "Звонок (скит)", "playCount": 2, "duration": 140.0 }),
+            json!({ "id": "paradise", "title": "Morning Paradise (feat. Иван Петров)", "playCount": 0, "duration": 200.0 }),
+            json!({ "id": "trap", "title": "Ночной TRAP", "playCount": 0, "duration": 200.0 }),
+            json!({ "id": "played", "title": "Тихий двор", "playCount": 1, "duration": 200.0 }),
+        ];
+        let deezer = [("Morning Paradise".to_owned(), 343_400), ("Ночной TRAP".to_owned(), 187_966)];
+        assert_eq!(choose(&[], &deezer, &songs, 5), ["paradise", "trap", "played", "intro", "skit"]);
+    }
+
+    #[test]
+    fn keeps_one_edition_of_each_song_preferring_the_original() {
+        let songs = vec![
+            json!({ "id": "live", "title": "Undertow (Live)", "year": 2009, "playCount": 5 }),
+            json!({ "id": "bonus", "title": "Undertow", "year": 2008, "playCount": 1 }),
+            json!({ "id": "studio", "title": "Undertow", "year": 2004, "playCount": 1 }),
+        ];
+        assert_eq!(choose(&[], &[], &songs, 5), ["studio"]);
     }
 }

@@ -40,6 +40,40 @@ pub fn title_key(title: &str) -> String {
     letters(&song_name(title))
 }
 
+const RECORDING: [&str; 20] = [
+    "remix", "rmx", "mix", "live", "instrumental", "acoustic", "unplugged", "demo", "cover", "karaoke", "rework", "bootleg", "reprise", "ремикс", "микс", "кавер", "инструментал", "акустика", "лайв", "концерт",
+];
+
+pub fn is_other_recording(title: &str) -> bool {
+    let mut depth = 0usize;
+    let mut extra = String::new();
+    for character in title.chars() {
+        match character {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            _ if depth > 0 => extra.push(character),
+            _ => {}
+        }
+    }
+    let mut parts = title.splitn(2, " - ");
+    parts.next();
+    extra.push(' ');
+    extra.push_str(parts.next().unwrap_or_default());
+    extra.to_lowercase().split(|character: char| !character.is_alphanumeric()).any(|word| RECORDING.contains(&word))
+}
+
+pub fn song_rank(top: &[(String, u64)], title: &str) -> Option<u64> {
+    let exact = letters(title);
+    if let Some((_, rank)) = top.iter().find(|(found, _)| letters(found) == exact) {
+        return Some(*rank);
+    }
+    if is_other_recording(title) {
+        return None;
+    }
+    let loose = title_key(title);
+    top.iter().find(|(found, _)| !is_other_recording(found) && title_key(found) == loose).map(|(_, rank)| *rank)
+}
+
 struct Unavailable;
 
 async fn get(client: &reqwest::Client, path: &str, query: &[(&str, &str)]) -> Result<Value, Unavailable> {
@@ -160,6 +194,15 @@ mod tests {
         assert_eq!(title_key("Тихий город при уч. Иван Петров"), "тихийгород");
         assert_eq!(title_key("Night Drive feat. Sam Rivers"), "nightdrive");
         assert_eq!(song_name("Наше интро при уч.  Иван Петров и Игорь"), "наше интро");
+    }
+
+    #[test]
+    fn ranks_songs_by_title_without_lending_scores_to_remixes() {
+        let top = [("Paper Moon".to_owned(), 693_944), ("Small Hours (Album Version)".to_owned(), 321_967)];
+        assert_eq!(song_rank(&top, "Paper Moon (Remastered)"), Some(693_944));
+        assert_eq!(song_rank(&top, "Paper Moon (Night Owl club mix)"), None);
+        assert_eq!(song_rank(&top, "Small Hours"), Some(321_967));
+        assert_eq!(song_rank(&top, "Driftwood"), None);
     }
 
     #[test]

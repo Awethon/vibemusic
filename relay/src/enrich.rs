@@ -237,6 +237,10 @@ impl Enricher {
         enricher
     }
 
+    pub fn deezer_top(&self, artist_id: &str) -> Vec<(String, u64)> {
+        self.state.lock().unwrap().cache.deezer.get(artist_id).and_then(|entry| entry.value.as_ref()).map(|artist| artist.top.clone()).unwrap_or_default()
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
         self.updates.subscribe()
     }
