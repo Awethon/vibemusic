@@ -1679,9 +1679,9 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 	.share-queue { top: calc(44px + var(--safe-t)); bottom: calc(84px + var(--safe-b)); }
 }
 
-.cover-icon { display: grid; place-items: center; width: 100%; height: 100%; background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)); color: var(--ink-2); container-type: size; }
+.cover-icon { display: grid; place-items: center; width: 100%; height: 100%; background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)); color: var(--ink); container-type: size; }
 
-.cover-icon svg { width: 42cqmin; height: 42cqmin; }
+.cover-icon svg { width: 42cqmin; height: 42cqmin; opacity: 0.72; }
 
 .radio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 
