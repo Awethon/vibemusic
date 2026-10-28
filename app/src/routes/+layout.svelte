@@ -46,7 +46,8 @@
 	let main = $state<HTMLElement | null>(null);
 	let started = false;
 	let ready = false;
-	const signedIn = $derived(!!session.credentials && !session.expired);
+	const publicPage = page.route.id === '/share/[id]';
+	const signedIn = $derived(!publicPage && !!session.credentials && !session.expired);
 
 	export const snapshot: Snapshot<number> = {
 		capture: () => main?.scrollTop ?? 0,
@@ -64,7 +65,7 @@
 	});
 
 	$effect(() => {
-		if (library.status !== 'ready' || ready) return;
+		if (publicPage || library.status !== 'ready' || ready) return;
 		ready = true;
 		libraryReady();
 	});
@@ -93,6 +94,9 @@
 	<title>{currentTrack() ? `${currentTrack()?.title} · ${currentTrack()?.artist}` : 'vibemusic'}</title>
 </svelte:head>
 
+{#if publicPage}
+	{@render children()}
+{:else}
 <Background />
 <GlassLayer level="rail" />
 {#if !signedIn}
@@ -120,4 +124,5 @@
 	<RemoteBanner />
 	<ConnectionNote />
 	<Toast />
+{/if}
 {/if}
