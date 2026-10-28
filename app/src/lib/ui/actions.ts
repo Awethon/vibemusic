@@ -1,8 +1,8 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { query, resyncLibrary } from '../library/library.svelte.ts';
-import { albumTracks, artistTracks, ownPlaylists, playlistTracks, type AlbumSummary, type Artist, type Playlist, type Track } from '../library/queries.ts';
-import { trackById } from '../player/player.svelte.ts';
+import { albumTracks, artistTracks, ownPlaylists, playlistTracks, skipsDisliked, withoutDisliked, type AlbumSummary, type Artist, type Playlist, type Track } from '../library/queries.ts';
+import { toggleDislike, trackById } from '../player/player.svelte.ts';
 import { navidrome, requireCredentials } from '../session.svelte.ts';
 import { plural } from './format.ts';
 import type { MenuItem } from './menu.svelte.ts';
@@ -63,7 +63,9 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 		SEPARATOR,
 		{ label: 'Go to album', run: () => openAlbum(track.albumId) },
 		{ label: 'Go to artist', run: () => openArtist(track.albumArtistId || track.artistId) },
-		...(await addToPlaylistEntries(async () => [track]))
+		...(await addToPlaylistEntries(async () => [track])),
+		SEPARATOR,
+		{ label: track.disliked ? 'Undo “I don’t like this song”' : 'I don’t like this song', hint: track.disliked ? undefined : 'skipped in mixes', run: () => dislike(track) }
 	];
 	if (playlist?.kind === 'own' && !playlist.readonly && playlist.ownerId === requireCredentials().userId) {
 		entries.push(SEPARATOR, {
@@ -83,6 +85,16 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 	return entries;
 }
 
+async function dislike(track: Track) {
+	try {
+		await toggleDislike(track);
+	} catch (error) {
+		reportFailure('save that', error);
+		return;
+	}
+	showToast(track.disliked ? 'Back in genre and This is playlists' : 'Grayed out and skipped in genre and This is playlists');
+}
+
 export async function albumMenu(album: AlbumSummary): Promise<MenuItem[]> {
 	const tracks = () => albumTracks(album.id);
 	return collectionEntries(tracks, album.songCount, album.name, `album:${album.id}`, 'Open album', () => openAlbum(album.id), [
@@ -96,7 +108,8 @@ export function artistMenu(artist: Artist): MenuItem[] {
 }
 
 export function playlistMenu(playlist: Playlist): MenuItem[] {
-	return collectionEntries(() => playlistTracks(playlist.id), playlist.songCount, playlist.name, `playlist:${playlist.id}`, 'Open playlist', () => openPlaylist(playlist.id));
+	const tracks = async () => (skipsDisliked(playlist) ? withoutDisliked(await playlistTracks(playlist.id)).tracks : playlistTracks(playlist.id));
+	return collectionEntries(tracks, playlist.songCount, playlist.name, `playlist:${playlist.id}`, 'Open playlist', () => openPlaylist(playlist.id));
 }
 
 export function queueRowMenu(row: HTMLElement): MenuItem[] {

@@ -32,6 +32,7 @@ export type Track = {
 	discNo: number;
 	duration: number;
 	starred: boolean;
+	disliked: boolean;
 };
 
 export type Artist = {
@@ -66,14 +67,14 @@ export type AlbumSort = 'mostPlayed' | 'recentlyAdded' | 'byArtist' | 'az' | 'ne
 export type ArtistSort = 'mostAlbums' | 'az';
 export type Filters = { genres: string[]; decades: number[] };
 
-type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; credits?: string; starred?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
+type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'disliked' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; credits?: string; starred?: number; disliked?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
 
 const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.genres, album.song_count as songCount,
 	album.duration, album.created, album.play_count as playCount, album.play_date as playDate, album.starred,
 	(select json_group_array(json_object('id', artist_id, 'name', name)) from (select artist_id, name from album_credit where album_credit.album_id = album.id order by position)) as credits`;
 
 const TRACK_COLUMNS = `track.id, track.album_id as albumId, album.name as album, track.title, track.artist, track.artist_id as artistId,
-	album.artist_id as albumArtistId, track.track_no as trackNo, track.disc_no as discNo, track.duration, track.starred`;
+	album.artist_id as albumArtistId, track.track_no as trackNo, track.disc_no as discNo, track.duration, track.starred, track.rating = 1 as disliked`;
 
 const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount, artist.track_count as trackCount, artist.first_year as firstYear,
 	artist.newest_album_id as newestAlbumId,
@@ -85,7 +86,14 @@ const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.ow
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 8)) as mosaicAlbumIds`;
 
 const toAlbum = (row: Raw<Album>): Album => ({ ...row, genres: JSON.parse(row.genres ?? '[]'), credits: JSON.parse(row.credits ?? '[]'), starred: row.starred === 1 });
-const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1 });
+const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1, disliked: row.disliked === 1 });
+
+export const skipsDisliked = (playlist: Pick<Playlist, 'kind'> | null | undefined) => playlist?.kind === 'genre' || playlist?.kind === 'artist';
+
+export function withoutDisliked(tracks: Track[], index = -1) {
+	const kept = tracks.filter((track, position) => !track.disliked || position === index);
+	return { tracks: kept, index: index < 0 ? 0 : kept.indexOf(tracks[index]) };
+}
 const toArtist = (row: Raw<Artist>): Artist => ({ ...row, coverAlbumIds: JSON.parse(row.coverAlbumIds ?? '[]') });
 const toPlaylist = (row: Raw<Playlist>): Playlist => ({ ...row, readonly: row.readonly === 1, mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]') });
 

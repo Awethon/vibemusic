@@ -85,4 +85,10 @@ export async function toggleLike(track: Track) {
 	perform({ kind: 'liked', trackId: track.id, starred });
 }
 
+export async function toggleDislike(track: Track) {
+	const disliked = !track.disliked;
+	await navidrome().subsonic('setRating', { id: track.id, rating: disliked ? 1 : 0 });
+	await patchLibrary('update track set rating = ? where id = ?', [disliked ? 1 : 0, track.id]);
+}
+
 export const audioLive = () => !isMirroring() && localAudioLive();

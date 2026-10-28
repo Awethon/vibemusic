@@ -16,6 +16,7 @@ export type LibraryChanges = {
 	albumSongs: NativeSong[];
 	albumStats: NativeAlbum[];
 	songStats: NativeSong[];
+	ratings: Map<string, number>;
 	playlists: NativePlaylist[];
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
 	totals: { albums: number; tracks: number } | null;

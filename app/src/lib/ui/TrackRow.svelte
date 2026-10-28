@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Playlist, Track } from '../library/queries.ts';
+	import { skipsDisliked, withoutDisliked, type Playlist, type Track } from '../library/queries.ts';
 	import { playTrackInList, playerQueue } from '../player/player.svelte.ts';
 	import { trackMenu } from './actions.ts';
 	import { clock } from './format.ts';
@@ -17,16 +17,24 @@
 	}: { tracks: Track[]; index: number; sourceName: string; listKey: string; number: number | string; showArtist: boolean; showAlbum: boolean; playlist?: Playlist } = $props();
 
 	const track = $derived(tracks[index]);
+	const skipping = $derived(skipsDisliked(playlist));
+	const dimmed = $derived(skipping && track.disliked);
+
+	function play() {
+		const list = skipping ? withoutDisliked(tracks, index) : { tracks, index };
+		playTrackInList(list.tracks, list.index, sourceName, listKey);
+	}
 </script>
 
 <div
 	class="trk"
 	class:playing={track.id === playerQueue().currentTrackId}
+	class:disliked={dimmed}
 	data-id={track.id}
 	role="button"
 	tabindex="-1"
-	onclick={() => playTrackInList(tracks, index, sourceName, listKey)}
-	onkeydown={(event) => event.key === 'Enter' && playTrackInList(tracks, index, sourceName, listKey)}
+	onclick={play}
+	onkeydown={(event) => event.key === 'Enter' && play()}
 	oncontextmenu={(event) => openMenu(event, trackMenu(tracks, index, sourceName, listKey, playlist))}
 >
 	<span class="n">{number}</span>

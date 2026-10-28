@@ -2,7 +2,7 @@
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { albumsByArtist, artistById, artistPlaylist, artistTracks, playlistTracks, tracksByIds, type Artist, type Track } from '#lib/library/queries.ts';
+	import { albumsByArtist, artistById, artistPlaylist, artistTracks, playlistTracks, tracksByIds, withoutDisliked, type Artist, type Track } from '#lib/library/queries.ts';
 	import { artistInfo } from '#lib/navidrome/artistInfo.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
@@ -71,7 +71,7 @@
 				<div>
 					<h2 class="section-title">Popular</h2>
 					{#if thisIs.value}
-						<TrackList tracks={thisIs.value.tracks.slice(0, ARTIST_PAGE.popularCount)} sourceName={thisIs.value.playlist.name} listKey="playlist:{thisIs.value.playlist.id}" showAlbum />
+						<TrackList tracks={thisIs.value.tracks.slice(0, ARTIST_PAGE.popularCount)} sourceName={thisIs.value.playlist.name} listKey="playlist:{thisIs.value.playlist.id}" playlist={thisIs.value.playlist} showAlbum />
 					{:else}
 						<TrackList tracks={popular} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
 					{/if}
@@ -82,7 +82,7 @@
 						<a href={resolve('/playlist/[id]', { id: playlist.id })} data-id={playlist.id}><PlaylistMosaic {playlist} size={COVER_PX.artistPlaylist} /></a>
 						<a class="t" href={resolve('/playlist/[id]', { id: playlist.id })}>{playlist.name}</a>
 						<span class="s">{playlistMetaLine(playlist)}</span>
-						<PlayButton tracks={thisIs.value.tracks} sourceName={playlist.name} listKey="playlist:{playlist.id}" />
+						<PlayButton tracks={withoutDisliked(thisIs.value.tracks).tracks} sourceName={playlist.name} listKey="playlist:{playlist.id}" />
 					</div>
 				{/if}
 			</div>

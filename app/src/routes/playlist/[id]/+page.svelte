@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { fixedRowMeasure } from '#lib/engine/geometry.ts';
-	import { playlistById, playlistTracks } from '#lib/library/queries.ts';
+	import { playlistById, playlistTracks, skipsDisliked, withoutDisliked } from '#lib/library/queries.ts';
 	import { COVER_PX, LAYOUT } from '#lib/tuning.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
@@ -18,6 +18,7 @@
 	const id = $derived(page.params.id ?? '');
 	const playlist = live(() => playlistById(id), null);
 	const tracks = live(() => playlistTracks(id), []);
+	const playable = $derived(skipsDisliked(playlist.value) ? withoutDisliked(tracks.value).tracks : tracks.value);
 	const rows = $derived(tracks.value.map((track, index) => ({ track, index })));
 	const duration = $derived(tracks.value.reduce((total, track) => total + track.duration, 0));
 	const updateLine = $derived.by(() => {
@@ -39,7 +40,7 @@
 				{#if playlist.value.kind === 'artist'}<p class="sub"><a href={resolve('/artist/[id]', { id: playlist.value.artistId })}>{playlist.value.name.replace(/^This is /, '')}</a></p>{/if}
 				{#if updateLine}<p class="sub smart-line"><Icon name="smart" /><span>{updateLine}</span></p>{/if}
 				<p class="genres">{plural(tracks.value.length, 'track')} · {longDuration(duration)}</p>
-				<div style:margin-top="20px"><PlayButton tracks={tracks.value} sourceName={playlist.value.name} listKey="playlist:{id}" /></div>
+				<div style:margin-top="20px"><PlayButton tracks={playable} sourceName={playlist.value.name} listKey="playlist:{id}" /></div>
 			</div>
 		</div>
 		{#if tracks.value.length}

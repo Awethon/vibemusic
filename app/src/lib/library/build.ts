@@ -65,7 +65,7 @@ const songGenresOf = (song: NativeSong) => {
 };
 
 function insertTracks(db: Database, songs: NativeSong[]) {
-	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0, JSON.stringify(songGenresOf(song))]));
+	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0, JSON.stringify(songGenresOf(song)), song.rating]));
 	eachBound(db, 'insert into search values (?,?,?)', songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)]));
 }
 
@@ -73,6 +73,14 @@ function removeTracks(db: Database, ids: string[]) {
 	deleteWhereIn(db, 'delete from track where id = ?', ids);
 	deleteWhereIn(db, 'delete from track_genre where track_id = ?', ids);
 	deleteWhereIn(db, "delete from search where kind = 'track' and ref = ?", ids);
+}
+
+function updateRatings(db: Database, ratings: Map<string, number>): number {
+	const current = new Map(db.selectObjects('select id, rating from track where rating != 0').map((row) => [row.id as string, row.rating as number]));
+	const changed: [number, string][] = [...current.keys()].filter((id) => !ratings.has(id)).map((id) => [0, id]);
+	for (const [id, rating] of ratings) if (current.get(id) !== rating && db.selectValue('select 1 from track where id = ?', [id])) changed.push([rating, id]);
+	eachBound(db, 'update track set rating = ? where id = ?', changed);
+	return changed.length;
 }
 
 function updateStats(db: Database, table: 'album' | 'track', rows: { id: string; playCount: number; playDate: string; starred: boolean }[]): number {
@@ -297,7 +305,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			removeTracks(db, changes.albumSongs.map((song) => song.id));
 			insertTracks(db, changes.albumSongs);
 		}
-		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats);
+		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats) + updateRatings(db, changes.ratings);
 		if (playlistsChanged) {
 			const ids = db.selectValues("select id from playlist where kind != 'genre'") as string[];
 			deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", ids);

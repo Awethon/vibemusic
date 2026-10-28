@@ -85,12 +85,13 @@ async function fetchAlbumSongs(http: NavidromeHttp, albumIds: string[]) {
 
 export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAlbums: number): Promise<LibraryChanges | null> {
 	const { marks } = sync;
-	const [albums, albumPlays, albumStars, songPlays, songStars, playlists] = await Promise.all([
+	const [albums, albumPlays, albumStars, songPlays, songStars, rated, playlists] = await Promise.all([
 		changedSince(http, 'album?_sort=importedAt&_order=DESC', nativeAlbum, (album) => album.importedAt, marks.albumImported),
 		changedSince(http, 'album?_sort=playDate&_order=DESC', nativeAlbum, (album) => album.playDate, marks.albumPlayed),
 		changedSince(http, 'album?_sort=starredAt&_order=DESC', nativeAlbum, (album) => album.starredAt, marks.albumStarred),
 		changedSince(http, 'song?_sort=playDate&_order=DESC', nativeSong, (song) => song.playDate, marks.songPlayed),
 		changedSince(http, 'song?_sort=starredAt&_order=DESC', nativeSong, (song) => song.starredAt, marks.songStarred),
+		http.nativeAll('song?has_rating=true&_sort=title&_order=ASC', LIBRARY_SYNC.pageSize).then((songs) => nativeSong.array().parse(songs)),
 		fetchPlaylists(http)
 	]);
 	if (albums.length > Math.max(LIBRARY_SYNC.fullSyncChangedAlbumMin, localAlbums * LIBRARY_SYNC.fullSyncChangedAlbumShare)) return null;
@@ -107,6 +108,7 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		albumSongs,
 		albumStats: latest([albumPlays, albumStars]),
 		songStats: latest([songPlays, songStars]),
+		ratings: new Map(rated.map((song) => [song.id, song.rating])),
 		marks: {
 			albumImported: newest([marks.albumImported, ...albums.map((album) => album.importedAt)]),
 			albumPlayed: newest([marks.albumPlayed, ...albumPlays.map((album) => album.playDate)]),

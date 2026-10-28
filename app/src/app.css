@@ -383,6 +383,8 @@ body.panel-open { --panel-w: 376px; }
 
 .trk:hover { background: var(--hover); }
 
+.trk.disliked > * { opacity: 0.38; }
+
 .trk .n { color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
 
 .trk .tt { min-width: 0; }

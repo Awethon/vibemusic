@@ -47,7 +47,8 @@ export const nativeSong = z.object({
 	playCount: optionalNumber,
 	playDate: optionalDate,
 	starred: z.boolean().nullish().transform((value) => value ?? false),
-	starredAt: optionalDate
+	starredAt: optionalDate,
+	rating: optionalNumber
 });
 
 export const nativePlaylist = z.object({
