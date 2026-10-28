@@ -2,7 +2,7 @@ import { GENRE_PLAYLISTS } from '../tuning.ts';
 import { descendantCount, parentsOf, withAncestors } from './genres.ts';
 import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
 
-export type GenreSong = { id: string; title: string; duration: number; albumId: string; artistId: string; genres: string[]; plays: number; starred: boolean; fans: number | null; popularity: number | null };
+export type GenreSong = { id: string; title: string; duration: number; year: number; albumId: string; artistId: string; genres: string[]; plays: number; starred: boolean; fans: number | null; popularity: number | null };
 export type GenrePlaylist = { genre: string; songs: GenreSong[] };
 
 type Rules = { readonly [Key in keyof typeof GENRE_PLAYLISTS]: number };
@@ -78,7 +78,7 @@ const FILLER = /(^|[^\p{L}])(skit|intro|outro|interlude|prelude|скит|инт�
 
 const isFiller = (song: GenreSong, rules: Rules) => song.popularity === null && (song.duration < rules.minSongSeconds || FILLER.test(song.title));
 
-const versionOrder = (song: GenreSong) => [-song.plays, -Number(song.starred), Number(isOtherRecording(song.title)), Number(!isPlainTitle(song.title)), Number(song.popularity === null)];
+const versionOrder = (song: GenreSong) => [Number(isOtherRecording(song.title)), song.year || Number.MAX_SAFE_INTEGER, Number(!isPlainTitle(song.title)), -song.plays, -Number(song.starred), Number(song.popularity === null)];
 
 function preferredVersion(a: GenreSong, b: GenreSong) {
 	const left = versionOrder(a);

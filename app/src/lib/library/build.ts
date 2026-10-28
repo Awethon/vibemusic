@@ -1,5 +1,6 @@
 import type { Database } from '@sqlite.org/sqlite-wasm';
 import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
+import { deezerAlbumGenre } from '../genres/deezer.ts';
 import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
 import { createGenreResolver, withAncestors } from '../genres/genres.ts';
 import { songRanks } from '../genres/titles.ts';
@@ -126,19 +127,24 @@ function rebuildTrackGenres(db: Database) {
 	db.exec('delete from track_genre');
 	const resolver = createGenreResolver();
 	const albumTags = new Map<string, Tag[] | null>();
-	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.raw_genres as albumGenres, mb_release_group.tags as albumTags, mb_artist.tags as artistTags
+	const storeGenres = new Map<string, string | null>();
+	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.name as albumName, album.raw_genres as albumGenres,
+		mb_release_group.tags as albumTags, mb_artist.tags as artistTags, deezer_artist.albums as deezerAlbums
 		from track join album on album.id = track.album_id
 		left join mb_release_group on mb_release_group.id = album.release_group
-		left join mb_artist on mb_artist.id = json_extract(mb_release_group.artists, '$[0]')`);
+		left join mb_artist on mb_artist.id = json_extract(mb_release_group.artists, '$[0]')
+		left join deezer_artist on deezer_artist.artist_id = album.artist_id`);
 	const insert = db.prepare('insert or ignore into track_genre values (?,?,?)');
 	for (const row of rows) {
 		const songGenres = JSON.parse(row.songGenres as string) as string[];
 		const albumId = row.albumId as string;
 		if (!albumTags.has(albumId)) albumTags.set(albumId, parsedTags(row.albumTags));
+		if (!storeGenres.has(albumId)) storeGenres.set(albumId, deezerAlbumGenre(typeof row.deezerAlbums === 'string' ? JSON.parse(row.deezerAlbums) : null, row.albumName as string));
 		const direct = genresFromEvidence(resolver, {
 			fileGenres: songGenres.length ? songGenres : (JSON.parse(row.albumGenres as string) as string[]),
 			albumTags: albumTags.get(albumId) ?? null,
-			artistTags: parsedTags(row.artistTags)
+			artistTags: parsedTags(row.artistTags),
+			storeGenre: storeGenres.get(albumId)
 		});
 		for (const genre of direct) insert.bind([genre, row.id as string, 1]).stepReset();
 		for (const genre of new Set(direct.flatMap(withAncestors))) if (!direct.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
@@ -160,7 +166,7 @@ function rebuildGenrePlaylists(db: Database) {
 	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', genreIds);
 	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", genreIds);
 	db.exec("delete from playlist where kind = 'genre'");
-	const rows = db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, track.play_count as plays,
+	const rows = db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, album.year, track.play_count as plays,
 		track.starred, track.duration, (select json_group_array(genre) from track_genre where track_genre.track_id = track.id) as genres
 		from track join album on album.id = track.album_id where exists (select 1 from track_genre where track_genre.track_id = track.id)`);
 	const deezer = new Map(
@@ -174,6 +180,7 @@ function rebuildGenrePlaylists(db: Database) {
 			id: row.id as string,
 			title: row.title as string,
 			duration: row.duration as number,
+			year: row.year as number,
 			albumId: row.albumId as string,
 			artistId: row.artistId as string,
 			genres: JSON.parse(row.genres as string),
@@ -208,7 +215,7 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
-const DERIVED_RULES = JSON.stringify({ algorithm: 5, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
+const DERIVED_RULES = JSON.stringify({ algorithm: 7, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
@@ -220,9 +227,12 @@ function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 
 function carryKept(from: Database | null, to: Database) {
 	if (!from) return;
 	for (const table of KEPT_TABLES) {
-		const rows = from.selectArrays(`select * from ${table}`);
+		const previous = new Set(from.selectValues(`select name from pragma_table_info('${table}')`) as string[]);
+		const columns = (to.selectValues(`select name from pragma_table_info('${table}')`) as string[]).filter((column) => previous.has(column));
+		if (!columns.length) continue;
+		const rows = from.selectArrays(`select ${columns.join(',')} from ${table}`);
 		if (!rows.length) continue;
-		const insert = to.prepare(`insert or replace into ${table} values (${rows[0].map(() => '?').join(',')})`);
+		const insert = to.prepare(`insert or replace into ${table} (${columns.join(',')}) values (${columns.map(() => '?').join(',')})`);
 		for (const row of rows) insert.bind(row as (string | number | null)[]).stepReset();
 		insert.finalize();
 	}
@@ -327,7 +337,7 @@ export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState
 	db.transaction(() => {
 		eachBound(db, 'insert or replace into mb_release_group values (?,?,?)', Object.entries(enrichment.releaseGroups).map(([id, group]) => [id, group && JSON.stringify(group.artists), group && JSON.stringify(group.tags)]));
 		eachBound(db, 'insert or replace into mb_artist values (?,?)', Object.entries(enrichment.mbArtists).map(([id, artist]) => [id, artist && JSON.stringify(artist.tags)]));
-		eachBound(db, 'insert or replace into deezer_artist values (?,?,?,?,?)', Object.entries(enrichment.deezer).map(([id, artist]) => [id, artist && artist.id, artist && artist.name, artist && artist.fans, artist && JSON.stringify(artist.top)]));
+		eachBound(db, 'insert or replace into deezer_artist values (?,?,?,?,?,?)', Object.entries(enrichment.deezer).map(([id, artist]) => [id, artist && artist.id, artist && artist.name, artist && artist.fans, artist && JSON.stringify(artist.top), artist?.albums ? JSON.stringify(artist.albums) : null]));
 		db.exec({ sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))", bind: [enrichment.at] });
 		rebuildDerived(db);
 	});

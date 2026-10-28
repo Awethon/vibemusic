@@ -18,6 +18,12 @@ describe('genres from evidence', () => {
 		expect(genres({ fileGenres: ['Rap'], albumTags: [['seen live', 9], ['russian rap', 3]] })).toEqual(['Hip-Hop', 'Russian Hip-Hop']);
 	});
 
+	it('uses the store genre to fill an untagged album, never to outvote tags', () => {
+		expect(genres({ storeGenre: 'Hip-Hop' })).toEqual(['Hip-Hop']);
+		expect(genres({ fileGenres: ['Rock'], storeGenre: 'Pop' })).toEqual(['Rock']);
+		expect(genres({ albumTags: [['nu metal', 4]], storeGenre: 'Rock' })).toEqual(['Nu Metal']);
+	});
+
 	it('falls back to the artist only when the song and album say nothing', () => {
 		expect(genres({ artistTags: [['ambient', 9], ['electronic', 6], ['game soundtrack', 4], ['british', 12]] })).toEqual(['Ambient']);
 		expect(genres({ fileGenres: ['Rock'], artistTags: [['ambient', 9]] })).toEqual(['Rock']);

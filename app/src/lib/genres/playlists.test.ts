@@ -4,7 +4,7 @@ import { withAncestors } from './genres.ts';
 import { chooseGenres, pickBest, type GenreSong } from './playlists.ts';
 
 const songs = (genre: string, count: number, artists: number, prefix = genre, fans: number | null = null): GenreSong[] =>
-	Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, title: `${prefix} song ${index}`, duration: 200, albumId: `${prefix}-album-${index % artists}`, artistId: `${prefix}-artist-${index % artists}`, genres: withAncestors(genre), plays: 0, starred: false, fans, popularity: null }));
+	Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, title: `${prefix} song ${index}`, duration: 200, year: 2000, albumId: `${prefix}-album-${index % artists}`, artistId: `${prefix}-artist-${index % artists}`, genres: withAncestors(genre), plays: 0, starred: false, fans, popularity: null }));
 
 const chosen = (library: GenreSong[]) => chooseGenres(library).map((playlist) => playlist.genre);
 
@@ -70,7 +70,15 @@ describe('genre playlists', () => {
 
 	it('plays each song once even when the library has several editions of it', () => {
 		const editions = ['Lighthouse', 'Lighthouse (Live)', 'Driftwood', 'Driftwood'].map((title, index) => ({ ...songs('Metal', 1, 1, `edition-${index}`)[0], title, artistId: 'harbor', plays: index }));
-		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Lighthouse (Live)', 'Driftwood']);
+		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Lighthouse', 'Driftwood']);
+	});
+
+	it('keeps the original edition of a song even after the later one was played more', () => {
+		const undertow = [
+			{ album: 'Second Wind', year: 2008, plays: 3 },
+			{ album: 'First Light', year: 2004, plays: 1 }
+		].map(({ album, year, plays }) => ({ ...songs('Metal', 1, 1, album)[0], title: 'Undertow', artistId: 'harbor', year, plays }));
+		expect(pickBest(undertow).map((song) => song.year)).toEqual([2004]);
 	});
 
 	it('prefers the original recording over remixes when nothing else decides', () => {

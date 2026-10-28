@@ -66,6 +66,10 @@ pub fn artist_of_song(results: &Value, title: &str) -> Option<u64> {
     titled(letters).or_else(|| titled(title_key))?["artist"]["id"].as_u64()
 }
 
+fn albums_of(value: &Value) -> Vec<(String, i64)> {
+    value["data"].as_array().into_iter().flatten().filter_map(|album| Some((album["title"].as_str()?.to_owned(), album["genre_id"].as_i64().unwrap_or(-1)))).collect()
+}
+
 fn top_songs(value: &Value) -> Vec<(String, u64)> {
     value["data"].as_array().into_iter().flatten().filter_map(|song| Some((song["title"].as_str()?.to_owned(), song["rank"].as_u64().unwrap_or(0)))).collect()
 }
@@ -138,7 +142,8 @@ pub async fn find_artist(client: &reqwest::Client, name: &str, songs: &[String])
         Err(Unavailable) => return Fetched::Failed,
     };
     let Ok(artist) = get(client, &format!("artist/{id}"), &[]).await else { return Fetched::Failed };
-    Fetched::Found(DeezerArtist { id, name: artist["name"].as_str().unwrap_or_default().to_owned(), fans: artist["nb_fan"].as_u64().unwrap_or(0), top })
+    let Ok(albums) = get(client, &format!("artist/{id}/albums"), &[("limit", &TOP_SONGS.to_string())]).await else { return Fetched::Failed };
+    Fetched::Found(DeezerArtist { id, name: artist["name"].as_str().unwrap_or_default().to_owned(), fans: artist["nb_fan"].as_u64().unwrap_or(0), top, albums: Some(albums_of(&albums)) })
 }
 
 #[cfg(test)]

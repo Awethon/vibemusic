@@ -242,6 +242,7 @@ export const GENRE_EVIDENCE = Object.freeze({
 	fileTagWeight: 1,
 	minTagShare: 0.4,
 	confidentVotes: 3,
+	storeGenreWeight: 0.5,
 	minWeight: 1
 });
 

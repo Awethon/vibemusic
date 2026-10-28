@@ -2,7 +2,7 @@ import { GENRE_EVIDENCE } from '../tuning.ts';
 import type { GenreResolver } from './genres.ts';
 
 export type Tag = [name: string, votes: number];
-export type Evidence = { fileGenres: string[]; albumTags: Tag[] | null; artistTags: Tag[] | null };
+export type Evidence = { fileGenres: string[]; albumTags: Tag[] | null; artistTags: Tag[] | null; storeGenre?: string | null };
 
 function addTags(resolver: GenreResolver, tags: Tag[], votes: Map<string, number>): number {
 	const resolved = tags.flatMap(([name, count]) => {
@@ -24,7 +24,8 @@ function addTags(resolver: GenreResolver, tags: Tag[], votes: Map<string, number
 export function genresFromEvidence(resolver: GenreResolver, evidence: Evidence): string[] {
 	const votes = new Map<string, number>();
 	for (const genre of resolver.genresOf(evidence.fileGenres)) votes.set(genre, (votes.get(genre) ?? 0) + GENRE_EVIDENCE.fileTagWeight);
-	const fileTagged = votes.size > 0;
+	if (evidence.storeGenre) votes.set(evidence.storeGenre, (votes.get(evidence.storeGenre) ?? 0) + GENRE_EVIDENCE.storeGenreWeight);
+	const fileTagged = resolver.genresOf(evidence.fileGenres).length > 0;
 	const albumConfidence = evidence.albumTags?.length ? addTags(resolver, evidence.albumTags, votes) : 0;
 	if (!fileTagged && albumConfidence < 1 && evidence.artistTags?.length) addTags(resolver, evidence.artistTags, votes);
 	const ranked = [...votes].toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));

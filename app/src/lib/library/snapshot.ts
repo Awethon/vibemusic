@@ -43,5 +43,5 @@ export type Enrichment = {
 	at: number;
 	releaseGroups: Record<string, { artists: string[]; tags: [string, number][] } | null>;
 	mbArtists: Record<string, { tags: [string, number][] } | null>;
-	deezer: Record<string, { id: number; name: string; fans: number; top: [string, number][] } | null>;
+	deezer: Record<string, { id: number; name: string; fans: number; top: [string, number][]; albums?: [string, number][] | null } | null>;
 };

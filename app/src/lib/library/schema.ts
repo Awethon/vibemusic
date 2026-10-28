@@ -1,6 +1,6 @@
 import { TREE_VERSION } from '../genres/genres.ts';
 
-export const SCHEMA_VERSION = `7.${TREE_VERSION}`;
+export const SCHEMA_VERSION = `8.${TREE_VERSION}`;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -74,7 +74,7 @@ create table playlist_track (playlist_id text not null, position integer not nul
 create table palette (album_id text primary key, colors text not null) without rowid;
 create table mb_release_group (id text primary key, artists text, tags text) without rowid;
 create table mb_artist (id text primary key, tags text) without rowid;
-create table deezer_artist (artist_id text primary key, deezer_id integer, name text, fans integer, top text) without rowid;
+create table deezer_artist (artist_id text primary key, deezer_id integer, name text, fans integer, top text, albums text) without rowid;
 create table enrichment_state (key text primary key, value text not null) without rowid;
 create table search_key (kind text not null, text text not null, ref text not null);
 create virtual table search using fts5 (kind unindexed, ref unindexed, text, tokenize = 'trigram remove_diacritics 1');

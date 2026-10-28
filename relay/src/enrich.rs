@@ -43,6 +43,8 @@ pub struct DeezerArtist {
     pub name: String,
     pub fans: u64,
     pub top: Vec<(String, u64)>,
+    #[serde(default)]
+    pub albums: Option<Vec<(String, i64)>>,
 }
 
 pub enum Fetched<T> {
@@ -205,7 +207,8 @@ impl State {
                     if entry.at > request.since {
                         reply.deezer.insert(artist.id.clone(), entry.value.clone());
                     }
-                    if !entry.fresh(now, DEEZER_FRESH_MS) {
+                    let outdated = entry.value.as_ref().is_some_and(|found| found.albums.is_none());
+                    if outdated || !entry.fresh(now, DEEZER_FRESH_MS) {
                         self.queue_deezer(artist);
                     }
                 }
