@@ -91,8 +91,8 @@ function updateStats(db: Database, table: 'album' | 'track', rows: { id: string;
 	return changed;
 }
 
-function insertPlaylists(db: Database, playlists: NativePlaylist[]) {
-	eachBound(db, 'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)', playlists.map((playlist) => [playlist.id, playlist.name, playlist.rules ? 'smart' : 'own', playlist.ownerId, '', 0, 0, playlist.duration, playlist.evaluatedAt || playlist.updatedAt, playlist.uploadedImage, playlist.sync ? 1 : 0, '']));
+function insertPlaylists(db: Database, playlists: NativePlaylist[], userId: string) {
+	eachBound(db, 'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)', playlists.map((playlist) => [playlist.id, playlist.name, playlist.rules ? 'smart' : 'own', playlist.ownerId, '', 0, 0, playlist.duration, playlist.evaluatedAt || playlist.updatedAt, playlist.uploadedImage, playlist.sync || playlist.ownerId !== userId ? 1 : 0, '']));
 	eachBound(db, 'insert into search values (?,?,?)', playlists.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.name)]));
 }
 
@@ -215,7 +215,7 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
-const DERIVED_RULES = JSON.stringify({ algorithm: 7, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
+const DERIVED_RULES = JSON.stringify({ algorithm: 8, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
@@ -244,7 +244,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 	db.transaction(() => {
 		insertAlbums(db, snapshot.albums);
 		insertTracks(db, snapshot.songs);
-		insertPlaylists(db, snapshot.playlists);
+		insertPlaylists(db, snapshot.playlists, userId);
 		insertPlaylistTracks(db, snapshot.playlistTracks);
 		rebuildDerived(db);
 	});
@@ -281,7 +281,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			db.exec("delete from playlist where kind != 'genre'");
 			const current = new Set(changes.playlists.map((playlist) => playlist.id));
 			deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', [...ids.filter((id) => !current.has(id)), ...changes.playlistTracks.keys()]);
-			insertPlaylists(db, changes.playlists);
+			insertPlaylists(db, changes.playlists, meta.userId);
 			insertPlaylistTracks(db, changes.playlistTracks);
 		}
 		if (contentChanged || playlistsChanged) rebuildDerived(db);

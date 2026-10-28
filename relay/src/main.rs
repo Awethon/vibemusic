@@ -1,8 +1,11 @@
+mod account;
 mod auth;
+mod cover;
 mod deezer;
 mod enrich;
 mod hub;
 mod musicbrainz;
+mod this_is;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -48,6 +51,10 @@ async fn main() {
     let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:4600".into());
     let cache = std::env::var("ENRICHMENT_CACHE").unwrap_or_else(|_| "/data/enrichment.json".into());
     let cache = (!cache.is_empty()).then(|| std::path::PathBuf::from(cache));
+    match this_is::Settings::from_env(&navidrome_url) {
+        Some(settings) => this_is::start(settings),
+        None => tracing::info!("This is playlists are off: set VIBEMUSIC_NAVIDROME_USER and VIBEMUSIC_NAVIDROME_PASSWORD to turn them on"),
+    }
     let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()), enricher: Enricher::new(cache) };
     let router = Router::new().route("/relay", get(upgrade)).route("/health", get(|| async { "ok" })).with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
