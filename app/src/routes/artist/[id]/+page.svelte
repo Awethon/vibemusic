@@ -2,7 +2,7 @@
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { albumsByArtist, artistById, artistPlaylist, artistTracks, playlistTracks, tracksByIds, withoutDisliked, type Artist, type Track } from '#lib/library/queries.ts';
+	import { albumsByArtist, artistById, artistPlaylist, playlistTracks, tracksByIds, withoutDisliked, type Artist, type Track } from '#lib/library/queries.ts';
 	import { artistInfo } from '#lib/navidrome/artistInfo.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
@@ -17,7 +17,6 @@
 	const id = $derived(page.params.id ?? '');
 	const artist = live(() => artistById(id), null);
 	const albums = live(() => albumsByArtist(id), []);
-	const tracks = live(() => artistTracks(id), []);
 	const thisIs = live(async () => {
 		const playlist = await artistPlaylist(id);
 		return playlist ? { playlist, tracks: await playlistTracks(playlist.id) } : null;
@@ -59,7 +58,6 @@
 				<p class="eyebrow">Artist</p>
 				<h1 class="display">{artist.value.name}</h1>
 				<p class="sub">{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}{artist.value.firstYear ? ` · since ${artist.value.firstYear}` : ''}</p>
-				<div style:margin="20px 0 8px"><PlayButton tracks={tracks.value} sourceName={artist.value.name} listKey="artist:{id}" label="Play all" /></div>
 				{#if biography}
 					<p class="bio" class:open={expanded}>{biography}</p>
 					<button class="ghost" type="button" onclick={() => (expanded = !expanded)}>{expanded ? 'Show less' : 'Read more'}</button>
