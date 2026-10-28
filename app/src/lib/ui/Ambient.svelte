@@ -3,6 +3,7 @@
 	import { currentLyricIndex, lyricsState } from '../player/lyricsState.svelte.ts';
 	import { currentTrack } from '../player/player.svelte.ts';
 	import { COVER_PX, LYRICS } from '../tuning.ts';
+	import { isRadio } from '../library/queries.ts';
 	import Cover from './Cover.svelte';
 
 	const track = $derived(currentTrack());
@@ -31,7 +32,7 @@
 </script>
 
 <section id="ambient" aria-hidden="true">
-	<Cover albumId={track?.albumId} size={COVER_PX.ambient} eager />
+	<Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.ambient} eager />
 	<div class="amb-text">
 		<p class="amb-artist">{track ? `${track.artist} — ${track.album}` : ''}</p>
 		<h2>{track?.title ?? ''}</h2>

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use axum::Json;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Response};
 use serde_json::Value;
 
 const MARKER: &str = "window.__SHARE_INFO__ = ";
@@ -19,24 +19,32 @@ impl Shares {
     }
 
     pub async fn info(&self, id: &str) -> Response {
-        if id.is_empty() || !id.chars().all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_') {
-            return StatusCode::NOT_FOUND.into_response();
+        match self.load(id).await {
+            Ok(info) => Json(info).into_response(),
+            Err(status) => status.into_response(),
         }
-        let page = match self.client.get(format!("{}/share/{id}", self.navidrome)).send().await {
-            Ok(page) => page,
-            Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
-        };
+    }
+
+    pub async fn preview(&self, id: &str, host: &str) -> Response {
+        match self.load(id).await {
+            Ok(info) => Html(preview_page(&info, id, host)).into_response(),
+            Err(status) => status.into_response(),
+        }
+    }
+
+    async fn load(&self, id: &str) -> Result<Value, StatusCode> {
+        if id.is_empty() || !id.chars().all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_') {
+            return Err(StatusCode::NOT_FOUND);
+        }
+        let page = self.client.get(format!("{}/share/{id}", self.navidrome)).send().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
         match page.status().as_u16() {
             200 => {}
-            404 => return StatusCode::NOT_FOUND.into_response(),
-            410 => return StatusCode::GONE.into_response(),
-            _ => return StatusCode::BAD_GATEWAY.into_response(),
+            404 => return Err(StatusCode::NOT_FOUND),
+            410 => return Err(StatusCode::GONE),
+            _ => return Err(StatusCode::BAD_GATEWAY),
         }
-        let Ok(html) = page.text().await else { return StatusCode::BAD_GATEWAY.into_response() };
-        match share_info_in(&html) {
-            Some(info) => Json(info).into_response(),
-            None => StatusCode::NOT_FOUND.into_response(),
-        }
+        let html = page.text().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+        share_info_in(&html).ok_or(StatusCode::NOT_FOUND)
     }
 }
 
@@ -45,6 +53,46 @@ pub fn share_info_in(html: &str) -> Option<Value> {
     let line = html[start..].lines().next()?.trim().trim_end_matches(';');
     let text: String = serde_json::from_str(line).ok()?;
     serde_json::from_str(&text).ok()
+}
+
+fn escape(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+pub fn preview_page(info: &Value, id: &str, host: &str) -> String {
+    let tracks = info["tracks"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let text = |value: &Value| value.as_str().unwrap_or_default().to_owned();
+    let first = tracks.first();
+    let description = text(&info["description"]);
+    let title = match first {
+        Some(track) if description.is_empty() => format!("{} · {}", text(&track["title"]), text(&track["artist"])),
+        _ if description.is_empty() => "Shared music".to_owned(),
+        _ => description,
+    };
+    let minutes = (tracks.iter().filter_map(|track| track["duration"].as_f64()).sum::<f64>() / 60.0).round();
+    let summary = match tracks {
+        [track] => [text(&track["artist"]), text(&track["album"])].into_iter().filter(|part| !part.is_empty()).collect::<Vec<_>>().join(" · "),
+        _ => format!("{} tracks · {minutes} min", tracks.len()),
+    };
+    let base = format!("https://{host}");
+    let url = format!("{base}/share/{id}");
+    let image = first.map(|track| format!("{base}/share/img/{}?size=600&square=true", text(&track["id"])));
+    let kind = if tracks.len() == 1 { "music.song" } else { "music.playlist" };
+    let mut head = vec![
+        format!("<title>{}</title>", escape(&title)),
+        r#"<meta property="og:site_name" content="vibemusic">"#.to_owned(),
+        format!(r#"<meta property="og:type" content="{kind}">"#),
+        format!(r#"<meta property="og:title" content="{}">"#, escape(&title)),
+        format!(r#"<meta property="og:description" content="{}">"#, escape(&summary)),
+        format!(r#"<meta name="description" content="{}">"#, escape(&summary)),
+        format!(r#"<meta property="og:url" content="{}">"#, escape(&url)),
+        r#"<meta name="twitter:card" content="summary">"#.to_owned(),
+    ];
+    if let Some(image) = image {
+        head.push(format!(r#"<meta property="og:image" content="{}">"#, escape(&image)));
+        head.push(r#"<meta property="og:image:width" content="600"><meta property="og:image:height" content="600">"#.to_owned());
+    }
+    format!("<!doctype html><html><head><meta charset=\"utf-8\">{}</head><body><a href=\"{}\">{}</a></body></html>", head.join(""), escape(&url), escape(&title))
 }
 
 #[cfg(test)]
@@ -58,5 +106,16 @@ mod tests {
         assert_eq!(info["description"], "Weekend");
         assert_eq!(info["tracks"][0]["title"], "Undertow <3");
         assert!(share_info_in("<html></html>").is_none());
+    }
+
+    #[test]
+    fn writes_preview_tags_for_chat_apps() {
+        let info = serde_json::json!({ "description": "Undertow · Glass Harbor", "tracks": [{ "id": "t.k", "title": "Undertow", "artist": "Glass Harbor", "album": "Second Wind <Live>", "duration": 252.0 }] });
+        let page = preview_page(&info, "ab", "music.example.com");
+        assert!(page.contains(r#"<meta property="og:title" content="Undertow · Glass Harbor">"#));
+        assert!(page.contains(r#"<meta property="og:description" content="Glass Harbor · Second Wind &lt;Live&gt;">"#));
+        assert!(page.contains(r#"<meta property="og:image" content="https://music.example.com/share/img/t.k?size=600&amp;square=true">"#));
+        let several = serde_json::json!({ "description": "", "tracks": [{ "title": "A", "artist": "X", "duration": 90.0 }, { "title": "B", "artist": "Y", "duration": 90.0 }] });
+        assert!(preview_page(&several, "cd", "h").contains(r#"content="2 tracks · 3 min""#));
     }
 }

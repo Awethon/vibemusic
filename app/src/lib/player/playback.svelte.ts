@@ -8,6 +8,7 @@ import { applyToQueue, type Command } from './commands.ts';
 import { AudioEngine } from './engine.ts';
 import { installMediaSession, updateMediaSession, type MediaHandlers } from './mediaSession.ts';
 import * as queue from './queue.ts';
+import { pollRadio } from './radioNow.svelte.ts';
 import { fetchSavedQueue, saveIsDue, saveQueue } from './savedQueue.ts';
 import { announceNowPlaying, listened, resetListening, sendPendingScrobbles } from './scrobbles.ts';
 import { currentTrack, player, queueChanged, queueState, remember, setStarred, storedVolume, VOLUME_KEY } from './state.svelte.ts';
@@ -116,6 +117,7 @@ function tick() {
 	const elapsed = lastTickAt ? (now - lastTickAt) / 1000 : 0;
 	lastTickAt = now;
 	remote.ticked(now);
+	pollRadio(queueState.currentTrackId, now);
 	if (remote.mirroring()) return;
 	refreshPlayback();
 	const track = currentTrack();

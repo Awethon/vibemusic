@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
-	import { allPlaylists, radioTracks, type PlaylistKind } from '#lib/library/queries.ts';
+	import { allPlaylists, type PlaylistKind } from '#lib/library/queries.ts';
 	import { BENTO } from '#lib/tuning.ts';
 	import Bento from '#lib/ui/Bento.svelte';
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
-	import { player, playerQueue, playTrackInList } from '#lib/player/player.svelte.ts';
 
 	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists', artist: 'Artist playlists' };
 	const playlists = live(allPlaylists, []);
-	const stations = live(radioTracks, []);
 
 	const blocks = $derived.by(() => {
 		const kinds = (['own', 'smart', 'genre'] as const)
@@ -24,19 +22,6 @@
 </script>
 
 <section class="view" {@attach viewEnter}>
-	<div class="vhead">
-		<div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div>
-		{#if stations.value.length}
-			<div class="radio-row" role="group" aria-label="Radio">
-				<span class="radio-label">Radio</span>
-				{#each stations.value as station, index (station.id)}
-					{@const on = playerQueue().currentTrackId === station.id}
-					<button class="radio-chip" class:on type="button" title={station.artist} onclick={() => playTrackInList(stations.value, index, 'Radio', 'radio')}>
-						{#if on && player.playing}<span class="live-badge"><i></i></span>{/if}{station.title}
-					</button>
-				{/each}
-			</div>
-		{/if}
-	</div>
+	<div class="vhead"><div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div></div>
 	{#if blocks.length}<Bento {blocks} />{/if}
 </section>

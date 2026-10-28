@@ -1679,12 +1679,30 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 	.share-queue { top: calc(44px + var(--safe-t)); bottom: calc(84px + var(--safe-b)); }
 }
 
-.radio-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; max-width: 50%; }
+.cover-icon { display: grid; place-items: center; width: 100%; height: 100%; background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)); color: var(--ink-2); container-type: size; }
 
-.radio-label { margin-right: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.cover-icon svg { width: 42cqmin; height: 42cqmin; }
 
-.radio-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(16px); font-size: 13px; font-weight: 500; color: var(--ink-2); transition: background 0.2s, color 0.2s; }
+.radio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 
-.radio-chip:hover { color: var(--ink); background: rgba(255, 255, 255, 0.1); }
+.radio-card { display: flex; align-items: center; gap: 16px; padding: 14px; border-radius: 20px; text-align: left; background: rgba(12, 11, 16, 0.26); border: 1px solid var(--line); transition: background 0.2s, border-color 0.2s; }
 
-.radio-chip.on { color: var(--ink); border-color: var(--line-2); }
+.radio-card:hover { background: rgba(255, 255, 255, 0.06); }
+
+.radio-card.on { border-color: var(--line-2); background: rgba(255, 255, 255, 0.08); }
+
+.radio-art { position: relative; flex: none; width: 88px; height: 88px; border-radius: 14px; overflow: hidden; }
+
+.radio-play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.35); opacity: 0; transition: opacity 0.2s; }
+
+.radio-play svg { width: 28px; height: 28px; }
+
+.radio-card:hover .radio-play, .radio-card.on .radio-play { opacity: 1; }
+
+.radio-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.radio-text b { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.radio-text small { font-size: 13px; color: var(--ink-3); }
+
+.radio-song { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

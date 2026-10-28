@@ -7,7 +7,7 @@
 	import { POPOVER } from '../tuning.ts';
 	import { relativeTime } from './format.ts';
 	import { applyFullScreenStyleClass } from './shell.ts';
-	import { setFullScreenStyle, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
+	import { setFullScreenStyle, setNavItem, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
 
 	const options: [FullScreenStyle, string, string][] = [
 		['canvas', 'Canvas', 'Lyrics centre stage'],
@@ -62,6 +62,9 @@
 	</div>
 	<p class="pop-title">Background</p>
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
+	<p class="pop-title">Sidebar</p>
+	<button type="button" class="set-row" class:on={ui.showTimeline} onclick={() => setNavItem('timeline', !ui.showTimeline)}><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button>
+	<button type="button" class="set-row" class:on={ui.showRadio} onclick={() => setNavItem('radio', !ui.showRadio)}><span>Radio<small>Stations configured in Navidrome</small></span><span class="switch"></span></button>
 	<p class="pop-title">Window</p>
 	<button type="button" class="set-row" class:on={fullScreen} onclick={toggleBrowserFullScreen}><span>Full screen<small>Hide the browser’s tabs and toolbar</small></span><span class="switch"></span></button>
 	<p class="pop-title">Glass</p>

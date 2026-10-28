@@ -15,6 +15,8 @@ export const ui = $state({
 	ripples: readPreference('ripples', ['on', 'off'] as const, 'on') === 'on',
 	railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
 	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
+	showTimeline: readPreference('nav.timeline', ['on', 'off'] as const, 'on') === 'on',
+	showRadio: readPreference('nav.radio', ['on', 'off'] as const, 'on') === 'on',
 	searchOpen: false,
 	settingsOpen: false,
 	devicesOpen: false,
@@ -46,6 +48,12 @@ export function setFullScreenStyle(style: FullScreenStyle) {
 export function setRipples(on: boolean) {
 	ui.ripples = on;
 	writePreference('ripples', on ? 'on' : 'off');
+}
+
+export function setNavItem(item: 'timeline' | 'radio', on: boolean) {
+	if (item === 'timeline') ui.showTimeline = on;
+	else ui.showRadio = on;
+	writePreference(`nav.${item}`, on ? 'on' : 'off');
 }
 
 export function setArtistView(view: 'list' | 'grid') {

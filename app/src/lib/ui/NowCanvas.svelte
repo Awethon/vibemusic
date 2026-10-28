@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { albumById } from '../library/queries.ts';
+	import { albumById, isRadio } from '../library/queries.ts';
 	import { currentTrack, playerQueue } from '../player/player.svelte.ts';
 	import { COVER_PX, LYRICS, QUEUE } from '../tuning.ts';
 	import Cover from './Cover.svelte';
@@ -33,7 +33,7 @@
 <section id="now" aria-label="Now playing">
 	<div class="np">
 		<div class="np-left">
-			<div class="np-cover"><Cover albumId={track?.albumId} size={COVER_PX.nowCanvas} eager /></div>
+			<div class="np-cover"><Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.nowCanvas} eager /></div>
 			<div class="np-meta">
 				<h1>{track?.title ?? ''}</h1>
 				<p>{#if track}<TrackLinks {track} year={album.value?.year ?? 0} />{/if}</p>

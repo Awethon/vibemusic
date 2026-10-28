@@ -27,7 +27,7 @@
 <div id="dock">
 	<div id="capsule" role="region" aria-label="Player">
 		<div class="cap-left">
-			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={COVER_PX.card} eager /></button>
+			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.card} eager /></button>
 			<div class="cap-meta">
 				<button class="cap-title" type="button" onclick={toggleFullScreen}>{track?.title ?? ''}</button>
 				<p class="cap-sub">{#if live}{track?.artist}{:else if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}{#if remote}<span class="cap-device"> · on {deviceLabel(relay.active)}</span>{/if}</p>

@@ -185,6 +185,8 @@ export const QUEUE = Object.freeze({
 	countDisplayCap: 999
 });
 
+export const RADIO = Object.freeze({ nowPlayingPollMs: 10_000, firstTitlePollMs: 2_000 });
+
 export const PLAYBACK = Object.freeze({
 	restartInsteadOfPreviousAfterSeconds: 4,
 	seekStepSeconds: 10,

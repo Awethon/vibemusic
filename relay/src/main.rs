@@ -7,6 +7,7 @@ mod enrich;
 mod hub;
 mod musicbrainz;
 mod radio;
+mod radio_meta;
 mod share;
 mod this_is;
 
@@ -64,7 +65,7 @@ async fn main() {
         None => tracing::info!("This is playlists are off: set VIBEMUSIC_NAVIDROME_USER and VIBEMUSIC_NAVIDROME_PASSWORD to turn them on"),
     }
     let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()), enricher, radio: Arc::new(radio::Radio::from_env(&navidrome_url)), shares: Arc::new(share::Shares::new(&navidrome_url)) };
-    let router = Router::new().route("/relay", get(upgrade)).route("/radio/{id}", get(radio_stream)).route("/relay/share/{id}", get(share_info)).route("/health", get(|| async { "ok" })).with_state(app);
+    let router = Router::new().route("/relay", get(upgrade)).route("/radio/{id}", get(radio_stream)).route("/radio/{id}/now", get(radio_now)).route("/relay/share/{id}", get(share_info)).route("/relay/share/{id}/preview", get(share_preview)).route("/health", get(|| async { "ok" })).with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
     tracing::info!(%listen, %navidrome_url, "relay listening");
     axum::serve(listener, router)
@@ -79,8 +80,17 @@ async fn radio_stream(State(app): State<App>, Path(id): Path<String>, Query(quer
     app.radio.stream(&id, &query).await
 }
 
+async fn radio_now(State(app): State<App>, Path(id): Path<String>) -> Response {
+    app.radio.now(&id)
+}
+
 async fn share_info(State(app): State<App>, Path(id): Path<String>) -> Response {
     app.shares.info(&id).await
+}
+
+async fn share_preview(State(app): State<App>, Path(id): Path<String>, headers: axum::http::HeaderMap) -> Response {
+    let host = headers.get("x-forwarded-host").or_else(|| headers.get(axum::http::header::HOST)).and_then(|value| value.to_str().ok()).unwrap_or("localhost");
+    app.shares.preview(&id, host).await
 }
 
 async fn upgrade(State(app): State<App>, upgrade: WebSocketUpgrade) -> Response {

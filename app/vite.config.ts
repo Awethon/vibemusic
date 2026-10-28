@@ -11,7 +11,7 @@ async function navidromeProxy() {
 	const navidromeUrl = new URL(navidrome);
 	const { address } = await lookup(navidromeUrl.hostname, { family: 4 });
 	const target = `${navidromeUrl.protocol}//${address}${navidromeUrl.port ? `:${navidromeUrl.port}` : ''}`;
-	return { ...Object.fromEntries(['/auth', '/api', '/rest', '/share/s/', '/share/img/'].map((path) => [path, { target, headers: { host: navidromeUrl.host } }])), '/relay': { target: relay, ws: true }, '/radio': { target: relay } };
+	return { ...Object.fromEntries(['/auth', '/api', '/rest', '/share/s/', '/share/img/'].map((path) => [path, { target, headers: { host: navidromeUrl.host } }])), '/relay': { target: relay, ws: true }, '^/radio/': { target: relay } };
 }
 
 const proxied = building ? {} : await navidromeProxy();
