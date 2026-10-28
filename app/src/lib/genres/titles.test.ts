@@ -10,4 +10,9 @@ it('matches titles the way the relay does', () => {
 	expect(rank('Open Road (Live)')).toBe(400000);
 	expect(rank('Undertow (Remastered 2023)')).toBe(974827);
 	expect(rank('Driftwood')).toBeNull();
+	const orchard = songRanks([['Paper Moon', 693944], ['Small Hours (Album Version)', 321967]]);
+	expect(orchard('Paper Moon (Night Owl club mix)')).toBeNull();
+	expect(orchard('Paper Moon - Live')).toBeNull();
+	expect(orchard('Paper Moon (Remastered 2023)')).toBe(693944);
+	expect(orchard('Small Hours')).toBe(321967);
 });

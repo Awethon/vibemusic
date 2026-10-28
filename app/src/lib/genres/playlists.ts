@@ -1,6 +1,6 @@
 import { GENRE_PLAYLISTS } from '../tuning.ts';
 import { parentsOf, withAncestors } from './genres.ts';
-import { titleKey } from './titles.ts';
+import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
 
 export type GenreSong = { id: string; title: string; duration: number; albumId: string; artistId: string; genres: string[]; plays: number; starred: boolean; fans: number | null; popularity: number | null };
 export type GenrePlaylist = { genre: string; songs: GenreSong[] };
@@ -14,11 +14,6 @@ const hash = (text: string) => {
 };
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-const median = (values: number[]) => {
-	const sorted = values.toSorted((a, b) => a - b);
-	return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
-};
 
 const artistCount = (songs: GenreSong[]) => new Set(songs.map((song) => song.artistId)).size;
 
@@ -83,14 +78,22 @@ const FILLER = /(^|[^\p{L}])(skit|intro|outro|interlude|prelude|скит|инт�
 
 const isFiller = (song: GenreSong, rules: Rules) => song.popularity === null && (song.duration < rules.minSongSeconds || FILLER.test(song.title));
 
+const versionOrder = (song: GenreSong) => [-song.plays, -Number(song.starred), Number(isOtherRecording(song.title)), Number(!isPlainTitle(song.title)), Number(song.popularity === null)];
+
+function preferredVersion(a: GenreSong, b: GenreSong) {
+	const left = versionOrder(a);
+	const right = versionOrder(b);
+	const index = left.findIndex((value, position) => value !== right[position]);
+	return index < 0 ? a.id.localeCompare(b.id) : left[index] - right[index];
+}
+
 function oneVersionEach(members: GenreSong[], rules: Rules) {
 	const best = new Map<string, GenreSong>();
 	for (const song of members) {
 		if (isFiller(song, rules)) continue;
 		const key = `${song.artistId}\u0000${titleKey(song.title) || song.id}`;
 		const kept = best.get(key);
-		const better = !kept || song.plays > kept.plays || (song.plays === kept.plays && (Number(song.starred) > Number(kept.starred) || (song.starred === kept.starred && song.id < kept.id)));
-		if (better) best.set(key, song);
+		if (!kept || preferredVersion(song, kept) < 0) best.set(key, song);
 	}
 	return [...best.values()];
 }
@@ -100,26 +103,31 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 	const size = Math.min(rules.songCap, members.length);
 	const byArtist = Map.groupBy(members, (song) => song.artistId);
 	const fans = new Map([...byArtist].map(([artist, songs]) => [artist, songs.find((song) => song.fans !== null)?.fans ?? null]));
-	const typicalFans = median([...fans.values()].filter((value): value is number => value !== null)) ?? 1;
-	const typicalPopularity = median(members.flatMap((song) => (song.popularity === null ? [] : [song.popularity]))) ?? 0;
+	const knownFans = [...fans.values()].filter((value): value is number => value !== null);
+	const unknownFans = knownFans.length ? Math.min(...knownFans) : 1;
+	const knownPopularity = members.flatMap((song) => (song.popularity === null ? [] : [song.popularity]));
+	const unknownPopularity = knownPopularity.length ? Math.min(...knownPopularity) : 0;
 	const fallback = new Map(
 		[...byArtist].map(([artist, songs]) => {
 			const known = songs.flatMap((song) => (song.popularity === null ? [] : [song.popularity]));
-			return [artist, (known.length ? Math.min(...known) : typicalPopularity) * rules.unknownPopularityShare];
+			return [artist, (known.length ? Math.min(...known) : unknownPopularity) * rules.unknownPopularityShare];
 		})
 	);
 	const week = Math.floor(now / WEEK_MS);
-	const score = (song: GenreSong) => Math.log10(1 + (song.popularity ?? fallback.get(song.artistId)!)) + rules.playsWeight * Math.log2(1 + song.plays) + (song.starred ? rules.likeBonus : 0);
+	const yours = (song: GenreSong) => (1 + song.plays / rules.playsDivisor) * (song.starred ? rules.likeMultiplier : 1);
+	const score = knownPopularity.length
+		? (song: GenreSong) => Math.log2(1 + (song.popularity ?? fallback.get(song.artistId)!) * yours(song))
+		: (song: GenreSong) => Math.log2(1 + song.plays) + Math.log2(song.starred ? rules.likeMultiplier : 1);
 	const weights = new Map(
 		[...byArtist].map(([artist, songs]) => {
 			const plays = songs.reduce((total, song) => total + song.plays, 0);
-			return [artist, Math.max(1, fans.get(artist) ?? typicalFans) ** rules.fanPower * (1 + rules.artistPlaysBoost * Math.log2(1 + plays))];
+			return [artist, Math.max(1, fans.get(artist) ?? unknownFans) ** rules.fanPower * (1 + plays / rules.artistPlaysDivisor)];
 		})
 	);
 	const seats = allot(weights, new Map([...byArtist].map(([artist, songs]) => [artist, songs.length])), size, rules);
 	const picked = [...seats].flatMap(([artist, count]) => byArtist.get(artist)!.toSorted((a, b) => score(b) - score(a) || a.id.localeCompare(b.id)).slice(0, count));
 	const ranked = picked.map((song) => ({ song, score: score(song) + rules.weeklyNoise * hash(`${song.id}:${week}`) })).toSorted((a, b) => b.score - a.score);
-	const gap = Math.min(rules.artistGap, seats.size - 1);
+	const gap = Math.min(rules.artistGap, Math.max(1, Math.floor((seats.size - 1) / 2)));
 	const ordered: GenreSong[] = [];
 	const left = new Map([...seats].map(([artist, count]) => [artist, Math.min(count, byArtist.get(artist)!.length)]));
 	while (ranked.length) {

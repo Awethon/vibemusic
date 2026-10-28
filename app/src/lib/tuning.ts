@@ -240,7 +240,8 @@ export const QUEUE_DRAG = Object.freeze({ startDistancePx: 4 });
 
 export const GENRE_EVIDENCE = Object.freeze({
 	fileTagWeight: 1,
-	minTagShare: 0.34,
+	minTagShare: 0.4,
+	confidentVotes: 3,
 	minWeight: 1
 });
 
@@ -257,10 +258,10 @@ export const GENRE_PLAYLISTS = Object.freeze({
 	minSongSeconds: 75,
 	fanPower: 0.2,
 	artistShareCap: 0.15,
-	artistPlaysBoost: 0.15,
+	artistPlaysDivisor: 1000,
 	artistGap: 3,
-	playsWeight: 0.5,
-	likeBonus: 1,
+	playsDivisor: 100,
+	likeMultiplier: 1.25,
 	unknownPopularityShare: 0.5,
 	weeklyNoise: 0.4
 });

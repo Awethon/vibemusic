@@ -9,8 +9,8 @@ use tokio::sync::{Notify, broadcast};
 
 use crate::{deezer, musicbrainz};
 
-const MUSICBRAINZ_PAUSE: Duration = Duration::from_millis(1100);
-const FAILURE_PAUSE: Duration = Duration::from_secs(30);
+const MUSICBRAINZ_PAUSE: Duration = Duration::from_millis(1500);
+const FAILURE_PAUSE: Duration = Duration::from_secs(10);
 const FLUSH_EVERY: Duration = Duration::from_secs(2);
 const SAVE_EVERY: Duration = Duration::from_secs(30);
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;

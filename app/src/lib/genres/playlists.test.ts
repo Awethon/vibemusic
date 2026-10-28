@@ -69,6 +69,20 @@ describe('genre playlists', () => {
 		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Lighthouse (Live)', 'Driftwood']);
 	});
 
+	it('prefers the original recording over remixes when nothing else decides', () => {
+		const versions = ['Paper Moon (Night Owl club mix)', 'Paper Moon (Sam Rivers mix)', 'Paper Moon', 'Paper Moon - Live'].map((title, index) => ({ ...songs('Nu Metal', 1, 1, `version-${index}`)[0], title, artistId: 'orchard' }));
+		expect(pickBest(versions).map((song) => song.title)).toEqual(['Paper Moon']);
+	});
+
+	it('does not let a couple of plays lift an obscure song over a hit', () => {
+		const velvet = [
+			['Open Road', 863266, 0],
+			['Northern Lights', 814254, 0],
+			['Small Hours', 321967, 2]
+		].map(([title, popularity, plays], index) => ({ ...songs('Nu Metal', 1, 1, `velvet-${index}`)[0], title: title as string, artistId: 'velvet', popularity: popularity as number, plays: plays as number }));
+		expect(pickBest(velvet, GENRE_PLAYLISTS, 0).map((song) => song.title)).toEqual(['Open Road', 'Northern Lights', 'Small Hours']);
+	});
+
 	it('leaves out skits, intros and very short tracks unless they are popular', () => {
 		const titles = ['Skittles (skit)', 'Интро', 'Outro', 'Introvert', 'Real song', 'Short one', 'Famous intro'];
 		const library = titles.map((title, index) => ({ ...songs('Hip-Hop', 1, 1, `filler-${index}`)[0], title, artistId: 'filler', duration: title === 'Short one' ? 40 : 200, popularity: title === 'Famous intro' ? 500_000 : null }));
