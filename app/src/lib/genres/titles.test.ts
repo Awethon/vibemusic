@@ -5,6 +5,8 @@ it('matches titles the way the relay does', () => {
 	expect(titleKey('Lights on a Hill (Remastered)')).toBe(titleKey('Lights On a Hill'));
 	expect(titleKey('Undertow - Live at Harbour Hall')).toBe('undertow');
 	expect(titleKey('Ёжик [Bonus Track]')).toBe('ежик');
+	expect(titleKey('Тихий город при уч. Иван Петров')).toBe(titleKey('Тихий город (feat. Иван Петров)'));
+	expect(titleKey('Night Drive feat. Sam Rivers')).toBe('nightdrive');
 	const rank = songRanks([['Open Road', 982895], ['Open Road (Live)', 400000], ['Undertow', 974827]]);
 	expect(rank('open road')).toBe(982895);
 	expect(rank('Open Road (Live)')).toBe(400000);

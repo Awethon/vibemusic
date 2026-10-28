@@ -2,6 +2,8 @@ const letters = (text: string) => [...text.toLowerCase().replaceAll('ё', 'е')]
 
 const RECORDING = /(^|[^\p{L}])(remix|rmx|mix|live|instrumental|acoustic|unplugged|demo|cover|karaoke|rework|bootleg|reprise|ремикс|микс|кавер|инструментал|акустика|акустическая|лайв|концерт)([^\p{L}]|$)/iu;
 
+const FEATURING = [' feat.', ' feat ', ' ft.', ' ft ', ' featuring ', ' при уч', ' при участии', ' w/ '];
+
 function split(title: string) {
 	let depth = 0;
 	let kept = '';
@@ -12,8 +14,10 @@ function split(title: string) {
 		else if (depth === 0) kept += character;
 		else extra += character;
 	}
-	const [base, ...rest] = kept.split(' - ');
-	return { base, extra: `${extra} ${rest.join(' ')}` };
+	const [whole, ...rest] = kept.split(' - ');
+	const lower = `${whole.toLowerCase()} `;
+	const end = Math.min(...FEATURING.map((marker) => lower.indexOf(marker)).filter((index) => index >= 0), lower.length);
+	return { base: lower.slice(0, end), extra: `${extra} ${rest.join(' ')}` };
 }
 
 export const titleKey = (title: string) => letters(split(title).base);

@@ -208,7 +208,7 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
-const DERIVED_RULES = JSON.stringify({ algorithm: 4, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
+const DERIVED_RULES = JSON.stringify({ algorithm: 5, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
