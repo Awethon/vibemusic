@@ -3,6 +3,7 @@ import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } fro
 import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
 import { createGenreResolver, withAncestors } from '../genres/genres.ts';
 import { songRanks } from '../genres/titles.ts';
+import { GENRE_EVIDENCE, GENRE_PLAYLISTS } from '../tuning.ts';
 import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
 import { KEPT_TABLES, normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
@@ -207,10 +208,12 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
+const DERIVED_RULES = JSON.stringify({ algorithm: 4, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS });
+
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
 	const full: LibraryMeta = { ...meta, albums: count('album'), artists: count('artist'), tracks: count('track'), playlists: count('playlist') };
-	db.exec({ sql: 'insert or replace into meta values (?, ?), (?, ?), (?, ?)', bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync)] });
+	db.exec({ sql: 'insert or replace into meta values (?, ?), (?, ?), (?, ?), (?, ?)', bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync), 'derived', DERIVED_RULES] });
 	return full;
 }
 
@@ -328,5 +331,12 @@ export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState
 		db.exec({ sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))", bind: [enrichment.at] });
 		rebuildDerived(db);
 	});
+	return writeMeta(db, { version: new Date().toISOString(), syncedAt: meta.syncedAt, userId: meta.userId }, sync);
+}
+
+export function refreshDerived(db: Database, meta: LibraryMeta): LibraryMeta | null {
+	const sync = readSyncState(db);
+	if (!sync || db.selectValue("select value from meta where key = 'derived'") === DERIVED_RULES) return null;
+	db.transaction(() => rebuildDerived(db));
 	return writeMeta(db, { version: new Date().toISOString(), syncedAt: meta.syncedAt, userId: meta.userId }, sync);
 }

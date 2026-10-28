@@ -2,7 +2,7 @@ import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.or
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
-import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState } from './build.ts';
+import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState, refreshDerived } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary, fetchSnapshotFile } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
@@ -94,7 +94,9 @@ async function loadSnapshot() {
 			return null;
 		}
 		replaceDatabase(database);
-		return meta;
+		const refreshed = refreshDerived(database, meta);
+		if (refreshed) await writeSnapshot(database);
+		return refreshed ?? meta;
 	} catch {
 		return null;
 	}
