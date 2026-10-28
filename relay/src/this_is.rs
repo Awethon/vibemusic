@@ -10,7 +10,7 @@ use crate::account::{Account, AccountError};
 use crate::apple::{self, Apple};
 use crate::cover;
 use crate::deezer;
-use crate::enrich::Enricher;
+use crate::enrich::{Enricher, Fetched};
 use crate::enrich::now_ms;
 
 const PREFIX: &str = "This is ";
@@ -24,8 +24,6 @@ pub struct Settings {
     password: String,
     min_tracks: usize,
     max_tracks: usize,
-    apple_pause: Duration,
-    storefronts: Vec<String>,
     every_ms: u64,
     skip: HashSet<String>,
     state: Option<PathBuf>,
@@ -46,8 +44,6 @@ impl Settings {
             password,
             min_tracks: env_number("THIS_IS_MIN_TRACKS", 13),
             max_tracks: env_number("THIS_IS_MAX_TRACKS", 50),
-            apple_pause: Duration::from_millis(env_number("APPLE_PAUSE_MS", 3200)),
-            storefronts: std::env::var("APPLE_STOREFRONTS").unwrap_or_else(|_| "us,ru".into()).split(',').map(|code| code.trim().to_lowercase()).filter(|code| !code.is_empty()).collect(),
             every_ms: env_number::<u64>("THIS_IS_EVERY_HOURS", 168) * 60 * 60 * 1000,
             skip: std::env::var("THIS_IS_SKIP").unwrap_or_default().split(',').map(|name| name.trim().to_lowercase()).filter(|name| !name.is_empty()).collect(),
             state: (!state.is_empty()).then(|| PathBuf::from(state)),
@@ -219,7 +215,7 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
     for list in albums_by_artist.values_mut() {
         list.sort_by_key(|album| std::cmp::Reverse((number(album, "maxYear"), text(album, "createdAt"))));
     }
-    let apple = Apple::new(client.clone(), settings.apple_pause, settings.storefronts.clone());
+    let apple = Apple::from_env(client.clone());
     let mut wanted: Vec<(String, String, Vec<String>)> = Vec::new();
     let mut artists: Vec<(&String, &Vec<Value>)> = songs_by_artist.iter().collect();
     artists.sort_by_key(|(id, _)| names[*id].to_lowercase());
@@ -230,7 +226,13 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
             continue;
         }
         let album_names: Vec<String> = albums_by_artist.get(id).map(|list| list.iter().map(|album| text(album, "name")).collect()).unwrap_or_default();
-        let top = apple.top_songs(name, &album_names).await;
+        let top = match enricher.apple_top(id) {
+            Some(top) => top,
+            None => match apple.top_songs(name, &album_names).await {
+                Fetched::Found(top) => top,
+                Fetched::Missing | Fetched::Failed => Vec::new(),
+            },
+        };
         tracing::debug!(name, top = top.len(), "apple top songs");
         wanted.push((id.clone(), name.clone(), choose(&apple::ranked(&top), &enricher.deezer_top(id), artist_songs, settings.max_tracks)));
     }

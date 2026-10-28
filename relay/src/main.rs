@@ -52,7 +52,7 @@ async fn main() {
     let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:4600".into());
     let cache = std::env::var("ENRICHMENT_CACHE").unwrap_or_else(|_| "/data/enrichment.json".into());
     let cache = (!cache.is_empty()).then(|| std::path::PathBuf::from(cache));
-    let enricher = Enricher::new(cache);
+    let enricher = Enricher::new(cache, apple::Apple::from_env(reqwest::Client::builder().timeout(Duration::from_secs(20)).build().expect("http client")));
     match this_is::Settings::from_env(&navidrome_url) {
         Some(settings) => this_is::start(settings, enricher.clone()),
         None => tracing::info!("This is playlists are off: set VIBEMUSIC_NAVIDROME_USER and VIBEMUSIC_NAVIDROME_PASSWORD to turn them on"),

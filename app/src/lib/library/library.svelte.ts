@@ -107,14 +107,15 @@ async function requestEnrichment(force = false) {
 }
 
 function queueEnrichment(enrichment: Enrichment) {
-	if ([enrichment.releaseGroups, enrichment.mbArtists, enrichment.deezer, enrichment.artistMatches ?? {}].every((part) => !Object.keys(part).length)) return;
+	if ([enrichment.releaseGroups, enrichment.mbArtists, enrichment.deezer, enrichment.artistMatches ?? {}, enrichment.apple ?? {}].every((part) => !Object.keys(part).length)) return;
 	pendingEnrichment = pendingEnrichment
 		? {
 				at: Math.max(pendingEnrichment.at, enrichment.at),
 				releaseGroups: { ...pendingEnrichment.releaseGroups, ...enrichment.releaseGroups },
 				mbArtists: { ...pendingEnrichment.mbArtists, ...enrichment.mbArtists },
 				deezer: { ...pendingEnrichment.deezer, ...enrichment.deezer },
-				artistMatches: { ...pendingEnrichment.artistMatches, ...enrichment.artistMatches }
+				artistMatches: { ...pendingEnrichment.artistMatches, ...enrichment.artistMatches },
+				apple: { ...pendingEnrichment.apple, ...enrichment.apple }
 			}
 		: enrichment;
 	if (enrichmentTimer) return;

@@ -4,7 +4,7 @@ import { withAncestors } from './genres.ts';
 import { chooseGenres, pickBest, type GenreSong } from './playlists.ts';
 
 const songs = (genre: string, count: number, artists: number, prefix = genre, fans: number | null = null): GenreSong[] =>
-	Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, title: `${prefix} song ${index}`, duration: 200, year: 2000, albumId: `${prefix}-album-${index % artists}`, artistId: `${prefix}-artist-${index % artists}`, genres: withAncestors(genre), plays: 0, starred: false, fans, popularity: null }));
+	Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, title: `${prefix} song ${index}`, duration: 200, year: 2000, albumId: `${prefix}-album-${index % artists}`, artistId: `${prefix}-artist-${index % artists}`, genres: withAncestors(genre), plays: 0, starred: false, fans, popularity: null, rank: null }));
 
 const chosen = (library: GenreSong[]) => chooseGenres(library).map((playlist) => playlist.genre);
 
@@ -98,6 +98,21 @@ describe('genre playlists', () => {
 			['Small Hours', 321967, 2]
 		].map(([title, popularity, plays], index) => ({ ...songs('Nu Metal', 1, 1, `velvet-${index}`)[0], title: title as string, artistId: 'velvet', popularity: popularity as number, plays: plays as number }));
 		expect(pickBest(velvet, GENRE_PLAYLISTS, 0).map((song) => song.title)).toEqual(['Open Road', 'Northern Lights', 'Small Hours']);
+	});
+
+	it("keeps each artist's songs in Apple's order, then Deezer's, wherever the artist lands", () => {
+		const river = [
+			['Тихий двор', 317231, null],
+			['Белый город', null, 3],
+			['Зимний вечер', 54508, 2],
+			['Тихая улица', null, null],
+			['Morning Paradise', 343400, 1]
+		].map(([title, popularity, rank], index) => ({ ...songs('Hip-Hop', 1, 1, `river-${index}`)[0], title: title as string, artistId: 'river', popularity: popularity as number | null, rank: rank as number | null }));
+		const others = songs('Hip-Hop', 10, 2, 'other', 50_000).map((song, index) => ({ ...song, popularity: 900_000 - index * 1000 }));
+		for (const week of [0, 1, 2, 3]) {
+			const order = pickBest([...river, ...others], GENRE_PLAYLISTS, week * 7 * 24 * 60 * 60 * 1000).filter((song) => song.artistId === 'river');
+			expect(order.map((song) => song.title)).toEqual(['Белый город', 'Зимний вечер', 'Morning Paradise', 'Тихий двор', 'Тихая улица']);
+		}
 	});
 
 	it('leaves out skits, intros and very short tracks unless they are popular', () => {

@@ -1,6 +1,6 @@
 import { TREE_VERSION } from '../genres/genres.ts';
 
-export const SCHEMA_VERSION = `10.${TREE_VERSION}`;
+export const SCHEMA_VERSION = `11.${TREE_VERSION}`;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -76,6 +76,7 @@ create table mb_release_group (id text primary key, artists text, tags text) wit
 create table mb_artist (id text primary key, tags text, countries text) without rowid;
 create table artist_match (artist_id text primary key, mbid text) without rowid;
 create table deezer_artist (artist_id text primary key, deezer_id integer, name text, fans integer, top text, albums text) without rowid;
+create table apple_artist (artist_id text primary key, top text) without rowid;
 create table enrichment_state (key text primary key, value text not null) without rowid;
 create table search_key (kind text not null, text text not null, ref text not null);
 create virtual table search using fts5 (kind unindexed, ref unindexed, text, tokenize = 'trigram remove_diacritics 1');
@@ -84,4 +85,4 @@ create index search_key_prefix on search_key (kind, text);
 
 export const normalizeForSearch = (text: string) => text.toLowerCase().replaceAll('ё', 'е').normalize('NFKC');
 
-export const KEPT_TABLES = ['palette', 'mb_release_group', 'mb_artist', 'deezer_artist', 'artist_match', 'enrichment_state'] as const;
+export const KEPT_TABLES = ['palette', 'mb_release_group', 'mb_artist', 'deezer_artist', 'artist_match', 'apple_artist', 'enrichment_state'] as const;

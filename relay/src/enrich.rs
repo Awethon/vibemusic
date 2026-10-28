@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::{Notify, broadcast};
 
+use crate::apple::Apple;
 use crate::{deezer, musicbrainz};
 
 const MUSICBRAINZ_PAUSE: Duration = musicbrainz::PAUSE;
@@ -16,10 +17,12 @@ const SAVE_EVERY: Duration = Duration::from_secs(30);
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 const MUSICBRAINZ_FRESH_MS: u64 = 30 * DAY_MS;
 const DEEZER_FRESH_MS: u64 = 14 * DAY_MS;
+const APPLE_FRESH_MS: u64 = 14 * DAY_MS;
 const MISSING_FRESH_MS: u64 = 7 * DAY_MS;
 const MAX_RELEASE_GROUPS: usize = 100_000;
 const MAX_ARTISTS: usize = 50_000;
 const MAX_SONGS: usize = 5;
+const MAX_ALBUMS: usize = 200;
 const MAX_TEXT_CHARS: usize = 200;
 const ATTEMPTS: u8 = 5;
 
@@ -84,6 +87,7 @@ struct Cache {
     mb_artists: HashMap<String, Entry<MbArtist>>,
     deezer: HashMap<String, Entry<DeezerArtist>>,
     artist_matches: HashMap<String, Entry<String>>,
+    apple: HashMap<String, Entry<Vec<String>>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -92,6 +96,8 @@ pub struct ArtistRequest {
     pub name: String,
     #[serde(default)]
     pub songs: Vec<String>,
+    #[serde(default)]
+    pub albums: Vec<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -127,15 +133,16 @@ struct Changes {
     mb_artists: HashMap<String, Option<MbArtist>>,
     deezer: HashMap<String, Option<DeezerArtist>>,
     artist_matches: HashMap<String, Option<String>>,
+    apple: HashMap<String, Option<Vec<String>>>,
 }
 
 impl Changes {
     fn is_empty(&self) -> bool {
-        self.release_groups.is_empty() && self.mb_artists.is_empty() && self.deezer.is_empty() && self.artist_matches.is_empty()
+        self.release_groups.is_empty() && self.mb_artists.is_empty() && self.deezer.is_empty() && self.artist_matches.is_empty() && self.apple.is_empty()
     }
 
     fn message(&self, at: u64) -> Value {
-        json!({ "type": "enrichment", "at": at, "releaseGroups": self.release_groups, "mbArtists": self.mb_artists, "deezer": self.deezer, "artistMatches": self.artist_matches })
+        json!({ "type": "enrichment", "at": at, "releaseGroups": self.release_groups, "mbArtists": self.mb_artists, "deezer": self.deezer, "artistMatches": self.artist_matches, "apple": self.apple })
     }
 }
 
@@ -144,6 +151,7 @@ struct State {
     cache: Cache,
     musicbrainz: VecDeque<(MbJob, u8)>,
     deezer: VecDeque<(ArtistRequest, u8)>,
+    apple: VecDeque<(ArtistRequest, u8)>,
     queued: HashSet<String>,
     changes: Changes,
     unsaved: bool,
@@ -153,6 +161,8 @@ pub struct Enricher {
     state: Mutex<State>,
     musicbrainz_ready: Notify,
     deezer_ready: Notify,
+    apple_ready: Notify,
+    apple: Apple,
     updates: broadcast::Sender<String>,
     client: reqwest::Client,
     path: Option<PathBuf>,
@@ -185,6 +195,12 @@ impl State {
     fn queue_deezer(&mut self, artist: ArtistRequest) {
         if self.queued.insert(format!("dz:{}", artist.id)) {
             self.deezer.push_back((artist, 0));
+        }
+    }
+
+    fn queue_apple(&mut self, artist: ArtistRequest) {
+        if !artist.albums.is_empty() && self.queued.insert(format!("ap:{}", artist.id)) {
+            self.apple.push_back((artist, 0));
         }
     }
 
@@ -238,7 +254,23 @@ impl State {
             }
         }
         for artist in request.artists.into_iter().filter(|artist| !artist.id.is_empty() && !artist.name.trim().is_empty()).take(MAX_ARTISTS) {
-            let artist = ArtistRequest { id: clip(&artist.id), name: clip(&artist.name), songs: artist.songs.iter().take(MAX_SONGS).map(|title| clip(title)).collect() };
+            let artist = ArtistRequest {
+                id: clip(&artist.id),
+                name: clip(&artist.name),
+                songs: artist.songs.iter().take(MAX_SONGS).map(|title| clip(title)).collect(),
+                albums: artist.albums.iter().take(MAX_ALBUMS).map(|title| clip(title)).collect(),
+            };
+            match self.cache.apple.get(&artist.id) {
+                Some(entry) => {
+                    if entry.at > request.since {
+                        reply.apple.insert(artist.id.clone(), entry.value.clone());
+                    }
+                    if !entry.fresh(now, APPLE_FRESH_MS) {
+                        self.queue_apple(artist.clone());
+                    }
+                }
+                None => self.queue_apple(artist.clone()),
+            }
             match self.cache.deezer.get(&artist.id) {
                 Some(entry) => {
                     if entry.at > request.since {
@@ -257,19 +289,22 @@ impl State {
 }
 
 impl Enricher {
-    pub fn new(path: Option<PathBuf>) -> Arc<Self> {
+    pub fn new(path: Option<PathBuf>, apple: Apple) -> Arc<Self> {
         let cache = path.as_ref().and_then(|path| std::fs::read(path).ok()).and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default();
         let (updates, _) = broadcast::channel(64);
         let enricher = Arc::new(Self {
             state: Mutex::new(State { cache, ..State::default() }),
             musicbrainz_ready: Notify::new(),
             deezer_ready: Notify::new(),
+            apple_ready: Notify::new(),
+            apple,
             updates,
             client: reqwest::Client::builder().timeout(Duration::from_secs(20)).build().expect("http client"),
             path,
         });
         tokio::spawn(enricher.clone().run_musicbrainz());
         tokio::spawn(enricher.clone().run_deezer());
+        tokio::spawn(enricher.clone().run_apple());
         tokio::spawn(enricher.clone().run_flusher());
         enricher
     }
@@ -278,17 +313,25 @@ impl Enricher {
         self.state.lock().unwrap().cache.deezer.get(artist_id).and_then(|entry| entry.value.as_ref()).map(|artist| artist.top.clone()).unwrap_or_default()
     }
 
+    pub fn apple_top(&self, artist_id: &str) -> Option<Vec<String>> {
+        let state = self.state.lock().unwrap();
+        state.cache.apple.get(artist_id).filter(|entry| entry.fresh(now_ms(), APPLE_FRESH_MS)).map(|entry| entry.value.clone().unwrap_or_default())
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
         self.updates.subscribe()
     }
 
     pub fn request(&self, request: EnrichRequest) -> String {
         let now = now_ms();
-        let (reply, musicbrainz, deezer) = {
+        let (reply, musicbrainz, deezer, apple) = {
             let mut state = self.state.lock().unwrap();
             let reply = state.answer(request, now);
-            (reply, !state.musicbrainz.is_empty(), !state.deezer.is_empty())
+            (reply, !state.musicbrainz.is_empty(), !state.deezer.is_empty(), !state.apple.is_empty())
         };
+        if apple {
+            self.apple_ready.notify_one();
+        }
         if musicbrainz {
             self.musicbrainz_ready.notify_one();
         }
@@ -335,6 +378,13 @@ impl Enricher {
         let mut state = self.state.lock().unwrap();
         state.changes.deezer.insert(id.clone(), value.clone());
         state.cache.deezer.insert(id, Entry { at: now_ms(), value });
+        state.unsaved = true;
+    }
+
+    fn store_apple(&self, id: String, value: Option<Vec<String>>) {
+        let mut state = self.state.lock().unwrap();
+        state.changes.apple.insert(id.clone(), value.clone());
+        state.cache.apple.insert(id, Entry { at: now_ms(), value });
         state.unsaved = true;
     }
 
@@ -438,6 +488,38 @@ impl Enricher {
         }
     }
 
+    async fn run_apple(self: Arc<Self>) {
+        loop {
+            let artist = self.state.lock().unwrap().apple.pop_front();
+            let Some((artist, attempts)) = artist else {
+                self.apple_ready.notified().await;
+                continue;
+            };
+            let failed = match self.apple.top_songs(&artist.name, &artist.albums).await {
+                Fetched::Found(top) => {
+                    self.store_apple(artist.id.clone(), Some(top));
+                    false
+                }
+                Fetched::Missing => {
+                    self.store_apple(artist.id.clone(), None);
+                    false
+                }
+                Fetched::Failed => true,
+            };
+            {
+                let mut state = self.state.lock().unwrap();
+                if failed && attempts + 1 < ATTEMPTS {
+                    state.apple.push_back((artist, attempts + 1));
+                } else {
+                    state.queued.remove(&format!("ap:{}", artist.id));
+                }
+            }
+            if failed {
+                tokio::time::sleep(FAILURE_PAUSE).await;
+            }
+        }
+    }
+
     async fn run_flusher(self: Arc<Self>) {
         let mut flush = tokio::time::interval(FLUSH_EVERY);
         let mut last_save = tokio::time::Instant::now();
@@ -479,7 +561,7 @@ mod tests {
             mb_search: Vec::new(),
             since,
             release_groups: vec![GROUP.into(), "not-an-id".into()],
-            artists: vec![ArtistRequest { id: "nd-1".into(), name: "Glass Harbor".into(), songs: vec!["Lighthouse".into()] }],
+            artists: vec![ArtistRequest { id: "nd-1".into(), name: "Glass Harbor".into(), songs: vec!["Lighthouse".into()], albums: vec!["Second Wind".into()] }],
         }
     }
 
@@ -491,6 +573,7 @@ mod tests {
         state.answer(request(0), 1_000);
         assert_eq!(state.musicbrainz.len(), 1);
         assert_eq!(state.deezer.len(), 1);
+        assert_eq!(state.apple.len(), 1);
     }
 
     #[test]

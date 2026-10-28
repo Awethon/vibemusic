@@ -4,6 +4,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::deezer::title_key;
+use crate::enrich::Fetched;
 
 const SEARCH: &str = "https://itunes.apple.com/search";
 const LOOKUP: &str = "https://itunes.apple.com/lookup";
@@ -23,6 +24,12 @@ impl Apple {
         Self { client, pause, storefronts }
     }
 
+    pub fn from_env(client: reqwest::Client) -> Self {
+        let pause = std::env::var("APPLE_PAUSE_MS").ok().and_then(|value| value.parse().ok()).unwrap_or(3200);
+        let storefronts = std::env::var("APPLE_STOREFRONTS").unwrap_or_else(|_| "us,ru".into()).split(',').map(|code| code.trim().to_lowercase()).filter(|code| !code.is_empty()).collect();
+        Self::new(client, Duration::from_millis(pause), storefronts)
+    }
+
     async fn get(&self, url: &str, query: &[(&str, String)]) -> Option<Value> {
         for _ in 0..ATTEMPTS {
             tokio::time::sleep(self.pause).await;
@@ -39,30 +46,38 @@ impl Apple {
         None
     }
 
-    async fn albums_of(&self, artist_id: u64, storefront: &str) -> Vec<String> {
-        let reply = self.get(LOOKUP, &[("id", artist_id.to_string()), ("entity", "album".into()), ("limit", "200".into()), ("country", storefront.into())]).await;
-        reply.map(|value| results(&value, "collection", "collectionName")).unwrap_or_default()
+    async fn albums_of(&self, artist_id: u64, storefront: &str) -> Option<Vec<String>> {
+        let reply = self.get(LOOKUP, &[("id", artist_id.to_string()), ("entity", "album".into()), ("limit", "200".into()), ("country", storefront.into())]).await?;
+        Some(results(&reply, "collection", "collectionName"))
     }
 
-    async fn artist(&self, name: &str, albums: &HashSet<String>, storefront: &str) -> Option<u64> {
-        let found = self.get(SEARCH, &[("term", name.into()), ("entity", "musicArtist".into()), ("limit", "5".into()), ("country", storefront.into())]).await?;
-        let candidates: Vec<u64> = found["results"].as_array()?.iter().filter(|item| item["wrapperType"] == "artist").filter_map(|item| item["artistId"].as_u64()).take(CANDIDATES).collect();
+    async fn artist(&self, name: &str, albums: &HashSet<String>, storefront: &str) -> Fetched<u64> {
+        let Some(found) = self.get(SEARCH, &[("term", name.into()), ("entity", "musicArtist".into()), ("limit", "5".into()), ("country", storefront.into())]).await else { return Fetched::Failed };
+        let candidates: Vec<u64> = found["results"].as_array().into_iter().flatten().filter(|item| item["wrapperType"] == "artist").filter_map(|item| item["artistId"].as_u64()).take(CANDIDATES).collect();
         for id in candidates {
-            if self.albums_of(id, storefront).await.iter().any(|album| albums.contains(&title_key(album))) {
-                return Some(id);
+            let Some(discography) = self.albums_of(id, storefront).await else { return Fetched::Failed };
+            if discography.iter().any(|album| albums.contains(&title_key(album))) {
+                return Fetched::Found(id);
             }
         }
-        None
+        Fetched::Missing
     }
 
-    pub async fn top_songs(&self, name: &str, album_names: &[String]) -> Vec<String> {
+    pub async fn top_songs(&self, name: &str, album_names: &[String]) -> Fetched<Vec<String>> {
         let albums: HashSet<String> = album_names.iter().map(|album| title_key(album)).filter(|key| !key.is_empty()).collect();
         for storefront in &self.storefronts {
-            let Some(id) = self.artist(name, &albums, storefront).await else { continue };
+            let id = match self.artist(name, &albums, storefront).await {
+                Fetched::Found(id) => id,
+                Fetched::Missing => continue,
+                Fetched::Failed => return Fetched::Failed,
+            };
             let reply = self.get(LOOKUP, &[("id", id.to_string()), ("entity", "song".into()), ("sort", "popular".into()), ("limit", TOP_SONGS.to_string()), ("country", storefront.clone())]).await;
-            return reply.map(|value| results(&value, "track", "trackName")).unwrap_or_default();
+            return match reply {
+                Some(value) => Fetched::Found(results(&value, "track", "trackName")),
+                None => Fetched::Failed,
+            };
         }
-        Vec::new()
+        Fetched::Missing
     }
 }
 
