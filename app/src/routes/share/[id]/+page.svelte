@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { medianCut } from '#lib/library/medianCut.ts';
 	import { PALETTE } from '#lib/tuning.ts';
-	import { accentFromPalette } from '#lib/ui/accent.ts';
+	import { accentFromPalette, vividFromPalette } from '#lib/ui/accent.ts';
 	import { setFaviconAccent } from '#lib/ui/favicon.svelte.ts';
 	import { clock } from '#lib/ui/format.ts';
 	import Icon from '#lib/ui/Icon.svelte';
@@ -93,18 +93,19 @@
 		const context = canvas.getContext('2d')!;
 		context.drawImage(bitmap, 0, 0);
 		bitmap.close();
-		const rgb = accentFromPalette(medianCut(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data));
-		return rgb ? `rgb(${rgb.map(Math.round).join(' ')})` : '';
+		const colors = medianCut(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data);
+		const rgb = accentFromPalette(colors);
+		return { accent: rgb ? `rgb(${rgb.map(Math.round).join(' ')})` : '', favicon: vividFromPalette(colors) };
 	}
 
 	$effect(() => {
 		if (!track) return;
 		let current = true;
 		void coverAccent(coverUrl(track.id, PALETTE.coverSamplePx * 2)).then(
-			(color) => {
-				if (!current || !color) return;
-				accent = color;
-				setFaviconAccent(color);
+			(colors) => {
+				if (!current) return;
+				if (colors.accent) accent = colors.accent;
+				setFaviconAccent(colors.favicon);
 			},
 			() => {}
 		);

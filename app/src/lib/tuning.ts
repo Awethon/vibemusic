@@ -210,7 +210,10 @@ export const ACCENT = Object.freeze({
 	colourWeight: 0.6,
 	whiteWeight: 0.4,
 	whiteLevel: 0.95,
-	snapDistance: 0.5
+	snapDistance: 0.5,
+	vividSaturation: 0.82,
+	vividLightness: 0.6,
+	vividMinSaturation: 0.12
 });
 
 export const FIELD = Object.freeze({

@@ -7,7 +7,7 @@
 	import { createField, type Field } from '../visual/field.ts';
 	import { copyField } from '../visual/fieldSnapshot.ts';
 	import type { Rgb } from '../color.ts';
-	import { accentFromPalette, blendAccent } from './accent.ts';
+	import { accentFromPalette, blendAccent, vividFromPalette } from './accent.ts';
 	import { setFaviconAccent } from './favicon.svelte.ts';
 	import { ui } from './state.svelte.ts';
 	import { scrimBackground } from './scrim.ts';
@@ -26,7 +26,7 @@
 			.then((colors) => {
 				if (!current) return;
 				accentTarget = accentFromPalette(colors) ?? accentTarget;
-				setFaviconAccent(`rgb(${accentTarget.map(Math.round).join(' ')})`);
+				setFaviconAccent(vividFromPalette(colors));
 			})
 			.catch(() => {});
 		return () => {
