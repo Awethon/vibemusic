@@ -194,9 +194,43 @@ async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: s
 	return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
 }
 
+export const RADIO_PREFIX = 'radio:';
+
+export const isRadio = (trackId: string | null | undefined) => !!trackId?.startsWith(RADIO_PREFIX);
+
+export type RadioStation = { id: string; name: string; homePageUrl: string };
+
+const radioHost = (url: string) => {
+	try {
+		return new URL(url).host.replace(/^www\./, '');
+	} catch {
+		return '';
+	}
+};
+
+const stationTrack = (station: RadioStation): Track => ({
+	id: `${RADIO_PREFIX}${station.id}`,
+	albumId: '',
+	album: '',
+	title: station.name,
+	artist: radioHost(station.homePageUrl) || 'Internet radio',
+	artistId: '',
+	albumArtistId: '',
+	trackNo: 0,
+	discNo: 0,
+	duration: 0,
+	starred: false,
+	disliked: false
+});
+
+export const radioStations = () => query<RadioStation>('select id, name, home_page_url as homePageUrl from radio_station order by name collate nocase');
+
+export const radioTracks = async () => (await radioStations()).map(stationTrack);
+
 export async function tracksByIds(ids: string[]) {
-	const found = await inChunks([...new Set(ids)], (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
-	const byId = new Map(found.map((track) => [track.id, track]));
+	const stations = ids.some(isRadio) ? await radioTracks() : [];
+	const found = await inChunks([...new Set(ids.filter((id) => !isRadio(id)))], (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
+	const byId = new Map([...found, ...stations].map((track) => [track.id, track]));
 	return ids.map((id) => byId.get(id)).filter((track): track is Track => !!track);
 }
 

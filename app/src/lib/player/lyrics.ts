@@ -20,6 +20,7 @@ async function fetchLyrics(trackId: string): Promise<Lyrics | null> {
 }
 
 export function lyricsFor(trackId: string): Promise<Lyrics | null> {
+	if (trackId.startsWith('radio:')) return Promise.resolve(null);
 	let loading = cache.get(trackId);
 	if (!loading) {
 		loading = fetchLyrics(trackId).catch(() => {

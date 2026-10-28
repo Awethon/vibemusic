@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
-	import { allPlaylists, type PlaylistKind } from '#lib/library/queries.ts';
+	import { allPlaylists, radioTracks, type PlaylistKind } from '#lib/library/queries.ts';
 	import { BENTO } from '#lib/tuning.ts';
 	import Bento from '#lib/ui/Bento.svelte';
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
+	import TrackList from '#lib/ui/TrackList.svelte';
 
 	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists', artist: 'Artist playlists' };
 	const playlists = live(allPlaylists, []);
+	const stations = live(radioTracks, []);
 
 	const blocks = $derived.by(() => {
 		const kinds = (['own', 'smart', 'genre'] as const)
@@ -24,4 +26,8 @@
 <section class="view" {@attach viewEnter}>
 	<div class="vhead"><div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div></div>
 	{#if blocks.length}<Bento {blocks} />{/if}
+	{#if stations.value.length}
+		<h2 class="section-title">Radio</h2>
+		<TrackList tracks={stations.value} sourceName="Radio" listKey="radio" alwaysShowArtist />
+	{/if}
 </section>

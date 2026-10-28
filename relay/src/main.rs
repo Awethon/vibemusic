@@ -6,13 +6,16 @@ mod deezer;
 mod enrich;
 mod hub;
 mod musicbrainz;
+mod radio;
 mod this_is;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Router;
-use axum::extract::State;
+use std::collections::HashMap;
+
+use axum::extract::{Path, Query, State};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::get;
@@ -35,6 +38,7 @@ struct App {
     hub: Arc<Mutex<Hub>>,
     navidrome: Navidrome,
     enricher: Arc<Enricher>,
+    radio: Arc<radio::Radio>,
 }
 
 #[derive(Deserialize)]
@@ -57,8 +61,8 @@ async fn main() {
         Some(settings) => this_is::start(settings, enricher.clone()),
         None => tracing::info!("This is playlists are off: set VIBEMUSIC_NAVIDROME_USER and VIBEMUSIC_NAVIDROME_PASSWORD to turn them on"),
     }
-    let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()), enricher };
-    let router = Router::new().route("/relay", get(upgrade)).route("/health", get(|| async { "ok" })).with_state(app);
+    let app = App { hub: Arc::default(), navidrome: Navidrome::new(navidrome_url.clone()), enricher, radio: Arc::new(radio::Radio::from_env(&navidrome_url)) };
+    let router = Router::new().route("/relay", get(upgrade)).route("/radio/{id}", get(radio_stream)).route("/health", get(|| async { "ok" })).with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
     tracing::info!(%listen, %navidrome_url, "relay listening");
     axum::serve(listener, router)
@@ -67,6 +71,10 @@ async fn main() {
         })
         .await
         .expect("serve");
+}
+
+async fn radio_stream(State(app): State<App>, Path(id): Path<String>, Query(query): Query<HashMap<String, String>>) -> Response {
+    app.radio.stream(&id, &query).await
 }
 
 async fn upgrade(State(app): State<App>, upgrade: WebSocketUpgrade) -> Response {

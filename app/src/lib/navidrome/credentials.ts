@@ -61,7 +61,8 @@ export function appendParams(target: URLSearchParams, params: SubsonicParams) {
 
 export const subsonicUrl = (credentials: Credentials, method: string, params: SubsonicParams = {}) => `/rest/${method}?${appendParams(subsonicAuthParams(credentials), params)}`;
 
-export const streamUrl = (credentials: Credentials, trackId: string) => subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
+export const streamUrl = (credentials: Credentials, trackId: string) =>
+	trackId.startsWith('radio:') ? `/radio/${encodeURIComponent(trackId.slice('radio:'.length))}?${subsonicAuthParams(credentials)}` : subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
 
 export const coverAlbumOverrides = new Map<string, string>();
 

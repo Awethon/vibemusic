@@ -1,6 +1,6 @@
 import { TREE_VERSION } from '../genres/genres.ts';
 
-export const SCHEMA_VERSION = `12.${TREE_VERSION}`;
+export const SCHEMA_VERSION = `13.${TREE_VERSION}`;
 
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
@@ -72,6 +72,7 @@ create table playlist (
 );
 create index playlist_artist on playlist (artist_id);
 create table playlist_track (playlist_id text not null, position integer not null, track_id text not null, primary key (playlist_id, position)) without rowid;
+create table radio_station (id text primary key, name text not null, stream_url text not null, home_page_url text not null) without rowid;
 create table palette (album_id text primary key, colors text not null) without rowid;
 create table mb_release_group (id text primary key, artists text, tags text) without rowid;
 create table mb_artist (id text primary key, tags text, countries text) without rowid;

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { NavidromeHttp } from '../navidrome/http.ts';
-import { nativeAlbum, nativePlaylist, nativePlaylistTrack, nativeSong, type NativePlaylist, type NativePlaylistTrack } from '../navidrome/schemas.ts';
+import { nativeAlbum, nativePlaylist, nativePlaylistTrack, nativeSong, radioStation, type NativePlaylist, type NativePlaylistTrack, type RadioStation } from '../navidrome/schemas.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { newest, playlistSignature } from './build.ts';
 import type { SyncProgress } from './protocol.ts';
@@ -8,6 +8,16 @@ import type { LibraryChanges, LibrarySnapshot, SyncState } from './snapshot.ts';
 
 export async function fetchPlaylists(http: NavidromeHttp): Promise<NativePlaylist[]> {
 	return nativePlaylist.array().parse(await http.nativeAll('playlist?_sort=name&_order=ASC', LIBRARY_SYNC.pageSize));
+}
+
+type RadioResponse = { internetRadioStations?: { internetRadioStation?: unknown[] } };
+
+async function fetchRadioStations(http: NavidromeHttp): Promise<RadioStation[] | null> {
+	try {
+		return radioStation.array().parse((await http.subsonic<RadioResponse>('getInternetRadioStations')).internetRadioStations?.internetRadioStation ?? []);
+	} catch {
+		return null;
+	}
 }
 
 async function fetchPlaylistTracks(http: NavidromeHttp, playlist: NativePlaylist): Promise<NativePlaylistTrack[]> {
@@ -29,7 +39,7 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 			steps[step] = Math.round(performance.now() - started);
 		}
 	};
-	const playlists = await timed('playlists', () => fetchPlaylists(http));
+	const [playlists, radioStations] = await Promise.all([timed('playlists', () => fetchPlaylists(http)), fetchRadioStations(http)]);
 	report({ playlistTotal: playlists.length });
 	const [albums, songs] = await Promise.all([
 		timed('albums', async () => nativeAlbum.array().parse(await http.nativeAll('album?missing=false&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, albumTotal) => report({ albums: loaded, albumTotal })))),
@@ -55,7 +65,7 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 			)
 	);
 	report({ building: true });
-	return { albums, songs, playlists, playlistTracks, steps };
+	return { albums, songs, playlists, playlistTracks, radioStations: radioStations ?? [], steps };
 }
 
 async function changedSince<T>(http: NavidromeHttp, path: string, schema: z.ZodType<T>, stampOf: (item: T) => string, mark: string): Promise<T[]> {
@@ -85,14 +95,15 @@ async function fetchAlbumSongs(http: NavidromeHttp, albumIds: string[]) {
 
 export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAlbums: number): Promise<LibraryChanges | null> {
 	const { marks } = sync;
-	const [albums, albumPlays, albumStars, songPlays, songStars, rated, playlists] = await Promise.all([
+	const [albums, albumPlays, albumStars, songPlays, songStars, rated, playlists, radioStations] = await Promise.all([
 		changedSince(http, 'album?_sort=importedAt&_order=DESC', nativeAlbum, (album) => album.importedAt, marks.albumImported),
 		changedSince(http, 'album?_sort=playDate&_order=DESC', nativeAlbum, (album) => album.playDate, marks.albumPlayed),
 		changedSince(http, 'album?_sort=starredAt&_order=DESC', nativeAlbum, (album) => album.starredAt, marks.albumStarred),
 		changedSince(http, 'song?_sort=playDate&_order=DESC', nativeSong, (song) => song.playDate, marks.songPlayed),
 		changedSince(http, 'song?_sort=starredAt&_order=DESC', nativeSong, (song) => song.starredAt, marks.songStarred),
 		http.nativeAll('song?has_rating=true&_sort=title&_order=ASC', LIBRARY_SYNC.pageSize).then((songs) => nativeSong.array().parse(songs)),
-		fetchPlaylists(http)
+		fetchPlaylists(http),
+		fetchRadioStations(http)
 	]);
 	if (albums.length > Math.max(LIBRARY_SYNC.fullSyncChangedAlbumMin, localAlbums * LIBRARY_SYNC.fullSyncChangedAlbumShare)) return null;
 	const libraryChanged = albums.length + albumPlays.length + albumStars.length + songPlays.length + songStars.length > 0;
@@ -118,6 +129,7 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		},
 		playlists,
 		playlistTracks: new Map(playlistTracks),
+		radioStations,
 		totals: totals && { albums: totals[0], tracks: totals[1] }
 	};
 }
@@ -130,6 +142,7 @@ export async function fetchSnapshotFile(url: string): Promise<LibrarySnapshot> {
 		albums: nativeAlbum.array().parse(raw.albums),
 		songs: nativeSong.array().parse(raw.songs),
 		playlists: nativePlaylist.array().parse(raw.playlists),
-		playlistTracks: new Map(Object.entries(raw.playlistTracks).map(([id, tracks]) => [id, nativePlaylistTrack.array().parse(tracks)]))
+		playlistTracks: new Map(Object.entries(raw.playlistTracks).map(([id, tracks]) => [id, nativePlaylistTrack.array().parse(tracks)])),
+		radioStations: []
 	};
 }

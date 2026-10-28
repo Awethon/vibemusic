@@ -1,5 +1,5 @@
 import { checkConnection, onReconnect } from '../connection.svelte.ts';
-import { tracksByIds } from '../library/queries.ts';
+import { isRadio, tracksByIds } from '../library/queries.ts';
 import { streamUrl } from '../navidrome/credentials.ts';
 import { requireCredentials } from '../session.svelte.ts';
 import { CONNECTION, PLAYBACK, SAVED_QUEUE } from '../tuning.ts';
@@ -79,6 +79,7 @@ function applyLevel() {
 
 function prepareNext() {
 	const next = queue.nextEntry(queueState);
+	if (next && isRadio(next.trackId)) return engine.prepare(null, null);
 	engine.prepare(next?.trackId ?? null, next ? streamUrl(requireCredentials(), next.trackId) : null);
 }
 
@@ -91,7 +92,7 @@ export async function startCurrent(autoplay = true, startAt = 0) {
 	if (started === 'blocked') waitForTap();
 	prepareNext();
 	refreshPlayback();
-	if (autoplay) announceNowPlaying(trackId);
+	if (autoplay && !isRadio(trackId)) announceNowPlaying(trackId);
 }
 
 function apply(effect: queue.QueueEffect) {
@@ -118,7 +119,7 @@ function tick() {
 	if (remote.mirroring()) return;
 	refreshPlayback();
 	const track = currentTrack();
-	if (!track || !player.playing) return;
+	if (!track || !player.playing || isRadio(track.id)) return;
 	listened(track, elapsed, player.duration || track.duration);
 	if (saveIsDue()) saveNow();
 }
@@ -150,7 +151,8 @@ export function runLocally(command: Command) {
 			if (engine.playing) {
 				engine.pause();
 				saveNow();
-			} else if (loaded && !player.error) void resumeEngine();
+			} else if (loaded && !player.error && !isRadio(engine.trackId)) void resumeEngine();
+			else if (isRadio(queueState.currentTrackId)) void startCurrent(true);
 			else void startCurrent(true, loaded ? engine.position : resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
 			return;
 		}

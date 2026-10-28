@@ -862,6 +862,16 @@ body.now-open #dock { left: 0; right: 0; padding: 0 28px; }
 
 .cap-seek { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 
+.cap-seek.live { justify-content: center; }
+
+.live-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); }
+
+.live-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: live-pulse 1.6s ease-in-out infinite; }
+
+@keyframes live-pulse { 50% { opacity: 0.35; } }
+
+@media (prefers-reduced-motion: reduce) { .live-badge i { animation: none; } }
+
 .cap-right { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 0; }
 
 .cap-right .slider.vol { flex: 0 1 80px; min-width: 44px; margin-right: 6px; }

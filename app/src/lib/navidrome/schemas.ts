@@ -51,6 +51,13 @@ export const nativeSong = z.object({
 	rating: optionalNumber
 });
 
+export const radioStation = z.object({
+	id: z.string(),
+	name: z.string(),
+	streamUrl: optionalString,
+	homePageUrl: optionalString
+});
+
 export const nativePlaylist = z.object({
 	id: z.string(),
 	name: z.string(),
@@ -72,4 +79,5 @@ export const nativePlaylistTrack = z.object({
 export type NativeAlbum = z.infer<typeof nativeAlbum>;
 export type NativeSong = z.infer<typeof nativeSong>;
 export type NativePlaylist = z.infer<typeof nativePlaylist>;
+export type RadioStation = z.infer<typeof radioStation>;
 export type NativePlaylistTrack = z.infer<typeof nativePlaylistTrack>;

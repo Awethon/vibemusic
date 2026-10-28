@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { isRadio } from '../library/queries.ts';
 	import { currentTrack, player, playNextTrack, playPreviousTrack, seekTo, setVolume, toggleMute, togglePlay } from '../player/player.svelte.ts';
 	import { deviceById, isActiveElsewhere, relay } from '../remote/relay.svelte.ts';
 	import { deviceIcon, deviceLabel } from '../remote/devices.ts';
@@ -14,6 +15,7 @@
 
 	let scrubRatio = $state<number | null>(null);
 	const track = $derived(currentTrack());
+	const live = $derived(isRadio(track?.id));
 	const duration = $derived(player.duration);
 	const position = $derived(scrubRatio !== null ? scrubRatio * duration : player.position);
 	const seekRatio = $derived(duration ? Math.min(1, position / duration) : 0);
@@ -28,9 +30,9 @@
 			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} size={COVER_PX.card} eager /></button>
 			<div class="cap-meta">
 				<button class="cap-title" type="button" onclick={toggleFullScreen}>{track?.title ?? ''}</button>
-				<p class="cap-sub">{#if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}{#if remote}<span class="cap-device"> · on {deviceLabel(relay.active)}</span>{/if}</p>
+				<p class="cap-sub">{#if live}{track?.artist}{:else if track}<a href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>{/if}{#if remote}<span class="cap-device"> · on {deviceLabel(relay.active)}</span>{/if}</p>
 			</div>
-			<LikeButton className="cap-like" />
+			{#if !live}<LikeButton className="cap-like" />{/if}
 		</div>
 		<div class="cap-center">
 			<div class="cap-ctrl">
@@ -38,7 +40,8 @@
 				<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}><Icon name={player.playing ? 'pause' : 'play'} /></button>
 				<button class="icon-btn" type="button" aria-label="Next" onclick={playNextTrack}><Icon name="next" /></button>
 			</div>
-			<div class="cap-seek">
+			<div class="cap-seek" class:live>
+				{#if live}<span class="live-badge"><i></i>Live</span>{:else}
 				<span class="time">{clock(position)}</span>
 				<Slider
 					ratio={seekRatio}
@@ -52,6 +55,7 @@
 					}}
 				/>
 				<span class="time">{clock(duration)}</span>
+				{/if}
 			</div>
 		</div>
 		<div class="cap-right">

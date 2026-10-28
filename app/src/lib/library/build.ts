@@ -1,5 +1,5 @@
 import type { Database } from '@sqlite.org/sqlite-wasm';
-import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong } from '../navidrome/schemas.ts';
+import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
 import { deezerAlbumGenre } from '../genres/deezer.ts';
 import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
 import { createGenreResolver, regionalGenres, withAncestors } from '../genres/genres.ts';
@@ -67,6 +67,14 @@ const songGenresOf = (song: NativeSong) => {
 function insertTracks(db: Database, songs: NativeSong[]) {
 	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0, JSON.stringify(songGenresOf(song)), song.rating]));
 	eachBound(db, 'insert into search values (?,?,?)', songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)]));
+}
+
+function replaceRadioStations(db: Database, stations: RadioStation[] | null): boolean {
+	if (!stations) return false;
+	const before = JSON.stringify(db.selectArrays('select id, name, stream_url, home_page_url from radio_station order by id'));
+	db.exec('delete from radio_station');
+	eachBound(db, 'insert or replace into radio_station values (?,?,?,?)', stations.map((station) => [station.id, station.name, station.streamUrl, station.homePageUrl]));
+	return JSON.stringify(db.selectArrays('select id, name, stream_url, home_page_url from radio_station order by id')) !== before;
 }
 
 function removeTracks(db: Database, ids: string[]) {
@@ -277,6 +285,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 		insertTracks(db, snapshot.songs);
 		insertPlaylists(db, snapshot.playlists, userId);
 		insertPlaylistTracks(db, snapshot.playlistTracks);
+		replaceRadioStations(db, snapshot.radioStations);
 		rebuildDerived(db);
 	});
 	const sync: SyncState = {
@@ -297,6 +306,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 	const contentChanged = changes.albums.length > 0;
 	const playlistsChanged = changes.playlistTracks.size > 0 || changes.playlists.length !== Object.keys(sync.playlists).length || changes.playlists.some((playlist) => !(playlist.id in sync.playlists));
 	let statsChanged = 0;
+	let radioChanged = false;
 	db.transaction(() => {
 		if (contentChanged) {
 			const ids = changes.albums.map((album) => album.id);
@@ -315,9 +325,10 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			insertPlaylists(db, changes.playlists, meta.userId);
 			insertPlaylistTracks(db, changes.playlistTracks);
 		}
+		radioChanged = replaceRadioStations(db, changes.radioStations);
 		if (contentChanged || playlistsChanged) rebuildDerived(db);
 	});
-	const changed = contentChanged || playlistsChanged || statsChanged > 0;
+	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0;
 	const next: SyncState = {
 		marks: changes.marks,
 		playlists: Object.fromEntries(changes.playlists.map((playlist) => [playlist.id, playlistSignature(playlist)])),

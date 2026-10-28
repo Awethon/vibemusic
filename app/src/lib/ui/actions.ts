@@ -1,7 +1,7 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { query, resyncLibrary } from '../library/library.svelte.ts';
-import { albumTracks, artistTracks, ownPlaylists, playlistTracks, skipsDisliked, withoutDisliked, type AlbumSummary, type Artist, type Playlist, type Track } from '../library/queries.ts';
+import { albumTracks, artistTracks, isRadio, ownPlaylists, playlistTracks, skipsDisliked, withoutDisliked, type AlbumSummary, type Artist, type Playlist, type Track } from '../library/queries.ts';
 import { toggleDislike, trackById } from '../player/player.svelte.ts';
 import { navidrome, requireCredentials } from '../session.svelte.ts';
 import { plural } from './format.ts';
@@ -37,6 +37,30 @@ async function addTracksToPlaylist(playlist: Playlist, tracks: Track[]) {
 	await resyncLibrary();
 }
 
+type ShareResponse = { shares?: { share?: { url?: string }[] } };
+
+async function share(ids: string[], description: string) {
+	let url: string | undefined;
+	try {
+		url = (await navidrome().subsonic<ShareResponse>('createShare', { id: ids, description })).shares?.share?.[0]?.url;
+	} catch (error) {
+		reportFailure('create a share link', error);
+		return;
+	}
+	if (!url) {
+		showToast('Couldn’t create a share link');
+		return;
+	}
+	try {
+		await navigator.clipboard.writeText(url);
+		showToast('Share link copied');
+	} catch {
+		showToast(url);
+	}
+}
+
+const shareEntry = (ids: () => Promise<string[]> | string[], description: string): MenuItem => ({ label: 'Share', hint: 'copies a public link', run: async () => share(await ids(), description) });
+
 async function addToPlaylistEntries(tracks: () => Promise<Track[]>): Promise<MenuItem[]> {
 	const playlists = await ownPlaylists(requireCredentials().userId);
 	if (!playlists.length) return [];
@@ -56,6 +80,12 @@ function collectionEntries(tracks: () => Promise<Track[]>, count: number, source
 
 export async function trackMenu(tracks: Track[], index: number, sourceName: string, listKey: string, playlist?: Playlist): Promise<MenuItem[]> {
 	const track = tracks[index];
+	if (isRadio(track.id))
+		return [
+			{ label: 'Play', run: () => playListAnimated(tracks, index, sourceName, listKey) },
+			{ label: 'Play next', run: () => playNextFromMenu([track], sourceName) },
+			{ label: 'Add to queue', run: () => addToQueueFromMenu([track], sourceName) }
+		];
 	const entries: MenuItem[] = [
 		{ label: 'Play', run: () => playListAnimated(tracks, index, sourceName, listKey) },
 		{ label: 'Play next', run: () => playNextFromMenu([track], sourceName) },
@@ -63,6 +93,7 @@ export async function trackMenu(tracks: Track[], index: number, sourceName: stri
 		SEPARATOR,
 		{ label: 'Go to album', run: () => openAlbum(track.albumId) },
 		{ label: 'Go to artist', run: () => openArtist(track.albumArtistId || track.artistId) },
+		shareEntry(() => [track.id], `${track.title} · ${track.artist}`),
 		...(await addToPlaylistEntries(async () => [track])),
 		SEPARATOR,
 		{ label: track.disliked ? 'Undo “I don’t like this song”' : 'I don’t like this song', hint: track.disliked ? undefined : 'skipped in mixes', run: () => dislike(track) }
@@ -99,6 +130,7 @@ export async function albumMenu(album: AlbumSummary): Promise<MenuItem[]> {
 	const tracks = () => albumTracks(album.id);
 	return collectionEntries(tracks, album.songCount, album.name, `album:${album.id}`, 'Open album', () => openAlbum(album.id), [
 		{ label: 'Go to artist', run: () => openArtist(album.artistId) },
+		shareEntry(() => [album.id], `${album.name} · ${album.artist}`),
 		...(await addToPlaylistEntries(tracks))
 	]);
 }
@@ -109,7 +141,9 @@ export function artistMenu(artist: Artist): MenuItem[] {
 
 export function playlistMenu(playlist: Playlist): MenuItem[] {
 	const tracks = async () => (skipsDisliked(playlist) ? withoutDisliked(await playlistTracks(playlist.id)).tracks : playlistTracks(playlist.id));
-	return collectionEntries(tracks, playlist.songCount, playlist.name, `playlist:${playlist.id}`, 'Open playlist', () => openPlaylist(playlist.id));
+	const own = playlist.kind !== 'genre' && playlist.ownerId === requireCredentials().userId;
+	const shared = own ? () => [playlist.id] : async () => (await playlistTracks(playlist.id)).map((track) => track.id);
+	return collectionEntries(tracks, playlist.songCount, playlist.name, `playlist:${playlist.id}`, 'Open playlist', () => openPlaylist(playlist.id), [shareEntry(shared, playlist.name)]);
 }
 
 export function queueRowMenu(row: HTMLElement): MenuItem[] {
