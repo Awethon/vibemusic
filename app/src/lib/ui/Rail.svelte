@@ -4,6 +4,7 @@
 	import { toggleRail } from '../engine/rail.ts';
 	import { library } from '../library/library.svelte.ts';
 	import { radioStations } from '../library/queries.ts';
+	import { session } from '../session.svelte.ts';
 	import { live } from './live.svelte.ts';
 	import Icon from './Icon.svelte';
 	import { ui } from './state.svelte.ts';
@@ -28,7 +29,7 @@
 		<a class="nav" class:active={section === 'artists'} href={resolve('/artists')} title="Artists"><span class="ni"><Icon name="mic" /></span><span class="nl">Artists</span></a>
 		<a class="nav" class:active={section === 'playlists'} href={resolve('/playlists')} title="Playlists"><span class="ni"><Icon name="lists" /></span><span class="nl">Playlists</span></a>
 		{#if ui.showTimeline}<a class="nav" class:active={section === 'timeline'} href={resolve('/timeline')} title="Timeline"><span class="ni"><Icon name="timeline" /></span><span class="nl">Timeline</span></a>{/if}
-		{#if ui.showRadio && stations.value.length}<a class="nav" class:active={section === 'radio'} href={resolve('/radio')} title="Radio"><span class="ni"><Icon name="radio" /></span><span class="nl">Radio</span></a>{/if}
+		{#if ui.showRadio && (stations.value.length || session.credentials?.isAdmin)}<a class="nav" class:active={section === 'radio'} href={resolve('/radio')} title="Radio"><span class="ni"><Icon name="radio" /></span><span class="nl">Radio</span></a>{/if}
 	</div>
 	<div class="rail-foot">
 		{#if library.status === 'syncing'}<span class="nav sync-note"><span class="nl">Syncing library…</span></span>{/if}

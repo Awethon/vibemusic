@@ -199,7 +199,7 @@ export const RADIO_PREFIX = 'radio:';
 
 export const isRadio = (trackId: string | null | undefined) => !!trackId?.startsWith(RADIO_PREFIX);
 
-export type RadioStation = { id: string; name: string; homePageUrl: string };
+export type RadioStation = { id: string; name: string; streamUrl: string; homePageUrl: string };
 
 const radioHost = (url: string) => {
 	try {
@@ -224,7 +224,7 @@ const stationTrack = (station: RadioStation): Track => ({
 	disliked: false
 });
 
-export const radioStations = () => query<RadioStation>('select id, name, home_page_url as homePageUrl from radio_station order by name collate nocase');
+export const radioStations = () => query<RadioStation>('select id, name, stream_url as streamUrl, home_page_url as homePageUrl from radio_station order by name collate nocase');
 
 export const radioTracks = async () => (await radioStations()).map(stationTrack);
 

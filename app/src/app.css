@@ -1715,3 +1715,25 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .radio-text small { font-size: 13px; color: var(--ink-3); }
 
 .radio-song { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.radio-add { border-style: dashed; }
+
+.radio-add .cover-icon { background: rgba(255, 255, 255, 0.04); }
+
+.radio-form { flex-direction: column; align-items: stretch; gap: 12px; grid-column: span 2; max-width: 620px; }
+
+.radio-form > b { font-weight: 600; font-size: 16px; }
+
+.radio-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--ink-3); }
+
+.radio-form label small { display: inline; font-size: 11.5px; color: var(--ink-4); }
+
+.radio-form input { height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.05); color: var(--ink); font: 500 14px var(--ui); outline: none; }
+
+.radio-form input:focus { border-color: var(--accent); }
+
+.radio-problem { margin: 0; color: #ff9a9a; font-size: 13px; }
+
+.radio-form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+
+@media (max-width: 760px) { .radio-form { grid-column: auto; } }
