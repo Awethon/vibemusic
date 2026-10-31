@@ -18,7 +18,7 @@
 </script>
 
 {#if track}
-	<div id="phoneDock" role="region" aria-label="Player">
+	<div id="phoneDock" role="region" aria-label="Player" ondragstart={(event) => event.preventDefault()}>
 		<button class="pd-open" type="button" aria-label="Open now playing" onclick={() => setFullScreen(true)}>
 			<span class="pd-cover"><Cover albumId={track.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.card} eager /></span>
 			<span class="pd-meta">

@@ -24,7 +24,7 @@
 	const showDevices = $derived(relay.connected && (relay.devices.length > 1 || remote));
 </script>
 
-<div id="dock">
+<div id="dock" role="presentation" ondragstart={(event) => event.preventDefault()}>
 	<div id="capsule" role="region" aria-label="Player">
 		<div class="cap-left">
 			<button class="cap-cover" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.card} eager /></button>

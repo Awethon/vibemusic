@@ -32,7 +32,7 @@ html, body {
 	margin: 0;
 	height: 100%;
 	overflow: hidden;
-	overscroll-behavior-x: none;
+	overscroll-behavior: none;
 	background: #0a090d;
 	color: var(--ink);
 	font-family: var(--ui);
@@ -41,6 +41,8 @@ html, body {
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
 }
+
+#dock, #phoneDock, #tabs { touch-action: none; }
 
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
