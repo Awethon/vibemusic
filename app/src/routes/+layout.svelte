@@ -8,6 +8,7 @@
 	import '@fontsource/unbounded/500.css';
 	import '@fontsource/unbounded/700.css';
 	import '../app.css';
+	import '../styles/phone.css';
 	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -24,6 +25,7 @@
 	import ConnectionNote from '#lib/ui/ConnectionNote.svelte';
 	import ContextMenu from '#lib/ui/ContextMenu.svelte';
 	import { favicon } from '#lib/ui/favicon.svelte.ts';
+	import { formFactor } from '#lib/ui/formFactor.svelte.ts';
 	import DevicesPopover from '#lib/ui/DevicesPopover.svelte';
 	import FilterPopover from '#lib/ui/FilterPopover.svelte';
 	import GlassLayer from '#lib/ui/GlassLayer.svelte';
@@ -32,7 +34,10 @@
 	import { showView } from '#lib/ui/navigation.ts';
 	import NowCanvas from '#lib/ui/NowCanvas.svelte';
 	import NowClassic from '#lib/ui/NowClassic.svelte';
+	import NowPhone from '#lib/ui/NowPhone.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
+	import PhoneDock from '#lib/ui/PhoneDock.svelte';
+	import PhoneTabs from '#lib/ui/PhoneTabs.svelte';
 	import { installPalettePreview } from '#lib/ui/palettePreview.ts';
 	import Rail from '#lib/ui/Rail.svelte';
 	import RemoteBanner from '#lib/ui/RemoteBanner.svelte';
@@ -103,18 +108,22 @@
 	<Login />
 {:else}
 	<div id="chrome">
-		<Rail />
+		{#if formFactor.phone}<PhoneTabs />{:else}<Rail />{/if}
 		<main id="main" tabindex="-1" bind:this={main}>
 			<LibraryGate>{@render children()}</LibraryGate>
 		</main>
-		<AlphabetNav />
+		{#if !formFactor.phone}<AlphabetNav />{/if}
 	</div>
-	<NowCanvas />
-	<NowClassic />
-	<Ambient />
+	{#if formFactor.phone}
+		<NowPhone />
+	{:else}
+		<NowCanvas />
+		<NowClassic />
+		<Ambient />
+	{/if}
 	<GlassLayer level="player" />
 	<Panel />
-	<Capsule />
+	{#if formFactor.phone}<PhoneDock />{:else}<Capsule />{/if}
 	<GlassLayer level="popups" />
 	<SettingsPopover />
 	<DevicesPopover />

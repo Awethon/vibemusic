@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formFactor } from './formFactor.svelte.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { glass, setGlassEnabled } from '../glass/settings.svelte.ts';
@@ -50,7 +51,8 @@
 
 <svelte:window onpointerdown={(event) => ui.settingsOpen && !element?.contains(event.target as Node) && !(event.target as Element).closest('#bSettings') && (ui.settingsOpen = false)} />
 
-<div id="settings" class="pop" class:open={ui.settingsOpen} role="dialog" aria-label="Settings" bind:this={element} style:left="{position.left}px" style:bottom="{position.bottom}px">
+<div id="settings" class="pop" class:open={ui.settingsOpen} role="dialog" aria-label="Settings" bind:this={element} style:left={formFactor.phone ? undefined : `${position.left}px`} style:bottom={formFactor.phone ? undefined : `${position.bottom}px`}>
+	{#if !formFactor.phone}
 	<p class="pop-title">Full-screen style</p>
 	<div class="fs-opts">
 		{#each options as [style, label, description] (style)}
@@ -60,11 +62,13 @@
 			</button>
 		{/each}
 	</div>
+	{/if}
 	<p class="pop-title">Background</p>
 	<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
-	<p class="pop-title">Sidebar</p>
-	<button type="button" class="set-row" class:on={ui.showTimeline} onclick={() => setNavItem('timeline', !ui.showTimeline)}><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button>
+	<p class="pop-title">{formFactor.phone ? 'Tabs' : 'Sidebar'}</p>
+	{#if !formFactor.phone}<button type="button" class="set-row" class:on={ui.showTimeline} onclick={() => setNavItem('timeline', !ui.showTimeline)}><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button>{/if}
 	<button type="button" class="set-row" class:on={ui.showRadio} onclick={() => setNavItem('radio', !ui.showRadio)}><span>Radio<small>Stations configured in Navidrome</small></span><span class="switch"></span></button>
+	{#if !formFactor.phone}
 	<p class="pop-title">Window</p>
 	<button type="button" class="set-row" class:on={fullScreen} onclick={toggleBrowserFullScreen}><span>Full screen<small>Hide the browser’s tabs and toolbar</small></span><span class="switch"></span></button>
 	<p class="pop-title">Glass</p>
@@ -77,6 +81,7 @@
 			void goto(resolve('/glass'));
 		}}><span>Tune liquid glass<small>Looks, shape, optics and light</small></span></button
 	>
+	{/if}
 	<p class="pop-title">Library</p>
 	<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary(true)}>
 		<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>

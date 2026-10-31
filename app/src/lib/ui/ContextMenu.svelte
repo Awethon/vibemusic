@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formFactor } from './formFactor.svelte.ts';
 	import { POPOVER } from '../tuning.ts';
 	import { closeMenu, menu, type MenuItem } from './menu.svelte.ts';
 
@@ -33,7 +34,7 @@
 	{/if}
 {/snippet}
 
-<div id="ctx" class="menu" class:open={menu.open} role="menu" bind:this={element} style:left="{position.left}px" style:top="{position.top}px">
+<div id="ctx" class="menu" class:open={menu.open} role="menu" bind:this={element} style:left={formFactor.phone ? undefined : `${position.left}px`} style:top={formFactor.phone ? undefined : `${position.top}px`}>
 	{#each menu.items as item, index (index)}
 		{#if 'separator' in item}
 			<hr />

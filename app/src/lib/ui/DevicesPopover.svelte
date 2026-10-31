@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formFactor } from './formFactor.svelte.ts';
 	import { player, playOn } from '../player/player.svelte.ts';
 	import { deviceIcon, deviceLabels } from '../remote/devices.ts';
 	import { relay, type Device } from '../remote/relay.svelte.ts';
@@ -36,7 +37,7 @@
 
 <svelte:window onpointerdown={(event) => ui.devicesOpen && !element?.contains(event.target as Node) && !(event.target as Element).closest('#bDevice') && (ui.devicesOpen = false)} />
 
-<div id="devices" class="pop" class:open={ui.devicesOpen} role="dialog" aria-label="Devices" bind:this={element} style:right="{position.right}px" style:bottom="{position.bottom}px">
+<div id="devices" class="pop" class:open={ui.devicesOpen} role="dialog" aria-label="Devices" bind:this={element} style:right={formFactor.phone ? undefined : `${position.right}px`} style:bottom={formFactor.phone ? undefined : `${position.bottom}px`}>
 	<p class="pop-title">Play on</p>
 	{#each devices as device (device.id)}
 		{@const current = device.id === relay.active}

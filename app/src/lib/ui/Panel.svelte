@@ -11,7 +11,9 @@
 	import QueueRow from './QueueRow.svelte';
 	import { beginPress, endPress, followPointer } from './queueDrag.ts';
 	import { clearQueued } from './queueActions.ts';
-	import { toggleFullScreen } from './shell.ts';
+	import { toggleFullScreen, togglePanel } from './shell.ts';
+	import { formFactor } from './formFactor.svelte.ts';
+	import Icon from './Icon.svelte';
 	import { ui } from './state.svelte.ts';
 	import TrackLinks from './TrackLinks.svelte';
 
@@ -39,7 +41,7 @@
 </script>
 
 <aside id="panel" aria-label="Now playing and queue">
-	<header class="pn-head"><span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span></header>
+	<header class="pn-head"><span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>{#if formFactor.phone}<button class="icon-btn pn-close" type="button" aria-label="Close" onclick={() => togglePanel(false)}><Icon name="down" /></button>{/if}</header>
 	<div class="pn-now">
 		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.panel} eager /></button>
 		<div class="pn-meta">

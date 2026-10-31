@@ -5,6 +5,7 @@
 	import { registerLayout } from '../engine/layout.svelte.ts';
 	import type { Playlist, PlaylistKind } from '../library/queries.ts';
 	import { BENTO } from '../tuning.ts';
+	import { formFactor } from './formFactor.svelte.ts';
 	import PlaylistRow from './PlaylistRow.svelte';
 	import GenreTile from './GenreTile.svelte';
 
@@ -51,7 +52,23 @@
 
 	const signature = (all: Record<string, Plan>) => Object.entries(all).map(([kind, plan]) => `${kind}:${plan.itemCount}|${plan.columns}|${plan.tileSize}`).join(',');
 
+	function stackedPlans(): Record<string, Plan> {
+		return Object.fromEntries(
+			blocks.map((block) => [
+				block.kind,
+				block.kind === 'genre'
+					? { columns: block.playlists.length, rows: 1, tileSize: BENTO.phoneGenreTilePx, itemCount: block.playlists.length }
+					: { columns: 1, rows: BENTO.phoneListRows, tileSize: 0, itemCount: BENTO.phoneListRows }
+			])
+		);
+	}
+
 	function refit() {
+		if (formFactor.phone) {
+			const stacked = stackedPlans();
+			if (signature(stacked) !== signature(plans)) plans = stacked;
+			return;
+		}
 		fitHeight();
 		const measured = measurePlans();
 		if (signature(measured) !== signature(plans)) plans = measured;
@@ -60,10 +77,12 @@
 	$effect(() => {
 		void blocks;
 		void bento;
+		void formFactor.phone;
 		untrack(refit);
 		const frame = requestAnimationFrame(refit);
 		const unregister = registerLayout({
 			needsRefill: () => {
+				if (formFactor.phone) return false;
 				fitHeight();
 				return Object.entries(measurePlans()).some(([kind, plan]) => plans[kind]?.itemCount !== plan.itemCount || plans[kind]?.columns !== plan.columns);
 			},
@@ -77,10 +96,10 @@
 	});
 </script>
 
-<div class="bento" id="bento" bind:this={bento} style:height="{height}px">
+<div class="bento" class:stacked={formFactor.phone} id="bento" bind:this={bento} style:height={formFactor.phone ? undefined : `${height}px`}>
 	{#each blocks as block (block.kind)}
 		{@const plan = plans[block.kind]}
-		<section class="bento-block" data-kind={block.kind} style:grid-column="span {block.span[0]}" style:grid-row="span {block.span[1]}">
+		<section class="bento-block" data-kind={block.kind} style:grid-column={formFactor.phone ? undefined : `span ${block.span[0]}`} style:grid-row={formFactor.phone ? undefined : `span ${block.span[1]}`}>
 			<div class="bb-head">
 				<h2 class="section-title">{block.title} <small>{block.playlists.length}</small></h2>
 				<a class="see-all" href={resolve('/playlists/[kind]', { kind: block.kind })} hidden={!!plan && block.playlists.length <= plan.itemCount}>See all</a>

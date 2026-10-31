@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formFactor } from './formFactor.svelte.ts';
 	import { library } from '../library/library.svelte.ts';
 	import { decadeCounts, genreCounts } from '../library/queries.ts';
 	import { POPOVER } from '../tuning.ts';
@@ -61,7 +62,7 @@
 
 <svelte:window onpointerdown={(event) => ui.filterPopover && !element?.contains(event.target as Node) && !(event.target as Element).closest('.fbtn') && (ui.filterPopover = null)} />
 
-<div id="filterPop" class="pop" class:open={!!ui.filterPopover} class:above={position.above} role="dialog" aria-label="Filter" bind:this={element} style:left="{position.left}px" style:top="{position.top}px">
+<div id="filterPop" class="pop" class:open={!!ui.filterPopover} class:above={position.above} role="dialog" aria-label="Filter" bind:this={element} style:left={formFactor.phone ? undefined : `${position.left}px`} style:top={formFactor.phone ? undefined : `${position.top}px`}>
 	{#if ui.filterPopover}
 		<p class="pop-title">{ui.filterPopover.kind === 'genre' ? 'Genre' : 'Decade'}</p>
 		<div class="fopts">

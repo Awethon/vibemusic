@@ -10,6 +10,7 @@
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 	import { openMenu } from '#lib/ui/menu.svelte.ts';
+	import { timelineAvailable } from '#lib/ui/sections.svelte.ts';
 
 	const albums = live(timelineAlbums, []);
 	const leads = live(paletteLeads, new Map<string, string>());
@@ -58,6 +59,7 @@
 	});
 
 	$effect(() => {
+		if (!timelineAvailable()) return;
 		setBodyClass('timeline-view', true);
 		return () => setBodyClass('timeline-view', false);
 	});
@@ -136,6 +138,7 @@
 	}
 </script>
 
+{#if timelineAvailable()}
 <section class="view tl-view" {@attach viewEnter}>
 	<h1 class="display tl-title">Timeline</h1>
 	<div class="tl">
@@ -206,3 +209,9 @@
 	</div>
 	{#if tip}<div class="tl-tip" style:left="{tip.x}px" style:top="{tip.y}px"><b>{tip.name}</b><span>{tip.detail}</span></div>{/if}
 </section>
+{:else}
+	<section class="view" {@attach viewEnter}>
+		<h1 class="display tl-title">Timeline</h1>
+		<p class="sub">The timeline needs a wider screen. Turn your phone sideways to see it.</p>
+	</section>
+{/if}

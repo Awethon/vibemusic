@@ -76,7 +76,11 @@ export const QUEUE_MOTION = Object.freeze({
 });
 
 export const LAYOUT = Object.freeze({
+	phoneMediaQuery: '(max-width: 640px)',
+	longPressMs: 450,
+	longPressMovePx: 10,
 	albumGrid: Object.freeze({ gapXPx: 22, gapYPx: 30, minTileWidthPx: 164, captionHeightPx: 50 }),
+	albumGridPhone: Object.freeze({ gapXPx: 12, gapYPx: 18, minTileWidthPx: 140, captionHeightPx: 46 }),
 	artistRowHeightPx: 96,
 	playlistTrackRowHeightPx: 50,
 	virtualOverscanRows: 2,
@@ -100,6 +104,8 @@ export const BENTO = Object.freeze({
 		3: [[2, 3], [2, 2], [2, 1]]
 	}),
 	genreTileGapPx: 12,
+	phoneListRows: 5,
+	phoneGenreTilePx: 132,
 	genreTileMaxSizePx: 150,
 	rowMinWidthPx: 200,
 	rowColumnGapPx: 12,

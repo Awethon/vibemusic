@@ -1,5 +1,6 @@
 import { player, playerQueue } from '../player/player.svelte.ts';
 import { IDLE } from '../tuning.ts';
+import { formFactor } from '../ui/formFactor.svelte.ts';
 import { anyMenuOpen } from '../ui/menu.svelte.ts';
 import { ui } from '../ui/state.svelte.ts';
 import { bodyHasClass, setBodyClass } from './dom.ts';
@@ -23,7 +24,7 @@ export function wakeFromIdle() {
 	}
 }
 
-const somethingKeepsUiAwake = () => ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
+const somethingKeepsUiAwake = () => formFactor.phone || ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
 
 function enterIdleOrRest() {
 	if (bodyHasClass('now-open')) {

@@ -6,17 +6,11 @@
 	import { radioStations } from '../library/queries.ts';
 	import { session } from '../session.svelte.ts';
 	import { live } from './live.svelte.ts';
+	import { sectionFor, visibleSections } from './sections.svelte.ts';
 	import Icon from './Icon.svelte';
 	import { ui } from './state.svelte.ts';
 
-	const section = $derived.by(() => {
-		const route = page.route.id ?? '/';
-		if (route.startsWith('/artist')) return 'artists';
-		if (route.startsWith('/playlist')) return 'playlists';
-		if (route.startsWith('/timeline')) return 'timeline';
-		if (route.startsWith('/radio')) return 'radio';
-		return 'home';
-	});
+	const section = $derived(sectionFor(page.route.id));
 	const stations = live(radioStations, []);
 	const foldLabel = $derived(ui.railExpanded ? 'Fold sidebar' : 'Expand sidebar');
 </script>
@@ -25,11 +19,9 @@
 	<a class="brand" href={resolve('/')} aria-label="vibemusic"><span class="b-full">vibe<span>music</span></span><span class="b-mini">v<span>m</span></span></a>
 	<button class="nav nav-search" type="button" title="Search (/)" onclick={() => (ui.searchOpen = true)}><span class="ni"><Icon name="search" /></span><span class="nl">Search</span></button>
 	<div class="nav-group">
-		<a class="nav" class:active={section === 'home'} href={resolve('/')} title="Your Music"><span class="ni"><Icon name="home" /></span><span class="nl">Your Music</span></a>
-		<a class="nav" class:active={section === 'artists'} href={resolve('/artists')} title="Artists"><span class="ni"><Icon name="mic" /></span><span class="nl">Artists</span></a>
-		<a class="nav" class:active={section === 'playlists'} href={resolve('/playlists')} title="Playlists"><span class="ni"><Icon name="lists" /></span><span class="nl">Playlists</span></a>
-		{#if ui.showTimeline}<a class="nav" class:active={section === 'timeline'} href={resolve('/timeline')} title="Timeline"><span class="ni"><Icon name="timeline" /></span><span class="nl">Timeline</span></a>{/if}
-		{#if ui.showRadio && (stations.value.length || session.credentials?.isAdmin)}<a class="nav" class:active={section === 'radio'} href={resolve('/radio')} title="Radio"><span class="ni"><Icon name="radio" /></span><span class="nl">Radio</span></a>{/if}
+		{#each visibleSections(!!(stations.value.length || session.credentials?.isAdmin)) as item (item.id)}
+			<a class="nav" class:active={section === item.id} href={item.href} title={item.label}><span class="ni"><Icon name={item.icon} /></span><span class="nl">{item.label}</span></a>
+		{/each}
 	</div>
 	<div class="rail-foot">
 		{#if library.status === 'syncing'}<span class="nav sync-note"><span class="nl">Syncing library…</span></span>{/if}
