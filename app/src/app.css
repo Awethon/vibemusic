@@ -1039,7 +1039,19 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .cl-lines p.on { opacity: 1; }
 
-#settings { width: 340px; padding: 10px; transform-origin: bottom left; }
+#settings { width: 340px; padding: 10px; overflow-y: auto; scrollbar-width: none; transform-origin: bottom left; }
+
+@media (max-height: 860px) and (min-width: 641px) {
+	#settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; column-gap: 14px; width: min(640px, calc(100vw - 32px)); }
+	#settings .set-group.wide { grid-column: 1 / -1; }
+	#settings .fs-thumb { height: 40px; }
+	#settings .fs-opt small { display: none; }
+}
+
+@media (max-height: 480px) and (min-width: 641px) {
+	#settings .fs-thumb { display: none; }
+	#settings .fs-opt b { margin-top: 0; }
+}
 
 #settings .pop-title { margin-top: 8px; }
 

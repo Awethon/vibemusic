@@ -3,9 +3,7 @@
 	import { registerLayout } from '../engine/layout.svelte.ts';
 	import { formFactor } from './formFactor.svelte.ts';
 
-	type PhoneShelf = { columns: number; rows: number; gapPx: number } | { scrollItemPx: number; rows: number; gapPx: number; limit: number };
-
-	let { id, items, minItemWidthPx, gapPx, rows, phone, item }: { id: string; items: T[]; minItemWidthPx: number; gapPx: number; rows: number; phone: PhoneShelf; item: Snippet<[T]> } = $props();
+	let { id, items, minItemWidthPx, gapPx, rows, phone, item }: { id: string; items: T[]; minItemWidthPx: number; gapPx: number; rows: number; phone: { columns: number; rows: number; gapPx: number }; item: Snippet<[T]> } = $props();
 
 	let container = $state<HTMLElement | null>(null);
 	let columns = $state(0);
@@ -23,13 +21,7 @@
 	});
 </script>
 
-{#if formFactor.phone && 'scrollItemPx' in phone}
-	<div class="shelf scroll" {id} style:--gap="{phone.gapPx}px" style:grid-template-rows="repeat({phone.rows}, auto)" style:grid-auto-columns="{phone.scrollItemPx}px">
-		{#each items.slice(0, phone.limit) as value, index (index)}
-			{@render item(value)}
-		{/each}
-	</div>
-{:else if formFactor.phone && 'columns' in phone}
+{#if formFactor.phone}
 	<div class="shelf" {id} style:--gap="{phone.gapPx}px" style:grid-template-columns="repeat({phone.columns}, minmax(0, 1fr))">
 		{#each items.slice(0, phone.columns * phone.rows) as value, index (index)}
 			{@render item(value)}

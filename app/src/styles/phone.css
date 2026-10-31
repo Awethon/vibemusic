@@ -209,6 +209,9 @@ body.phone .pop {
 	transform: translateY(16px);
 }
 
+body.phone:not(.now-open):not(.panel-open) #ctx,
+body.phone:not(.now-open):not(.panel-open) .pop { bottom: calc(var(--tabs-h) + 8px + var(--phone-safe-b)); max-height: calc(100dvh - var(--tabs-h) - var(--phone-safe-b) - var(--phone-safe-t) - 24px); }
+
 body.phone #ctx.open,
 body.phone .pop.open { transform: none; }
 
@@ -272,11 +275,11 @@ body.phone .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 1
 
 body.phone .artist-row .name { font-size: 24px; }
 
-body.phone .artist-strip { flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(-1 * var(--phone-gutter)) 4px; padding: 0 var(--phone-gutter); scrollbar-width: none; }
+body.phone .artist-strip { gap: 4px 2px; margin-left: -8px; }
 
-body.phone .artist-strip a { flex: none; font-size: 17px; padding: 4px 8px; }
+body.phone .artist-strip a { font-size: 17px; padding: 4px 8px; }
 
-body.phone .artist-strip a.more { padding-right: 0; }
+body.phone .artist-strip a.more { padding-left: 8px; }
 
 body.phone .artist-strip + .sec-head { margin-top: 22px; }
 
@@ -290,12 +293,18 @@ body.phone .jump .j-text b { font-size: 13px; }
 
 body.phone .jump .j-text small { font-size: 11.5px; }
 
-body.phone .shelf.scroll { grid-auto-flow: column; overflow-x: auto; margin: 0 calc(-1 * var(--phone-gutter)); padding: 0 var(--phone-gutter) 4px; scroll-padding-inline: var(--phone-gutter); scroll-snap-type: x proximity; scrollbar-width: none; }
+body.phone #plShelf .pl-tile .t { margin-top: 7px; font-size: 13px; }
 
-body.phone .shelf.scroll > * { scroll-snap-align: start; }
-
-body.phone .shelf.scroll .pl-tile .t { margin-top: 7px; font-size: 13px; }
-
-body.phone .shelf.scroll .pl-tile .s { font-size: 11.5px; }
+body.phone #plShelf .pl-tile .s { font-size: 11.5px; }
 
 body.phone .pal-item em { display: none; }
+
+body.phone #remoteBanner { top: var(--phone-safe-t); left: 12px; right: 12px; justify-content: space-between; transform: translateY(calc(-80px - var(--phone-safe-t))); }
+
+body.phone.remote #remoteBanner, body.phone.tap-to-play #remoteBanner { transform: none; }
+
+body.phone #remoteBanner .rb-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+body.phone #remoteBanner .rb-extra { display: none; }
+
+body.phone #remoteBanner button { flex: none; }

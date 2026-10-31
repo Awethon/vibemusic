@@ -96,7 +96,7 @@ export const LAYOUT = Object.freeze({
 
 export const SHELVES = Object.freeze({
 	jumpBackIn: Object.freeze({ minItemWidthPx: 236, gapPx: 12, rows: 2, phone: Object.freeze({ columns: 2, rows: 3, gapPx: 8 }) }),
-	homePlaylists: Object.freeze({ minItemWidthPx: 150, gapPx: 22, rows: 1, phone: Object.freeze({ scrollItemPx: 112, rows: 2, gapPx: 14, limit: 16 }) })
+	homePlaylists: Object.freeze({ minItemWidthPx: 150, gapPx: 22, rows: 1, phone: Object.freeze({ columns: 3, rows: 2, gapPx: 12 }) })
 });
 
 export const BENTO = Object.freeze({
@@ -119,6 +119,7 @@ export const BENTO = Object.freeze({
 
 export const HOME = Object.freeze({
 	artistStripCount: 14,
+	phoneArtistRows: 2,
 	playlistMixPattern: Object.freeze(['smart', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre'])
 });
 

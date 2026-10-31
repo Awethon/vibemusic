@@ -9,6 +9,8 @@
 	import { HOME, SHELVES } from '#lib/tuning.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import Filters from '#lib/ui/Filters.svelte';
+	import { fitRows } from '#lib/ui/fitRows.ts';
+	import { formFactor } from '#lib/ui/formFactor.svelte.ts';
 	import JumpCard from '#lib/ui/JumpCard.svelte';
 	import PlaylistTile from '#lib/ui/PlaylistTile.svelte';
 	import Shelf from '#lib/ui/Shelf.svelte';
@@ -83,7 +85,7 @@
 			{#if library.meta}<p class="sub">{plural(library.meta.albums, 'album')} · {plural(library.meta.artists, 'artist')} · {plural(library.meta.tracks, 'track')}</p>{/if}
 		</div>
 	</div>
-	<div class="artist-strip">
+	<div class="artist-strip" {@attach formFactor.phone && fitRows(HOME.phoneArtistRows)}>
 		{#each strip.value as artist (artist.id)}
 			<a href={resolve('/artist/[id]', { id: artist.id })} data-preview-album={artist.newestAlbumId}>{artist.name}<sup>{artist.albumCount}</sup></a>
 		{/each}
