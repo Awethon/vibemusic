@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { isRadio } from '../library/queries.ts';
 	import { currentLyricIndex, lyricsState } from '../player/lyricsState.svelte.ts';
 	import { currentTrack, player, playerQueue, playNextTrack, playPreviousTrack, seekTo, togglePlay } from '../player/player.svelte.ts';
@@ -12,7 +13,7 @@
 	import { setFullScreen, togglePanel } from './shell.ts';
 	import Slider from './Slider.svelte';
 	import { ui } from './state.svelte.ts';
-	import TrackLinks from './TrackLinks.svelte';
+	import { swipeToDismiss } from './swipeToDismiss.ts';
 
 	let scrubRatio = $state<number | null>(null);
 	const track = $derived(currentTrack());
@@ -30,22 +31,30 @@
 	});
 </script>
 
-<section id="nowPhone" aria-label="Now playing">
+<section id="nowPhone" aria-label="Now playing" {@attach swipeToDismiss(() => setFullScreen(false))}>
 	<header class="nf-head">
 		<button class="icon-btn" type="button" aria-label="Close now playing" onclick={() => setFullScreen(false)}><Icon name="down" /></button>
 		<span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>
-		<span class="nf-spacer"></span>
+		{#if showDevices}
+			<button class="icon-btn" class:on={remote} id={ui.fullScreen ? 'bDevice' : undefined} type="button" aria-label="Devices" onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button>
+		{:else}
+			<span></span>
+		{/if}
 	</header>
 	<div class="nf-stage">
 		<div class="nf-cover"><Cover albumId={track?.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.nowCanvas} eager /></div>
 	</div>
 	<div class="nf-info">
-		<div class="nf-meta">
-			<div class="nf-text">
-				<h1>{track?.title ?? ''}</h1>
-				<p>{#if track}<TrackLinks {track} />{/if}</p>
-			</div>
-			{#if !live}<LikeButton className="nf-like" />{/if}
+		<div class="nf-text">
+			<h1>{track?.title ?? ''}</h1>
+			{#if track?.albumId}
+				<a class="nf-artist" href={resolve('/artist/[id]', { id: track.albumArtistId || track.artistId })}>{track.artist}</a>
+				<a class="nf-album" href={resolve('/album/[id]', { id: track.albumId })}>{track.album}</a>
+			{:else if track}
+				<p class="nf-artist">{track.artist}</p>
+				<p class="nf-album">Internet radio</p>
+			{/if}
+			{#if remote}<p class="nf-remote"><Icon name={deviceIcon(deviceById(relay.active))} />Playing on {deviceLabel(relay.active)}</p>{/if}
 		</div>
 		<div class="nf-lyrics" aria-live="off">
 			{#if lyricLines}
@@ -71,17 +80,11 @@
 			{/if}
 		</div>
 		<div class="nf-ctrl">
+			{#if live}<span></span>{:else}<LikeButton className="nf-like" />{/if}
 			<button class="icon-btn" type="button" aria-label="Previous" onclick={playPreviousTrack}><Icon name="prev" /></button>
 			<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}><Icon name={player.playing ? 'pause' : 'play'} /></button>
 			<button class="icon-btn" type="button" aria-label="Next" onclick={playNextTrack}><Icon name="next" /></button>
-		</div>
-		<div class="nf-foot">
-			{#if showDevices}
-				<button class="nf-device" class:on={remote} id={ui.fullScreen ? 'bDevice' : undefined} type="button" onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /><span>{remote ? deviceLabel(relay.active) : 'This device'}</span></button>
-			{:else}
-				<span></span>
-			{/if}
-			<button class="icon-btn" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel(true, 'queue')}><Icon name="queue" /></button>
+			<button class="icon-btn nf-queue" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel(true, 'queue')}><Icon name="queue" /></button>
 		</div>
 	</div>
 </section>

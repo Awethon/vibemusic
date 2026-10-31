@@ -111,7 +111,7 @@
 		<div class="pal-input">
 			<span class="pal-ico"><Icon name="search" /></span>
 			<input bind:this={input} bind:value={text} type="text" placeholder="Artists, albums, tracks…" autocomplete="off" spellcheck="false" {onkeydown} />
-			<kbd>esc</kbd>
+			<button class="pal-close" type="button" onclick={close}>Cancel</button>
 		</div>
 		<div class="pal-results" bind:this={resultsBox}>
 			{#each groups as group (group.title)}

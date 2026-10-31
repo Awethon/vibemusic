@@ -15,6 +15,7 @@
 	import { formFactor } from './formFactor.svelte.ts';
 	import Icon from './Icon.svelte';
 	import { ui } from './state.svelte.ts';
+	import { swipeToDismiss } from './swipeToDismiss.ts';
 	import TrackLinks from './TrackLinks.svelte';
 
 	const track = $derived(currentTrack());
@@ -40,7 +41,7 @@
 	});
 </script>
 
-<aside id="panel" aria-label="Now playing and queue">
+<aside id="panel" aria-label="Now playing and queue" {@attach formFactor.phone && swipeToDismiss(() => togglePanel(false), '.pn-head, .pn-now')}>
 	<header class="pn-head"><span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>{#if formFactor.phone}<button class="icon-btn pn-close" type="button" aria-label="Close" onclick={() => togglePanel(false)}><Icon name="down" /></button>{/if}</header>
 	<div class="pn-now">
 		<button class="pn-art" type="button" aria-label="Open full screen" onclick={toggleFullScreen}><Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.panel} eager /></button>

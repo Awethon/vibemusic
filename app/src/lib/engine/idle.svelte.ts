@@ -24,7 +24,7 @@ export function wakeFromIdle() {
 	}
 }
 
-const somethingKeepsUiAwake = () => formFactor.phone || ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
+const somethingKeepsUiAwake = () => ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
 
 function enterIdleOrRest() {
 	if (bodyHasClass('now-open')) {
@@ -40,6 +40,10 @@ function enterIdleOrRest() {
 }
 
 function checkIdle() {
+	if (formFactor.phone) {
+		if (idle.isIdle || idle.isResting) wakeFromIdle();
+		return;
+	}
 	if (idle.isIdle || idle.isResting || !playerQueue().currentTrackId || !player.playing) return;
 	if (somethingKeepsUiAwake() || performance.now() - lastActivityAt <= idleDelayMs) return;
 	enterIdleOrRest();

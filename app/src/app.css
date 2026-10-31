@@ -48,16 +48,19 @@ a { color: inherit; text-decoration: none; }
 
 img { display: block; }
 
-kbd { font-family: var(--ui); font-size: 11px; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 6px; padding: 1px 6px; }
-
 :focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 
-#field {
+#fieldBox {
 	position: fixed;
+	inset: 0;
+	z-index: 0;
+}
+
+#field {
+	position: absolute;
 	inset: 0;
 	width: 100%;
 	height: 100%;
-	z-index: 0;
 }
 
 #scrim {
@@ -661,6 +664,10 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 .pal-input input { flex: 1; background: none; border: 0; outline: none; color: var(--ink); font: 500 17px var(--ui); }
 
 .pal-input input::placeholder { color: var(--ink-4); }
+
+.pal-close { flex: none; font-size: 14px; font-weight: 500; color: var(--ink-3); transition: color 0.15s; }
+
+.pal-close:hover { color: var(--ink); }
 
 .pal-results { max-height: 56vh; overflow-y: auto; padding: 6px; }
 

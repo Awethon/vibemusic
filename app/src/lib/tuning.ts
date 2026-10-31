@@ -79,6 +79,9 @@ export const LAYOUT = Object.freeze({
 	phoneMediaQuery: '(max-width: 640px)',
 	longPressMs: 450,
 	longPressMovePx: 10,
+	swipeSlopPx: 8,
+	swipeDismissPx: 110,
+	swipeDismissPxPerMs: 0.6,
 	albumGrid: Object.freeze({ gapXPx: 22, gapYPx: 30, minTileWidthPx: 164, captionHeightPx: 50 }),
 	albumGridPhone: Object.freeze({ gapXPx: 12, gapYPx: 18, minTileWidthPx: 140, captionHeightPx: 46 }),
 	artistRowHeightPx: 96,
@@ -92,8 +95,8 @@ export const LAYOUT = Object.freeze({
 });
 
 export const SHELVES = Object.freeze({
-	jumpBackIn: Object.freeze({ minItemWidthPx: 236, gapPx: 12, rows: 2 }),
-	homePlaylists: Object.freeze({ minItemWidthPx: 150, gapPx: 22, rows: 1 })
+	jumpBackIn: Object.freeze({ minItemWidthPx: 236, gapPx: 12, rows: 2, phone: Object.freeze({ columns: 2, rows: 3, gapPx: 8 }) }),
+	homePlaylists: Object.freeze({ minItemWidthPx: 150, gapPx: 22, rows: 1, phone: Object.freeze({ scrollItemPx: 112, rows: 2, gapPx: 14, limit: 16 }) })
 });
 
 export const BENTO = Object.freeze({
@@ -105,7 +108,8 @@ export const BENTO = Object.freeze({
 	}),
 	genreTileGapPx: 12,
 	phoneListRows: 5,
-	phoneGenreTilePx: 132,
+	phoneGenreColumns: 3,
+	phoneGenreRows: 2,
 	genreTileMaxSizePx: 150,
 	rowMinWidthPx: 200,
 	rowColumnGapPx: 12,

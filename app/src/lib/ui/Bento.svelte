@@ -57,7 +57,7 @@
 			blocks.map((block) => [
 				block.kind,
 				block.kind === 'genre'
-					? { columns: block.playlists.length, rows: 1, tileSize: BENTO.phoneGenreTilePx, itemCount: block.playlists.length }
+					? { columns: BENTO.phoneGenreColumns, rows: BENTO.phoneGenreRows, tileSize: 0, itemCount: BENTO.phoneGenreColumns * BENTO.phoneGenreRows }
 					: { columns: 1, rows: BENTO.phoneListRows, tileSize: 0, itemCount: BENTO.phoneListRows }
 			])
 		);
@@ -108,8 +108,8 @@
 				class="bb-body"
 				class:tiles={block.kind === 'genre'}
 				data-body={block.kind}
-				style:grid-template-columns={plan ? (block.kind === 'genre' ? `repeat(${plan.columns}, ${plan.tileSize}px)` : `repeat(${plan.columns}, minmax(0, 1fr))`) : undefined}
-				style:grid-auto-rows={plan ? `${block.kind === 'genre' ? plan.tileSize : BENTO.rowHeightPx}px` : undefined}
+				style:grid-template-columns={plan ? (plan.tileSize ? `repeat(${plan.columns}, ${plan.tileSize}px)` : `repeat(${plan.columns}, minmax(0, 1fr))`) : undefined}
+				style:grid-auto-rows={plan ? (block.kind !== 'genre' ? `${BENTO.rowHeightPx}px` : plan.tileSize ? `${plan.tileSize}px` : 'auto') : undefined}
 			>
 				{#if plan}
 					{#each block.playlists.slice(0, plan.itemCount) as playlist (playlist.id)}

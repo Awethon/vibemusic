@@ -1,3 +1,5 @@
+import { formFactor } from './formFactor.svelte.ts';
+
 const SCRIM = Object.freeze({
 	rgb: '6, 5, 9',
 	edgeAlpha: 0.5,
@@ -5,26 +7,36 @@ const SCRIM = Object.freeze({
 	nearPx: 360,
 	fadeEndRatio: 0.6,
 	bottomFromRatio: 0.55,
-	bottomAlpha: 0.4
+	bottomAlpha: 0.4,
+	phone: { topAlpha: 0.3, topEndRatio: 0.35, bottomFromRatio: 0.6, bottomAlpha: 0.45 }
 });
 
-const shade = (alpha: number) => `rgba(${SCRIM.rgb}, ${alpha})`;
-const percent = (ratio: number) => `${ratio * 100}%`;
+type Stop = [ratio: number, alpha: number];
+type Layer = { vertical: boolean; stops: Stop[] };
 
-export const scrimBackground = () =>
-	`linear-gradient(90deg, ${shade(SCRIM.edgeAlpha)} 0, ${shade(SCRIM.nearAlpha)} ${SCRIM.nearPx}px, ${shade(0)} ${percent(SCRIM.fadeEndRatio)}), ` +
-	`linear-gradient(180deg, ${shade(0)} ${percent(SCRIM.bottomFromRatio)}, ${shade(SCRIM.bottomAlpha)} 100%)`;
+const shade = (alpha: number) => `rgba(${SCRIM.rgb}, ${alpha})`;
+
+function layers(width: number): Layer[] {
+	if (formFactor.phone) {
+		const { topAlpha, topEndRatio, bottomFromRatio, bottomAlpha } = SCRIM.phone;
+		return [{ vertical: true, stops: [[0, topAlpha], [topEndRatio, 0], [bottomFromRatio, 0], [1, bottomAlpha]] }];
+	}
+	return [
+		{ vertical: false, stops: [[0, SCRIM.edgeAlpha], [Math.min(SCRIM.nearPx / width, SCRIM.fadeEndRatio), SCRIM.nearAlpha], [SCRIM.fadeEndRatio, 0]] },
+		{ vertical: true, stops: [[SCRIM.bottomFromRatio, 0], [1, SCRIM.bottomAlpha]] }
+	];
+}
+
+export const scrimBackground = (width: number) =>
+	layers(width)
+		.map(({ vertical, stops }) => `linear-gradient(${vertical ? 180 : 90}deg, ${stops.map(([ratio, alpha]) => `${shade(alpha)} ${ratio * 100}%`).join(', ')})`)
+		.join(', ');
 
 export function paintScrim(context: CanvasRenderingContext2D, width: number, height: number) {
-	const across = context.createLinearGradient(0, 0, width, 0);
-	across.addColorStop(0, shade(SCRIM.edgeAlpha));
-	across.addColorStop(Math.min(SCRIM.nearPx / width, SCRIM.fadeEndRatio), shade(SCRIM.nearAlpha));
-	across.addColorStop(SCRIM.fadeEndRatio, shade(0));
-	context.fillStyle = across;
-	context.fillRect(0, 0, width, height);
-	const down = context.createLinearGradient(0, 0, 0, height);
-	down.addColorStop(SCRIM.bottomFromRatio, shade(0));
-	down.addColorStop(1, shade(SCRIM.bottomAlpha));
-	context.fillStyle = down;
-	context.fillRect(0, 0, width, height);
+	for (const { vertical, stops } of layers(width)) {
+		const gradient = vertical ? context.createLinearGradient(0, 0, 0, height) : context.createLinearGradient(0, 0, width, 0);
+		for (const [ratio, alpha] of stops) gradient.addColorStop(ratio, shade(alpha));
+		context.fillStyle = gradient;
+		context.fillRect(0, 0, width, height);
+	}
 }

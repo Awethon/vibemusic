@@ -13,6 +13,7 @@
 	import { scrimBackground } from './scrim.ts';
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
+	let viewportWidth = $state(innerWidth);
 	let accent: Rgb = [217, 200, 255];
 	let accentTarget: Rgb = accent;
 	const albumId = $derived(currentTrack()?.albumId ?? '');
@@ -94,5 +95,6 @@
 	});
 </script>
 
-<canvas id="field" aria-hidden="true" bind:this={canvas}></canvas>
-<div id="scrim" aria-hidden="true" style:background={scrimBackground()}></div>
+<div id="fieldBox" aria-hidden="true"><canvas id="field" bind:this={canvas}></canvas></div>
+<svelte:window bind:innerWidth={viewportWidth} />
+<div id="scrim" aria-hidden="true" style:background={scrimBackground(viewportWidth)}></div>
