@@ -25,13 +25,23 @@
 	}
 	let position = $state({ left: 0, bottom: 0, maxHeight: 0 });
 
-	$effect(() => {
-		if (!ui.settingsOpen || !element) return;
+	function place() {
 		const anchor = document.getElementById('bSettings')?.getBoundingClientRect();
-		if (!anchor) return;
+		if (!anchor || !element) return;
 		const width = element.offsetWidth;
 		const bottom = innerHeight - anchor.top + POPOVER.anchorGapPx;
 		position = { left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - width - POPOVER.edgeMarginPx)), bottom, maxHeight: innerHeight - bottom - POPOVER.edgeMarginPx };
+	}
+
+	$effect(() => {
+		if (!ui.settingsOpen || !element || formFactor.phone) return;
+		place();
+		const frame = requestAnimationFrame(place);
+		addEventListener('resize', place);
+		return () => {
+			cancelAnimationFrame(frame);
+			removeEventListener('resize', place);
+		};
 	});
 
 	const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;

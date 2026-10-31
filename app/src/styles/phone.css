@@ -215,6 +215,8 @@ body.phone:not(.now-open):not(.panel-open) .pop { bottom: calc(var(--tabs-h) + 8
 body.phone #ctx.open,
 body.phone .pop.open { transform: none; }
 
+body.phone #settings { width: auto; }
+
 body.phone #ctx button { min-height: 44px; }
 
 body.phone #palette { padding-top: var(--phone-safe-t); }

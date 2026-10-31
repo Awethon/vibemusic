@@ -1,4 +1,5 @@
 import { BASE, DEFAULT_LOOK, LOOKS, type GlassParams } from './params.ts';
+import { formFactor } from '../ui/formFactor.svelte.ts';
 
 const STORAGE_KEY = 'vibemusic.glass';
 const DEFAULT_PRESET = DEFAULT_LOOK;
@@ -23,6 +24,8 @@ function save() {
 	clearTimeout(saveTimer);
 	saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify($state.snapshot(glass))), 200);
 }
+
+export const glassActive = () => glass.enabled && !formFactor.phone;
 
 export function setGlassEnabled(enabled: boolean) {
 	glass.enabled = enabled;
