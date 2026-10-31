@@ -2,7 +2,7 @@
 	import { formFactor } from './formFactor.svelte.ts';
 	import { player, playOn } from '../player/player.svelte.ts';
 	import { deviceIcon, deviceLabels } from '../remote/devices.ts';
-	import { relay, type Device } from '../remote/relay.svelte.ts';
+	import { onlineDevices, relay, type Device } from '../remote/relay.svelte.ts';
 	import { POPOVER } from '../tuning.ts';
 	import Icon from './Icon.svelte';
 	import { ui } from './state.svelte.ts';
@@ -10,7 +10,7 @@
 	let element = $state<HTMLElement | null>(null);
 	let position = $state({ right: 0, bottom: 0 });
 	const labels = $derived(deviceLabels());
-	const devices = $derived(relay.devices.toSorted((a, b) => Number(b.id === relay.deviceId) - Number(a.id === relay.deviceId)));
+	const devices = $derived(onlineDevices().toSorted((a, b) => Number(b.id === relay.deviceId) - Number(a.id === relay.deviceId)));
 
 	$effect(() => {
 		if (!ui.devicesOpen || !element) return;

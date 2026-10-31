@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { isRadio } from '../library/queries.ts';
 	import { currentTrack, player, togglePlay } from '../player/player.svelte.ts';
-	import { deviceById, isActiveElsewhere, relay } from '../remote/relay.svelte.ts';
+	import { deviceById, isActiveElsewhere, onlineDevices, relay } from '../remote/relay.svelte.ts';
 	import { deviceIcon, deviceLabel } from '../remote/devices.ts';
 	import { COVER_PX } from '../tuning.ts';
 	import Cover from './Cover.svelte';
@@ -13,7 +13,7 @@
 	const track = $derived(currentTrack());
 	const live = $derived(isRadio(track?.id));
 	const remote = $derived(isActiveElsewhere());
-	const showDevices = $derived(relay.connected && (relay.devices.length > 1 || remote));
+	const showDevices = $derived(relay.connected && (onlineDevices().length > 1 || remote));
 	const progress = $derived(player.duration ? Math.min(1, player.position / player.duration) : 0);
 </script>
 

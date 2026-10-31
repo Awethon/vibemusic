@@ -120,6 +120,8 @@ export function sendToRelay(message: object) {
 
 export const deviceById = (id: string | null) => relay.devices.find((device) => device.id === id) ?? null;
 
-export const isActiveElsewhere = () => relay.connected && !!relay.active && relay.active !== relay.deviceId;
-
 export const activeIsOnline = () => !!deviceById(relay.active)?.online;
+
+export const isActiveElsewhere = () => relay.connected && !!relay.active && relay.active !== relay.deviceId && activeIsOnline();
+
+export const onlineDevices = () => relay.devices.filter((device) => device.online || device.id === relay.deviceId);

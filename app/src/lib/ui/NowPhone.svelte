@@ -3,7 +3,7 @@
 	import { isRadio } from '../library/queries.ts';
 	import { currentLyricIndex, lyricsState } from '../player/lyricsState.svelte.ts';
 	import { currentTrack, player, playerQueue, playNextTrack, playPreviousTrack, seekTo, togglePlay } from '../player/player.svelte.ts';
-	import { deviceById, isActiveElsewhere, relay } from '../remote/relay.svelte.ts';
+	import { deviceById, isActiveElsewhere, onlineDevices, relay } from '../remote/relay.svelte.ts';
 	import { deviceIcon, deviceLabel } from '../remote/devices.ts';
 	import { COVER_PX } from '../tuning.ts';
 	import Cover from './Cover.svelte';
@@ -19,7 +19,7 @@
 	const track = $derived(currentTrack());
 	const live = $derived(isRadio(track?.id));
 	const remote = $derived(isActiveElsewhere());
-	const showDevices = $derived(relay.connected && (relay.devices.length > 1 || remote));
+	const showDevices = $derived(relay.connected && (onlineDevices().length > 1 || remote));
 	const duration = $derived(player.duration);
 	const position = $derived(scrubRatio !== null ? scrubRatio * duration : player.position);
 	const lyricLines = $derived.by(() => {

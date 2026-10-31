@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { isRadio } from '../library/queries.ts';
 	import { currentTrack, player, playNextTrack, playPreviousTrack, seekTo, setVolume, toggleMute, togglePlay } from '../player/player.svelte.ts';
-	import { deviceById, isActiveElsewhere, relay } from '../remote/relay.svelte.ts';
+	import { deviceById, isActiveElsewhere, onlineDevices, relay } from '../remote/relay.svelte.ts';
 	import { deviceIcon, deviceLabel } from '../remote/devices.ts';
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
@@ -21,7 +21,7 @@
 	const seekRatio = $derived(duration ? Math.min(1, position / duration) : 0);
 	const level = $derived(player.muted ? 0 : player.volume);
 	const remote = $derived(isActiveElsewhere());
-	const showDevices = $derived(relay.connected && (relay.devices.length > 1 || remote));
+	const showDevices = $derived(relay.connected && (onlineDevices().length > 1 || remote));
 </script>
 
 <div id="dock" role="presentation" ondragstart={(event) => event.preventDefault()}>

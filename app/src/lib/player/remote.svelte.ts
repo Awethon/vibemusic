@@ -169,7 +169,13 @@ async function takeOver(snapshot: queue.QueueState | null, playback: Playback | 
 	const playing = playback?.playing ?? false;
 	const position = (playback?.position ?? 0) + (playing ? ageMs / 1000 : 0);
 	await startCurrent(playing, playback?.trackId === snapshot.currentTrackId ? position : 0);
-	if (!player.waitingForTap) showToast('Playing in this tab');
+	if (playing && !player.waitingForTap) showToast('Playing in this tab');
+}
+
+const activeIsOffline = () => relay.connected && !!relay.active && relay.active !== relay.deviceId && !activeIsOnline();
+
+function adopt(snapshot: queue.QueueState | null, playback: Playback | null) {
+	return takeOver(snapshot, playback && { ...playback, playing: false }, 0);
 }
 
 function release(to: string, handoff: boolean) {
@@ -190,14 +196,14 @@ function onRelayMessage(message: RelayMessage) {
 				enterMirror();
 				void mirrorQueue(message.queue as queue.QueueState | null);
 				mirrorPlayback(message.playback as Playback | null, message.ageMs);
-			} else if (!relay.active && player.playing) sendToRelay({ type: 'claim' });
+			} else if (activeIsOffline()) void adopt(message.queue as queue.QueueState | null, message.playback as Playback | null);
+			else if (!relay.active && player.playing) sendToRelay({ type: 'claim' });
 			announceIfActive();
 			return;
 		case 'devices':
-			if (isActiveElsewhere()) {
-				enterMirror();
-				if (!activeIsOnline()) player.playing = false;
-			} else if (relay.active === relay.deviceId && mirroring) leaveMirror();
+			if (isActiveElsewhere()) enterMirror();
+			else if (mirroring && activeIsOffline()) void adopt(queue.copyQueue(queueState), playbackSnapshot());
+			else if (mirroring) leaveMirror();
 			announceIfActive();
 			return;
 		case 'queue':
