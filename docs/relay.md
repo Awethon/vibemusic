@@ -11,25 +11,27 @@ network.
 - **Remote control between devices.** Every open vibemusic of the same account sees the others:
   play on one and control it from another.
 - **Genres and popularity.** It looks up your artists and albums on MusicBrainz, Deezer and
-  Apple, for genre tags, artist countries and which songs are popular. Genre playlists, "This is"
+  Apple, for genre tags, artist countries and which tracks are popular. Genre playlists, "This is"
   playlists and the home page use this.
 - **"This is" playlists.** With its own Navidrome account it keeps one playlist per artist with
-  their most popular songs that you own, with a generated cover, refreshed weekly. They're
+  their most popular tracks that you own, with a generated cover, refreshed weekly. They're
   ordinary Navidrome playlists, so other apps see them too.
 - **Internet radio.** Stations configured in Navidrome play through the relay, so the background
   can move with them.
-- **Share link previews.** Chat apps get a title and a cover for shared albums and playlists.
+- **Shared links.** The public page a shared link opens gets its track list from the relay, and
+  chat apps get a title and a cover for their previews. Without the relay, links can still be
+  created but not opened. See [Shared links](features/shared-links.md).
 
 ## What it sends outside
 
-To look up genres and popularity, the relay sends **artist names, album titles and a few song
+To look up genres and popularity, the relay sends **artist names, album titles and a few track
 titles** from your library to:
 
 | Service | For |
 |---|---|
 | MusicBrainz | genre tags and countries of artists and albums |
-| Deezer | genres, popularity and top songs |
-| Apple (iTunes Search) | top songs, from the country catalogs you choose |
+| Deezer | genres, popularity and top tracks |
+| Apple (iTunes Search) | top tracks, from the country catalogs you choose |
 
 Nothing else leaves: no accounts, no listening history, no files. Answers are cached, so each
 artist is looked up again only every couple of weeks.

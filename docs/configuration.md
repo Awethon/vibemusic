@@ -23,8 +23,8 @@ change, apply it with `docker compose up -d`. Lists are comma-separated.
 | `VIBEMUSIC_GENRE_HIDDEN` | none | Genres that never get a playlist |
 | `VIBEMUSIC_GENRE_PINNED` | none | Genres that always get one, however small |
 | `VIBEMUSIC_GENRE_MAX_PLAYLISTS` | `24` | Most genre playlists |
-| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Most songs per playlist |
-| `VIBEMUSIC_GENRE_MIN_SONGS` | `30`, sub-genres `50` | Songs a genre needs |
+| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Most tracks per playlist |
+| `VIBEMUSIC_GENRE_MIN_SONGS` | `30`, sub-genres `50` | Tracks a genre needs |
 | `VIBEMUSIC_GENRE_MIN_ARTISTS` | `2`, sub-genres `3` | Artists a genre needs |
 
 Changes apply on each person's next visit, when their genre playlists are rebuilt.
@@ -58,8 +58,8 @@ make it everyone's default.
 | `VIBEMUSIC_RELAY_NAVIDROME_USER` | none | Navidrome account for "This is" playlists; unset turns them off |
 | `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` | none | Its password |
 | `THIS_IS_SKIP` | none | Artists that never get a "This is" playlist |
-| `THIS_IS_MIN_TRACKS` | `13` | Songs an artist needs for one |
-| `THIS_IS_MAX_TRACKS` | `50` | Songs per playlist |
+| `THIS_IS_MIN_TRACKS` | `13` | Tracks an artist needs for one |
+| `THIS_IS_MAX_TRACKS` | `50` | Tracks per playlist |
 | `THIS_IS_EVERY_HOURS` | `168` | Hours between refreshes |
 | `RADIO_LOCAL_PROXY` | none | Proxy for radio stations on `.local` addresses, which containers can't resolve |
 | `RELAY_LOG` | `info` | Log level: `error`, `warn`, `info`, `debug` |

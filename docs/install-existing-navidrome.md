@@ -8,12 +8,13 @@ For when Navidrome already runs, on the same machine or another one. vibemusic a
 ## What Navidrome is
 
 Navidrome is the music server vibemusic plays from: it scans your music files, keeps accounts,
-play counts and playlists, and streams the songs. vibemusic is a different face for it, and
+play counts and playlists, and streams the tracks. vibemusic is a different face for it, and
 other Navidrome or Subsonic apps keep working alongside.
 
 ## What you need
 
-- Navidrome, reachable from the machine that runs vibemusic. vibemusic is tested with Navidrome 0.64.
+- Navidrome, reachable from the machine that runs vibemusic. vibemusic is tested with Navidrome
+  0.64.
 - Docker with Docker Compose 2.24 or newer, `git` and `curl`.
 
 ## Install
