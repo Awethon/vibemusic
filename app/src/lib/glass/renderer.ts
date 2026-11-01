@@ -1,7 +1,7 @@
 // WebGL2 side of the glass: uploads each shape's painted backdrop as a texture ("slot"), keeps a
 // blurred copy for frost, and draws the glass shader with a scissor per draw area.
 import { lightVector, RENDER, type GlassParams } from './params.ts';
-import { BLUR, GLASS, GLASS_BAKED, MAX_SHAPES, SURFACE, VERT } from './shaders.ts';
+import { BLUR, COMPOSITE, GLASS, GLASS_BAKED, MAX_SHAPES, SURFACE, VERT } from './shaders.ts';
 
 export type GlassShape = { x: number; y: number; width: number; height: number; radius: number; alpha: number };
 export type Region = { x: number; y: number; width: number; height: number };
@@ -50,7 +50,12 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 
 	// Baking the glass surface needs a float render target; without one the glass pass computes it live.
 	const baked = !!context.getExtension('EXT_color_buffer_float');
-	const programs = { blur: compile(BLUR), glass: compile(baked ? GLASS_BAKED : GLASS), ...(baked ? { surface: compile(SURFACE) } : {}) };
+	const programs = {
+		blur: compile(BLUR),
+		composite: compile(COMPOSITE),
+		glass: compile(baked ? GLASS_BAKED : GLASS),
+		...(baked ? { surface: compile(SURFACE) } : {})
+	};
 	context.bindVertexArray(context.createVertexArray());
 
 	function texture(mips: boolean): WebGLTexture {
@@ -81,16 +86,30 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 
 	type Slot = {
 		scene: WebGLTexture;
+		// Lets the composite pass render into the scene texture.
+		sceneFbo: WebGLFramebuffer | null;
 		size: [number, number];
 		version: number;
 		blur: { scale: number; h: Target; v: Target } | null;
 		blurKey: string;
 		// What the slot's areas of the surface texture were last baked from.
 		surfaceKey: string;
+		fixed: WebGLTexture | null;
+		scroll: WebGLTexture | null;
 	};
 	const slots: Slot[] = [];
 	const slotAt = (index: number) =>
-		(slots[index] ??= { scene: texture(true), size: [1, 1], version: 0, blur: null, blurKey: '', surfaceKey: '' });
+		(slots[index] ??= {
+			scene: texture(true),
+			sceneFbo: null,
+			size: [1, 1],
+			version: 0,
+			blur: null,
+			blurKey: '',
+			surfaceKey: '',
+			fixed: null,
+			scroll: null
+		});
 	let width = 0;
 	let height = 0;
 	let surface: Target | null = null;
@@ -121,6 +140,9 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		release(slot.blur?.h ?? null);
 		release(slot.blur?.v ?? null);
 		context.deleteTexture(slot.scene);
+		context.deleteFramebuffer(slot.sceneFbo);
+		context.deleteTexture(slot.fixed);
+		context.deleteTexture(slot.scroll);
 	}
 
 	function keepSlots(count: number) {
@@ -134,6 +156,60 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, source);
 		context.generateMipmap(context.TEXTURE_2D);
 		slot.size = [source.width, source.height];
+		slot.version += 1;
+	}
+
+	function upload(into: WebGLTexture, source: HTMLCanvasElement) {
+		context.bindTexture(context.TEXTURE_2D, into);
+		context.pixelStorei(context.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+		context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, source);
+	}
+
+	// Uploads a freshly painted fixed and/or scroll layer for a slot; composite() combines them.
+	function setLayers(index: number, fixed: HTMLCanvasElement | null, scroll: HTMLCanvasElement | null) {
+		const slot = slotAt(index);
+		if (fixed) {
+			slot.fixed ??= texture(false);
+			upload(slot.fixed, fixed);
+			if (slot.size[0] !== fixed.width || slot.size[1] !== fixed.height || !slot.sceneFbo) {
+				context.bindTexture(context.TEXTURE_2D, slot.scene);
+				context.texImage2D(context.TEXTURE_2D, 0, context.RGBA8, fixed.width, fixed.height, 0, context.RGBA, context.UNSIGNED_BYTE, null);
+				slot.sceneFbo ??= context.createFramebuffer();
+				context.bindFramebuffer(context.FRAMEBUFFER, slot.sceneFbo);
+				context.framebufferTexture2D(context.FRAMEBUFFER, context.COLOR_ATTACHMENT0, context.TEXTURE_2D, slot.scene, 0);
+				slot.size = [fixed.width, fixed.height];
+			}
+		}
+		if (scroll) {
+			slot.scroll ??= texture(false);
+			upload(slot.scroll, scroll);
+		}
+	}
+
+	// Renders the slot's scene from its layers, with the scroll layer moved up by `delta` CSS px
+	// (how far the scroller has scrolled since that layer was painted).
+	function composite(index: number, fixedRect: Region, scrollRect: Region, clip: Region, delta: number) {
+		const slot = slotAt(index);
+		if (!slot.fixed || !slot.scroll || !slot.sceneFbo) return;
+		const { program, u } = programs.composite;
+		context.bindFramebuffer(context.FRAMEBUFFER, slot.sceneFbo);
+		context.viewport(0, 0, slot.size[0], slot.size[1]);
+		context.useProgram(program);
+		context.activeTexture(context.TEXTURE0);
+		context.bindTexture(context.TEXTURE_2D, slot.fixed);
+		context.uniform1i(u.uFixed, 0);
+		context.activeTexture(context.TEXTURE1);
+		context.bindTexture(context.TEXTURE_2D, slot.scroll);
+		context.uniform1i(u.uScroll, 1);
+		context.uniform2f(u.uDst, slot.size[0], slot.size[1]);
+		context.uniform4f(u.uFixedRect, fixedRect.x, fixedRect.y, fixedRect.width, fixedRect.height);
+		context.uniform4f(u.uScrollRect, scrollRect.x, scrollRect.y, scrollRect.width, scrollRect.height);
+		context.uniform4f(u.uClip, clip.x, clip.y, clip.x + clip.width, clip.y + clip.height);
+		context.uniform1f(u.uDelta, delta);
+		context.drawArrays(context.TRIANGLES, 0, 3);
+		context.activeTexture(context.TEXTURE0);
+		context.bindTexture(context.TEXTURE_2D, slot.scene);
+		context.generateMipmap(context.TEXTURE_2D);
 		slot.version += 1;
 	}
 
@@ -301,7 +377,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		if (loseContext) context.getExtension('WEBGL_lose_context')?.loseContext();
 	}
 
-	return { resize, setScene, render, clear, keepSlots, dispose };
+	return { resize, setScene, setLayers, composite, render, clear, keepSlots, dispose };
 }
 
 export type GlassRenderer = NonNullable<ReturnType<typeof createGlassRenderer>>;

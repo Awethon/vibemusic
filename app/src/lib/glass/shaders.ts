@@ -310,3 +310,30 @@ export const SURFACE = `${GLASS.slice(0, GLASS.indexOf('void main() {'))}void ma
   }
   o = vec4(surfaceLive(p, max(-d, 0.0)), 1.0);
 }`;
+
+// Builds the backdrop the glass reads from two painted layers: the fixed layer, and the main
+// view's content shifted by how far it has scrolled since it was painted (uDelta, in CSS px).
+// Rows run top-down in all three textures. Scroll content shows only inside the scroller's box.
+export const COMPOSITE = `#version 300 es
+precision highp float;
+uniform sampler2D uFixed;
+uniform sampler2D uScroll;
+uniform vec2 uDst;
+uniform vec4 uFixedRect;
+uniform vec4 uScrollRect;
+uniform vec4 uClip;
+uniform float uDelta;
+out vec4 o;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uDst;
+  vec2 screen = uFixedRect.xy + uv * uFixedRect.zw;
+  vec3 color = textureLod(uFixed, uv, 0.0).rgb;
+  vec2 suv = (screen + vec2(0.0, uDelta) - uScrollRect.xy) / uScrollRect.zw;
+  bool inside = all(greaterThanEqual(screen, uClip.xy)) && all(lessThan(screen, uClip.zw)) &&
+    all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)));
+  if (inside) {
+    vec4 s = textureLod(uScroll, suv, 0.0);
+    color = mix(color, s.rgb, s.a);
+  }
+  o = vec4(color, 1.0);
+}`;

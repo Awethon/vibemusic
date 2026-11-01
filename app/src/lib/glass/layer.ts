@@ -1,7 +1,7 @@
 // One glass canvas per level (rail, player, popups), stacked in z-order. Each frame it finds the
 // glass surfaces, and only when something behind them changed repaints the backdrop and redraws.
 // Started from GlassLayer.svelte inside untrack, since it reads layout and runs its own loop.
-import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
+import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop, SCROLLER } from './backdrop.ts';
 import { glassMargin, RENDER, scenePad, type GlassParams } from './params.ts';
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
@@ -75,6 +75,16 @@ function drawAreas(shapes: GlassShape[], params: GlassParams): Region[][] {
 	);
 }
 
+// While the main view scrolls, each glass reuses its painted layers and only shifts the scroll
+// layer (renderer.composite). The scroll layer is painted this far (CSS px) beyond the glass region
+// above and below, so content scrolling in is already there; past that it is repainted.
+const SCROLL_OVERSCAN_PX = 320;
+// Once the main view has been still this long, both layers are repainted from the page, which
+// picks up anything that changed meanwhile (lazy covers, rows a virtual grid added).
+const SCROLL_SETTLE_MS = 150;
+
+type PaintedScroll = { top: number; rect: Region };
+
 const inside = (node: Node, selector: string) => (node instanceof Element ? node : node.parentElement)?.closest(selector) != null;
 
 export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, params: () => GlassParams): (() => void) | null {
@@ -92,9 +102,21 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	let lastParams = '';
 	let fieldVersion = -1;
 	let frame = 0;
+	const scrollPaint = newBackdrop();
+	const painted: (PaintedScroll | null)[] = [];
+	let lastScrollTop = -1;
+	let lastScrollAt = -Infinity;
+	let scrollSettling = false;
 
 	const markDirty = () => {
 		pageDirty = true;
+	};
+	const scrolling = () => performance.now() - lastScrollAt < SCROLL_SETTLE_MS;
+	const onScroll = (event: Event) => {
+		if (event.target instanceof Element && event.target.matches(SCROLLER)) {
+			lastScrollAt = performance.now();
+			scrollSettling = true;
+		} else pageDirty = true;
 	};
 	const rebuild = () => {
 		if (canvas.getContext('webgl2')?.isContextLost()) return;
@@ -127,8 +149,11 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	canvas.addEventListener('webglcontextrestored', onRestored);
 	// Repainting the backdrop walks the whole DOM, so it only happens when the page actually
 	// changed. Mutations inside elements above this layer can't affect what's behind the glass.
+	// Changes inside the main view while it scrolls (virtual grid rows) wait for the repaint at settle.
 	const observer = new MutationObserver((records) => {
-		if (records.some((record) => !inside(record.target, above))) pageDirty = true;
+		const relevant = records.filter((record) => !inside(record.target, above));
+		if (scrolling() && relevant.every((record) => inside(record.target, SCROLLER))) return;
+		if (relevant.length) pageDirty = true;
 	});
 	observer.observe(document.body, {
 		subtree: true,
@@ -137,7 +162,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		characterData: true,
 		attributeFilter: ['class', 'style', 'src', 'hidden']
 	});
-	addEventListener('scroll', markDirty, true);
+	addEventListener('scroll', onScroll, true);
 	addEventListener('load', markDirty, true);
 	addEventListener('resize', markDirty);
 	if (level === 'popups') addEventListener(PLAYER_RENDERED, markDirty);
@@ -159,21 +184,25 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		frame = requestAnimationFrame(tick);
 		// A draw that threw marks the renderer broken; try a fresh one next frame instead of stopping.
 		if (broken) rebuild();
-		if (lost || !renderer || !backdrop) return;
+		if (lost || !renderer || !backdrop || !scrollPaint) return;
 		try {
-			draw(renderer, backdrop);
+			draw(renderer, backdrop, scrollPaint);
 		} catch {
 			broken = true;
 		}
 	};
 
-	const draw = (gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
+	const draw = (gl: GlassRenderer, paint: CanvasRenderingContext2D, scrollCanvas: CanvasRenderingContext2D) => {
 		const ratio = Math.min(devicePixelRatio || 1, RENDER.maxPixelRatio);
 		if (ratio !== dpr || canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
 			dpr = ratio;
 			gl.resize(innerWidth, innerHeight, dpr);
 			pageDirty = true;
 			lastShapes = '';
+		}
+		if (scrollSettling && !scrolling()) {
+			scrollSettling = false;
+			pageDirty = true;
 		}
 		const shapes = surfaces(selector).toSorted((a, b) => a.width * a.height - b.width * b.height);
 		const current = params();
@@ -191,20 +220,47 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		const regions = shapes.map((shape) => around(shape, pad));
 		const areas = drawAreas(shapes, current);
 		const regionKeys = regions.map((region) => `${region.x},${region.y},${region.width},${region.height}`);
-		const sceneStale = pageDirty || fieldVersion !== fieldSnapshot.version || pageAnimating();
+		const scroller = document.querySelector(SCROLLER);
+		const scrollTop = scroller?.scrollTop ?? 0;
+		const pageStale = pageDirty || pageAnimating();
+		const fieldStale = fieldVersion !== fieldSnapshot.version;
 		const shapesKey = JSON.stringify(shapes);
-		if (!sceneStale && regionKeys.join('|') === lastRegions.join('|') && shapesKey === lastShapes && paramsKey === lastParams) return;
+		if (
+			!pageStale &&
+			!fieldStale &&
+			scrollTop === lastScrollTop &&
+			regionKeys.join('|') === lastRegions.join('|') &&
+			shapesKey === lastShapes &&
+			paramsKey === lastParams
+		)
+			return;
+		const backdropRatio = Math.min(dpr, RENDER.backdropPixelRatio);
+		const clipBox = scroller?.getBoundingClientRect();
+		const clip: Region = clipBox ? { x: clipBox.left, y: clipBox.top, width: clipBox.width, height: clipBox.height } : regions[0];
+		painted.length = shapes.length;
 		gl.keepSlots(shapes.length);
 		gl.clear();
 		shapes.forEach((shape, index) => {
-			if (sceneStale || regionKeys[index] !== lastRegions[index]) {
-				paintBackdrop(paint, regions[index], Math.min(dpr, RENDER.backdropPixelRatio), above);
-				gl.setScene(paint.canvas, index);
+			const region = regions[index];
+			const last = painted[index];
+			const repaintScroll =
+				pageStale || regionKeys[index] !== lastRegions[index] || !last || Math.abs(scrollTop - last.top) > SCROLL_OVERSCAN_PX;
+			const repaintFixed = repaintScroll || fieldStale;
+			let layer = last;
+			if (repaintScroll) {
+				const rect = { x: region.x, y: region.y - SCROLL_OVERSCAN_PX, width: region.width, height: region.height + 2 * SCROLL_OVERSCAN_PX };
+				paintBackdrop(scrollCanvas, rect, backdropRatio, above, 'scroll');
+				layer = painted[index] = { top: scrollTop, rect };
 			}
-			gl.render(current, shapes, areas[index], regions[index], dpr, index);
+			if (repaintFixed) paintBackdrop(paint, region, backdropRatio, above, 'fixed');
+			if (repaintFixed || repaintScroll)
+				gl.setLayers(index, repaintFixed ? paint.canvas : null, repaintScroll ? scrollCanvas.canvas : null);
+			if (layer) gl.composite(index, region, layer.rect, clip, scrollTop - layer.top);
+			gl.render(current, shapes, areas[index], region, dpr, index);
 		});
 		pageDirty = false;
 		lastRegions = regionKeys;
+		lastScrollTop = scrollTop;
 		fieldVersion = fieldSnapshot.version;
 		if (level === 'player') dispatchEvent(new Event(PLAYER_RENDERED));
 		lastShapes = shapesKey;
@@ -215,7 +271,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	return () => {
 		cancelAnimationFrame(frame);
 		observer.disconnect();
-		removeEventListener('scroll', markDirty, true);
+		removeEventListener('scroll', onScroll, true);
 		removeEventListener('load', markDirty, true);
 		removeEventListener('resize', markDirty);
 		removeEventListener(PLAYER_RENDERED, markDirty);

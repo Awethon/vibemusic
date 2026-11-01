@@ -125,7 +125,21 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	}
 }
 
-export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, above: string) {
+// The main view scrolls on the compositor without waiting for JavaScript. The glass paints what
+// is inside it as a separate "scroll" layer, which the renderer shifts by the scroll distance
+// instead of repainting it every frame; everything else is the "fixed" layer.
+export const SCROLLER = '#main';
+
+export type BackdropLayer = 'all' | 'fixed' | 'scroll';
+
+function ancestorOpacity(element: Element): number {
+	let opacity = 1;
+	for (let node = element.parentElement; node && node !== document.body; node = node.parentElement)
+		opacity *= Number(getComputedStyle(node).opacity);
+	return opacity;
+}
+
+export function paintBackdrop(context: CanvasRenderingContext2D, region: Region, dpr: number, above: string, layer: BackdropLayer = 'all') {
 	const canvas = context.canvas;
 	const width = Math.max(1, Math.round(region.width * dpr));
 	const height = Math.max(1, Math.round(region.height * dpr));
@@ -136,23 +150,28 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 	const box: Box = { left: region.x, top: region.y, right: region.x + region.width, bottom: region.y + region.height };
 	context.setTransform(dpr, 0, 0, dpr, -region.x * dpr, -region.y * dpr);
 	context.globalAlpha = 1;
-	context.fillStyle = PAGE_COLOR;
-	context.fillRect(region.x, region.y, region.width, region.height);
-	if (fieldSnapshot.canvas) {
-		context.imageSmoothingQuality = 'high';
-		context.drawImage(fieldSnapshot.canvas, 0, 0, innerWidth, innerHeight);
+	if (layer === 'scroll') context.clearRect(region.x, region.y, region.width, region.height);
+	else {
+		context.fillStyle = PAGE_COLOR;
+		context.fillRect(region.x, region.y, region.width, region.height);
+		if (fieldSnapshot.canvas) {
+			context.imageSmoothingQuality = 'high';
+			context.drawImage(fieldSnapshot.canvas, 0, 0, innerWidth, innerHeight);
+		}
 	}
 
 	// SVG icons are not painted. #field (the animated background) is already drawn above from
 	// its snapshot, since reading the live GPU canvas every frame is too slow.
 	const visit = (element: Element, opacity: number) => {
 		if (element instanceof SVGElement || element.matches(above) || element.id === 'field') return;
+		if (layer === 'fixed' && element.matches(SCROLLER)) return;
 		const style = getComputedStyle(element);
 		if (style.display === 'none' || style.visibility === 'hidden') return;
 		const alpha = opacity * Number(style.opacity);
 		if (alpha < 0.02) return;
 		const rect = element.getBoundingClientRect();
-		const clips = style.overflowX !== 'visible' || style.overflowY !== 'visible';
+		// The scroll layer is painted beyond the scroller's visible box, so content is ready to slide in.
+		const clips = (style.overflowX !== 'visible' || style.overflowY !== 'visible') && !(layer === 'scroll' && element.matches(SCROLLER));
 		if (clips && !intersects(rect, box)) return;
 		context.save();
 		context.globalAlpha = alpha;
@@ -202,5 +221,10 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 		context.restore();
 	};
 
-	for (const child of document.body.children) visit(child, 1);
+	if (layer !== 'scroll') {
+		for (const child of document.body.children) visit(child, 1);
+		return;
+	}
+	const scroller = document.querySelector(SCROLLER);
+	if (scroller && !scroller.closest(above)) visit(scroller, ancestorOpacity(scroller));
 }
