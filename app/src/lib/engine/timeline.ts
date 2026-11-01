@@ -78,6 +78,18 @@ export function laneSpan(lane: Lane, layout: TimelineLayout, cover: number): { f
 	return xs.length ? { from: Math.min(...xs), to: Math.max(...xs) + cover } : null;
 }
 
+// Lanes whose last album lies entirely before `viewLeft`, the left edge of the visible time axis.
+// They fold away while scrolling forward in time and come back in their place when scrolling back,
+// so the lane order never changes.
+export function endedLanes(lanes: Lane[], layout: TimelineLayout, cover: number, viewLeft: number): Set<number> {
+	const ended = new Set<number>();
+	lanes.forEach((lane, index) => {
+		const span = laneSpan(lane, layout, cover);
+		if (span && span.to <= viewLeft) ended.add(index);
+	});
+	return ended;
+}
+
 export function laneYears(lane: Lane): string {
 	const years = lane.albums.map((album) => album.year).filter(Boolean);
 	if (!years.length) return '';

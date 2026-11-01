@@ -120,7 +120,19 @@ body.timeline-view #main {
 .tl-lane {
 	position: relative;
 	height: var(--lh);
-	transition: opacity 0.2s;
+	transition:
+		height 0.24s var(--ease),
+		opacity 0.2s;
+}
+
+/* An artist whose last album is behind the view folds away (see endedLanes). overflow: clip, not
+   hidden, so the sticky label inside keeps sticking to the scroller while the lane folds. */
+.tl-lane.gone {
+	height: 0;
+	opacity: 0;
+	overflow: clip;
+	pointer-events: none;
+	border-top-color: transparent;
 }
 
 .tl-lane + .tl-lane {

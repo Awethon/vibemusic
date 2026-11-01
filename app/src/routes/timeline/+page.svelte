@@ -2,7 +2,7 @@
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { setBodyClass } from '#lib/engine/dom.ts';
 	import { resolve } from '$app/paths';
-	import { laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes } from '#lib/engine/timeline.ts';
+	import { endedLanes, laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes } from '#lib/engine/timeline.ts';
 	import { albumById, paletteLeads, timelineAlbums } from '#lib/library/queries.ts';
 	import { COVER_PX, TIMELINE } from '#lib/tuning.ts';
 	import { albumMenu, openAlbum } from '#lib/ui/actions.ts';
@@ -34,7 +34,9 @@
 	);
 	const marks = $derived(markedBuckets(layout.buckets, TIMELINE.markRoomPx));
 	const byId = $derived(new Map(albums.value.map((album) => [album.id, album])));
-	const height = $derived(TIMELINE.headerHeightPx + lanes.length * TIMELINE.laneHeightPx);
+	// The time axis starts right of the sticky lane labels.
+	const ended = $derived(endedLanes(lanes, layout, TIMELINE.coverPx, scrollLeft + TIMELINE.labelWidthPx));
+	const height = $derived(TIMELINE.headerHeightPx + (lanes.length - ended.size) * TIMELINE.laneHeightPx);
 	const era = $derived.by(() => {
 		const focus = scrollLeft + TIMELINE.labelWidthPx + (viewWidth - TIMELINE.labelWidthPx) * 0.3;
 		return layout.buckets.find((bucket) => bucket.x + bucket.width > focus)?.era ?? '';
@@ -206,7 +208,12 @@
 					</div>
 					{#each lanes as lane, index (lane.artistId ?? 'elsewhere')}
 						{@const span = laneSpan(lane, layout, TIMELINE.coverPx)}
-						<div class="tl-lane" class:dim={hoveredLane >= 0 && hoveredLane !== index} class:hi={hoveredLane === index}>
+						<div
+							class="tl-lane"
+							class:gone={ended.has(index)}
+							class:dim={hoveredLane >= 0 && hoveredLane !== index}
+							class:hi={hoveredLane === index}
+						>
 							{#if span}<i class="tl-line" style:left="{span.from}px" style:width="{span.to - span.from}px"></i>{/if}
 							{#if lane.artistId}
 								<a

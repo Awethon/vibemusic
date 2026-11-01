@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes, type TimelineAlbum } from './timeline.ts';
+import { endedLanes, laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes, type TimelineAlbum } from './timeline.ts';
 
 const album = (id: string, artistId: string, year: number): TimelineAlbum => ({
 	id,
@@ -59,4 +59,17 @@ it('labels quiet five-year marks only where they have room', () => {
 	const lanes = timelineLanes([album('a', 'x', 1994), album('b', 'x', 1997), album('c', 'x', 2010)], 1, '');
 	const marked = markedBuckets(layoutTimeline(lanes, metrics).buckets, 72);
 	expect(marked.map((bucket) => bucket.key)).toEqual([1994, 1997, 2000, 2005, 2010]);
+});
+
+it('folds lanes whose last album is behind the view, and brings them back in place', () => {
+	const lanes = timelineLanes(
+		[album('a1', 'early', 1990), album('a2', 'early', 1992), album('b1', 'late', 1991), album('b2', 'late', 2000)],
+		2,
+		'Elsewhere'
+	);
+	const layout = layoutTimeline(lanes, metrics);
+	const lastEarly = layout.positions.get('a2')!.x;
+	expect(endedLanes(lanes, layout, metrics.cover, lastEarly)).toEqual(new Set());
+	expect(endedLanes(lanes, layout, metrics.cover, lastEarly + metrics.cover)).toEqual(new Set([0]));
+	expect(endedLanes(lanes, layout, metrics.cover, metrics.start)).toEqual(new Set());
 });
