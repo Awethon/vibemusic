@@ -37,7 +37,9 @@ describe('genre tree', () => {
 
 	it('only names parents that exist', () => {
 		const names = new Set(Object.keys(tree));
-		const missing = Object.values(tree as Record<string, { parents?: string[] }>).flatMap((node) => (node.parents ?? []).filter((parent) => !names.has(parent)));
+		const missing = Object.values(tree as Record<string, { parents?: string[] }>).flatMap((node) =>
+			(node.parents ?? []).filter((parent) => !names.has(parent))
+		);
 		expect(missing).toEqual([]);
 	});
 
@@ -45,7 +47,9 @@ describe('genre tree', () => {
 		const owners = new Map<string, string[]>();
 		const { genresOf } = createGenreResolver();
 		for (const [name, node] of Object.entries(tree as Record<string, { aliases?: string[] }>)) {
-			for (const alias of node.aliases ?? []) for (const resolved of genresOf([alias])) owners.set(alias, [...(owners.get(alias) ?? []), resolved !== name ? `${resolved} (not ${name})` : name]);
+			for (const alias of node.aliases ?? [])
+				for (const resolved of genresOf([alias]))
+					owners.set(alias, [...(owners.get(alias) ?? []), resolved !== name ? `${resolved} (not ${name})` : name]);
 		}
 		expect([...owners.values()].flat().filter((owner) => owner.includes('(not '))).toEqual([]);
 	});

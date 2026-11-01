@@ -4,7 +4,20 @@ import { withAncestors } from './genres.ts';
 import { chooseGenres, pickBest, type GenreSong } from './playlists.ts';
 
 const songs = (genre: string, count: number, artists: number, prefix = genre, fans: number | null = null): GenreSong[] =>
-	Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, title: `${prefix} song ${index}`, duration: 200, year: 2000, albumId: `${prefix}-album-${index % artists}`, artistId: `${prefix}-artist-${index % artists}`, genres: withAncestors(genre), plays: 0, starred: false, fans, popularity: null, rank: null }));
+	Array.from({ length: count }, (_, index) => ({
+		id: `${prefix}-${index}`,
+		title: `${prefix} song ${index}`,
+		duration: 200,
+		year: 2000,
+		albumId: `${prefix}-album-${index % artists}`,
+		artistId: `${prefix}-artist-${index % artists}`,
+		genres: withAncestors(genre),
+		plays: 0,
+		starred: false,
+		fans,
+		popularity: null,
+		rank: null
+	}));
 
 const chosen = (library: GenreSong[]) => chooseGenres(library).map((playlist) => playlist.genre);
 
@@ -21,9 +34,16 @@ const bands: [string, number][] = [
 	['Salt Choir', 30974]
 ];
 
-const nuMetal = bands.flatMap(([band, fans]) => Array.from({ length: 12 }, (_, index) => ({ ...songs('Nu Metal', 1, 1, `${band}-${index}`, fans)[0], artistId: band, popularity: (fans / 10) * (1 - index / 20) })));
+const nuMetal = bands.flatMap(([band, fans]) =>
+	Array.from({ length: 12 }, (_, index) => ({
+		...songs('Nu Metal', 1, 1, `${band}-${index}`, fans)[0],
+		artistId: band,
+		popularity: (fans / 10) * (1 - index / 20)
+	}))
+);
 
-const perArtist = (picked: GenreSong[]) => Object.fromEntries(bands.map(([band]) => [band, picked.filter((song) => song.artistId === band).length]));
+const perArtist = (picked: GenreSong[]) =>
+	Object.fromEntries(bands.map(([band]) => [band, picked.filter((song) => song.artistId === band).length]));
 
 describe('genre playlists', () => {
 	it('keeps only the broad genre when a subgenre would repeat it', () => {
@@ -53,7 +73,7 @@ describe('genre playlists', () => {
 			'Paper Lanterns': 7,
 			'Iron Orchard': 6,
 			'Velvet Static': 6,
-			'Northbound': 5,
+			Northbound: 5,
 			'Copper Sky': 5,
 			'Low Tide': 4,
 			'Ember Lane': 3,
@@ -63,19 +83,32 @@ describe('genre playlists', () => {
 	});
 
 	it('splits evenly when nothing is known about popularity', () => {
-		const counts = Object.values(Object.groupBy(pickBest(songs('Hip-Hop', 300, 10)), (song) => song.artistId)).map((group) => group!.length);
+		const counts = Object.values(Object.groupBy(pickBest(songs('Hip-Hop', 300, 10)), (song) => song.artistId)).map(
+			(group) => group!.length
+		);
 		expect(counts).toEqual(Array(10).fill(10));
 	});
 
 	it('starts with the biggest songs but keeps each artist out of the last three places', () => {
 		const picked = pickBest(nuMetal, { ...GENRE_PLAYLISTS, songCap: 50 });
 		expect(picked[0].artistId).toBe('Glass Harbor');
-		picked.forEach((song, index) => expect(picked.slice(Math.max(0, index - 3), index).map((previous) => previous.artistId)).not.toContain(song.artistId));
+		picked.forEach((song, index) =>
+			expect(picked.slice(Math.max(0, index - 3), index).map((previous) => previous.artistId)).not.toContain(song.artistId)
+		);
 	});
 
 	it('plays each song once even when the library has several editions of it', () => {
-		const editions = ['Lighthouse', 'Lighthouse (Live)', 'Driftwood', 'Driftwood'].map((title, index) => ({ ...songs('Metal', 1, 1, `edition-${index}`)[0], title, artistId: 'harbor', plays: index }));
-		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Driftwood', 'Lighthouse']);
+		const editions = ['Lighthouse', 'Lighthouse (Live)', 'Driftwood', 'Driftwood'].map((title, index) => ({
+			...songs('Metal', 1, 1, `edition-${index}`)[0],
+			title,
+			artistId: 'harbor',
+			plays: index
+		}));
+		expect(
+			pickBest(editions)
+				.map((song) => song.title)
+				.toSorted()
+		).toEqual(['Driftwood', 'Lighthouse']);
 	});
 
 	it('keeps the original edition of a song even after the later one was played more', () => {
@@ -87,7 +120,9 @@ describe('genre playlists', () => {
 	});
 
 	it('prefers the original recording over remixes when nothing else decides', () => {
-		const versions = ['Paper Moon (Night Owl club mix)', 'Paper Moon (Sam Rivers mix)', 'Paper Moon', 'Paper Moon - Live'].map((title, index) => ({ ...songs('Nu Metal', 1, 1, `version-${index}`)[0], title, artistId: 'orchard' }));
+		const versions = ['Paper Moon (Night Owl club mix)', 'Paper Moon (Sam Rivers mix)', 'Paper Moon', 'Paper Moon - Live'].map(
+			(title, index) => ({ ...songs('Nu Metal', 1, 1, `version-${index}`)[0], title, artistId: 'orchard' })
+		);
 		expect(pickBest(versions).map((song) => song.title)).toEqual(['Paper Moon']);
 	});
 
@@ -96,7 +131,13 @@ describe('genre playlists', () => {
 			['Open Road', 863266, 0],
 			['Northern Lights', 814254, 0],
 			['Small Hours', 321967, 2]
-		].map(([title, popularity, plays], index) => ({ ...songs('Nu Metal', 1, 1, `velvet-${index}`)[0], title: title as string, artistId: 'velvet', popularity: popularity as number, plays: plays as number }));
+		].map(([title, popularity, plays], index) => ({
+			...songs('Nu Metal', 1, 1, `velvet-${index}`)[0],
+			title: title as string,
+			artistId: 'velvet',
+			popularity: popularity as number,
+			plays: plays as number
+		}));
 		expect(pickBest(velvet, GENRE_PLAYLISTS, 0).map((song) => song.title)).toEqual(['Open Road', 'Northern Lights', 'Small Hours']);
 	});
 
@@ -107,23 +148,44 @@ describe('genre playlists', () => {
 			['Зимний вечер', 54508, 2],
 			['Тихая улица', null, null],
 			['Morning Paradise', 343400, 1]
-		].map(([title, popularity, rank], index) => ({ ...songs('Hip-Hop', 1, 1, `river-${index}`)[0], title: title as string, artistId: 'river', popularity: popularity as number | null, rank: rank as number | null }));
+		].map(([title, popularity, rank], index) => ({
+			...songs('Hip-Hop', 1, 1, `river-${index}`)[0],
+			title: title as string,
+			artistId: 'river',
+			popularity: popularity as number | null,
+			rank: rank as number | null
+		}));
 		const others = songs('Hip-Hop', 10, 2, 'other', 50_000).map((song, index) => ({ ...song, popularity: 900_000 - index * 1000 }));
 		for (const week of [0, 1, 2, 3]) {
-			const order = pickBest([...river, ...others], GENRE_PLAYLISTS, week * 7 * 24 * 60 * 60 * 1000).filter((song) => song.artistId === 'river');
+			const order = pickBest([...river, ...others], GENRE_PLAYLISTS, week * 7 * 24 * 60 * 60 * 1000).filter(
+				(song) => song.artistId === 'river'
+			);
 			expect(order.map((song) => song.title)).toEqual(['Белый город', 'Зимний вечер', 'Morning Paradise', 'Тихий двор', 'Тихая улица']);
 		}
 	});
 
 	it('leaves out skits, intros and very short tracks unless they are popular', () => {
 		const titles = ['Skittles (skit)', 'Интро', 'Outro', 'Introvert', 'Real song', 'Short one', 'Famous intro'];
-		const library = titles.map((title, index) => ({ ...songs('Hip-Hop', 1, 1, `filler-${index}`)[0], title, artistId: 'filler', duration: title === 'Short one' ? 40 : 200, popularity: title === 'Famous intro' ? 500_000 : null }));
-		expect(pickBest(library).map((song) => song.title).toSorted()).toEqual(['Famous intro', 'Introvert', 'Real song']);
+		const library = titles.map((title, index) => ({
+			...songs('Hip-Hop', 1, 1, `filler-${index}`)[0],
+			title,
+			artistId: 'filler',
+			duration: title === 'Short one' ? 40 : 200,
+			popularity: title === 'Famous intro' ? 500_000 : null
+		}));
+		expect(
+			pickBest(library)
+				.map((song) => song.title)
+				.toSorted()
+		).toEqual(['Famous intro', 'Introvert', 'Real song']);
 	});
 
 	it('drops a playlist whose picks mostly repeat another one', () => {
 		const shared = songs('Rock', 60, 6, 'shared').map((song) => ({ ...song, genres: ['Rock', 'Electronic'], popularity: 900_000 }));
-		const library = [...shared, ...songs('Rock', 100, 6, 'rock'), ...songs('Electronic', 100, 6, 'electronic')].map((song) => ({ ...song, popularity: song.popularity ?? 1_000 }));
+		const library = [...shared, ...songs('Rock', 100, 6, 'rock'), ...songs('Electronic', 100, 6, 'electronic')].map((song) => ({
+			...song,
+			popularity: song.popularity ?? 1_000
+		}));
 		expect(chosen(library)).toHaveLength(1);
 	});
 

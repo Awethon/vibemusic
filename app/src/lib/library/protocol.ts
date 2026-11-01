@@ -3,7 +3,15 @@ import type { Enrichment, EnrichmentRequest, LibraryMeta } from './snapshot.ts';
 
 export type SqlParam = string | number | null;
 
-export type SyncProgress = { albums: number; albumTotal: number; tracks: number; trackTotal: number; playlists: number; playlistTotal: number; building: boolean };
+export type SyncProgress = {
+	albums: number;
+	albumTotal: number;
+	tracks: number;
+	trackTotal: number;
+	playlists: number;
+	playlistTotal: number;
+	building: boolean;
+};
 
 export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number; steps: Record<string, number> };
 
@@ -32,4 +40,7 @@ export type WorkerResults = {
 
 export type WorkerEnvelope = { id: number; request: WorkerRequest };
 
-export type WorkerReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string; expired: boolean; unreachable: boolean } | { id: number; progress: SyncProgress };
+export type WorkerReply =
+	| { id: number; ok: true; value: unknown }
+	| { id: number; ok: false; error: string; expired: boolean; unreachable: boolean }
+	| { id: number; progress: SyncProgress };

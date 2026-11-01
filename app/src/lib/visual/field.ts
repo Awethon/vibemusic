@@ -363,10 +363,7 @@ function createWebGl2Backend(canvas: HTMLCanvasElement): Backend | null {
 	};
 }
 
-export async function createField(
-	initialCanvas: HTMLCanvasElement,
-	options: { renderer?: 'webgpu' | 'webgl2' } = {}
-): Promise<Field> {
+export async function createField(initialCanvas: HTMLCanvasElement, options: { renderer?: 'webgpu' | 'webgl2' } = {}): Promise<Field> {
 	const render = FIELD_RENDER_TUNING;
 	const modes = render.modes;
 	const tune: FieldTuning = { ...FIELD_TUNING };
@@ -516,7 +513,8 @@ export async function createField(
 					: ease(envelope[mode], target, dt, tune.attack, tune.release);
 				const hz = hits ? tune.hitHz * Math.pow(tune.hzStep, mode * 0.5) : tune.hz * Math.pow(tune.hzStep, mode);
 				phase[mode] = (phase[mode] + dt * tau * hz) % tau;
-				displacement[mode] = tune.gain * (tune.baseDisp + tune.dispPerWave * waveScale[mode]) * Math.min(1, envelope[mode] * boost) * amount;
+				displacement[mode] =
+					tune.gain * (tune.baseDisp + tune.dispPerWave * waveScale[mode]) * Math.min(1, envelope[mode] * boost) * amount;
 				displacement[8 + mode] = phase[mode];
 			}
 			rotation += dt * tune.spin;

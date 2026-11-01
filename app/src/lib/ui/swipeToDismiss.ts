@@ -17,7 +17,15 @@ export function swipeToDismiss(onDismiss: () => void, handle?: string): Attachme
 		const down = (event: PointerEvent) => {
 			if (event.pointerType !== 'touch' || !(event.target instanceof Element)) return;
 			if (event.target.closest(IGNORED) || (handle && !event.target.closest(handle))) return;
-			drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, lastY: event.clientY, lastAt: event.timeStamp, speed: 0, down: null };
+			drag = {
+				pointerId: event.pointerId,
+				x: event.clientX,
+				y: event.clientY,
+				lastY: event.clientY,
+				lastAt: event.timeStamp,
+				speed: 0,
+				down: null
+			};
 		};
 
 		const move = (event: PointerEvent) => {

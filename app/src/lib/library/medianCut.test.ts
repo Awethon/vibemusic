@@ -9,9 +9,16 @@ const image = (colors: [number, number, number, number][]) => {
 
 describe('medianCut', () => {
 	it('separates distinct colours', () => {
-		expect(medianCut(image([[255, 0, 0, 20], [0, 0, 255, 20]]), 2).toSorted()).toEqual(['#0000ff', '#ff0000']);
+		expect(
+			medianCut(
+				image([
+					[255, 0, 0, 20],
+					[0, 0, 255, 20]
+				]),
+				2
+			).toSorted()
+		).toEqual(['#0000ff', '#ff0000']);
 	});
-
 
 	it('returns fewer colours for a flat image', () => {
 		expect(medianCut(image([[10, 20, 30, 50]]))).toEqual(['#0a141e']);

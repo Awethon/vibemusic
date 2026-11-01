@@ -10,8 +10,8 @@ use crate::account::{Account, AccountError};
 use crate::apple::{self, Apple};
 use crate::cover;
 use crate::deezer;
-use crate::enrich::{Enricher, Fetched};
 use crate::enrich::now_ms;
+use crate::enrich::{Enricher, Fetched};
 
 const PREFIX: &str = "This is ";
 const COVER_VERSION: &str = "discography-3";
@@ -30,13 +30,20 @@ pub struct Settings {
 }
 
 fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
-    std::env::var(name).ok().and_then(|value| value.parse().ok()).unwrap_or(default)
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
 }
 
 impl Settings {
     pub fn from_env(url: &str) -> Option<Self> {
-        let username = std::env::var("VIBEMUSIC_NAVIDROME_USER").ok().filter(|value| !value.is_empty())?;
-        let password = std::env::var("VIBEMUSIC_NAVIDROME_PASSWORD").ok().filter(|value| !value.is_empty())?;
+        let username = std::env::var("VIBEMUSIC_NAVIDROME_USER")
+            .ok()
+            .filter(|value| !value.is_empty())?;
+        let password = std::env::var("VIBEMUSIC_NAVIDROME_PASSWORD")
+            .ok()
+            .filter(|value| !value.is_empty())?;
         let state = std::env::var("THIS_IS_STATE").unwrap_or_else(|_| "/data/this-is.json".into());
         Some(Self {
             url: url.to_owned(),
@@ -45,7 +52,12 @@ impl Settings {
             min_tracks: env_number("THIS_IS_MIN_TRACKS", 13),
             max_tracks: env_number("THIS_IS_MAX_TRACKS", 50),
             every_ms: env_number::<u64>("THIS_IS_EVERY_HOURS", 168) * 60 * 60 * 1000,
-            skip: std::env::var("THIS_IS_SKIP").unwrap_or_default().split(',').map(|name| name.trim().to_lowercase()).filter(|name| !name.is_empty()).collect(),
+            skip: std::env::var("THIS_IS_SKIP")
+                .unwrap_or_default()
+                .split(',')
+                .map(|name| name.trim().to_lowercase())
+                .filter(|name| !name.is_empty())
+                .collect(),
             state: (!state.is_empty()).then(|| PathBuf::from(state)),
         })
     }
@@ -60,12 +72,20 @@ struct State {
 
 impl State {
     fn load(settings: &Settings) -> Self {
-        settings.state.as_ref().and_then(|path| std::fs::read(path).ok()).and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default()
+        settings
+            .state
+            .as_ref()
+            .and_then(|path| std::fs::read(path).ok())
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default()
     }
 
     fn save(&self, settings: &Settings) {
         let Some(path) = &settings.state else { return };
-        if let Err(error) = serde_json::to_vec_pretty(self).map_err(std::io::Error::other).and_then(|bytes| std::fs::write(path, bytes)) {
+        if let Err(error) = serde_json::to_vec_pretty(self)
+            .map_err(std::io::Error::other)
+            .and_then(|bytes| std::fs::write(path, bytes))
+        {
             tracing::warn!(%error, path = %path.display(), "could not save the This is state");
         }
     }
@@ -73,7 +93,10 @@ impl State {
 
 pub fn start(settings: Settings, enricher: std::sync::Arc<Enricher>) {
     tokio::spawn(async move {
-        let client = reqwest::Client::builder().timeout(Duration::from_secs(120)).build().expect("http client");
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+            .expect("http client");
         loop {
             let mut state = State::load(&settings);
             if now_ms().saturating_sub(state.last_run) >= settings.every_ms {
@@ -104,31 +127,66 @@ pub fn album_artists(item: &Value) -> Vec<(String, String)> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|artist| Some((artist["id"].as_str().filter(|id| !id.is_empty())?.to_owned(), artist["name"].as_str().filter(|name| !name.is_empty())?.to_owned())))
+        .filter_map(|artist| {
+            Some((
+                artist["id"].as_str().filter(|id| !id.is_empty())?.to_owned(),
+                artist["name"].as_str().filter(|name| !name.is_empty())?.to_owned(),
+            ))
+        })
         .collect();
     if !credited.is_empty() {
         return credited;
     }
     let (id, name) = (text(item, "albumArtistId"), text(item, "albumArtist"));
-    if id.is_empty() || name.is_empty() { Vec::new() } else { vec![(id, name)] }
+    if id.is_empty() || name.is_empty() {
+        Vec::new()
+    } else {
+        vec![(id, name)]
+    }
 }
 
-const FILLER: [&str; 9] = ["skit", "intro", "outro", "interlude", "prelude", "скит", "интро", "аутро", "интерлюдия"];
+const FILLER: [&str; 9] = [
+    "skit",
+    "intro",
+    "outro",
+    "interlude",
+    "prelude",
+    "скит",
+    "интро",
+    "аутро",
+    "интерлюдия",
+];
 const MIN_SONG_SECONDS: f64 = 75.0;
 
 fn is_filler(song: &Value) -> bool {
     let title = text(song, "title").to_lowercase();
-    song["duration"].as_f64().is_some_and(|seconds| seconds < MIN_SONG_SECONDS) || title.split(|character: char| !character.is_alphanumeric()).any(|word| FILLER.contains(&word))
+    song["duration"]
+        .as_f64()
+        .is_some_and(|seconds| seconds < MIN_SONG_SECONDS)
+        || title
+            .split(|character: char| !character.is_alphanumeric())
+            .any(|word| FILLER.contains(&word))
 }
 
 fn one_edition_each(songs: Vec<&Value>) -> Vec<&Value> {
     let mut best: HashMap<String, &Value> = HashMap::new();
     let mut order: Vec<String> = Vec::new();
-    let preference = |song: &Value| (deezer::is_other_recording(&text(song, "title")), number(song, "year") == 0, number(song, "year"), -number(song, "playCount"));
+    let preference = |song: &Value| {
+        (
+            deezer::is_other_recording(&text(song, "title")),
+            number(song, "year") == 0,
+            number(song, "year"),
+            -number(song, "playCount"),
+        )
+    };
     for song in songs {
         let title = text(song, "title");
         let key = deezer::title_key(&title);
-        let key = if key.is_empty() { format!("id:{}", text(song, "id")) } else { key };
+        let key = if key.is_empty() {
+            format!("id:{}", text(song, "id"))
+        } else {
+            key
+        };
         match best.get(&key) {
             Some(kept) if preference(kept) <= preference(song) => {}
             Some(_) => {
@@ -149,7 +207,15 @@ pub fn choose(apple_top: &[(String, u64)], deezer_top: &[(String, u64)], songs: 
         let title = text(song, "title");
         let apple = deezer::song_rank(apple_top, &title);
         let deezer = deezer::song_rank(deezer_top, &title);
-        (apple.is_none() && deezer.is_none() && is_filler(song), std::cmp::Reverse(apple.unwrap_or(0)), std::cmp::Reverse(deezer.unwrap_or(0)), -number(song, "playCount"), -number(song, "year"), number(song, "discNumber"), number(song, "trackNumber"))
+        (
+            apple.is_none() && deezer.is_none() && is_filler(song),
+            std::cmp::Reverse(apple.unwrap_or(0)),
+            std::cmp::Reverse(deezer.unwrap_or(0)),
+            -number(song, "playCount"),
+            -number(song, "year"),
+            number(song, "discNumber"),
+            number(song, "trackNumber"),
+        )
     });
     chosen.into_iter().take(max).map(|song| text(song, "id")).collect()
 }
@@ -160,7 +226,9 @@ pub fn comment(name: &str, count: usize) -> String {
 
 async fn cover_image(account: &Account, album_id: &str, size: u32) -> Result<RgbImage, AccountError> {
     let bytes = account.cover_art(&format!("al-{album_id}"), size).await?;
-    Ok(image::load_from_memory(&bytes).map_err(|error| AccountError(error.to_string()))?.to_rgb8())
+    Ok(image::load_from_memory(&bytes)
+        .map_err(|error| AccountError(error.to_string()))?
+        .to_rgb8())
 }
 
 async fn draw_cover(account: &Account, name: &str, albums: &[&Value]) -> Result<Vec<u8>, AccountError> {
@@ -170,10 +238,17 @@ async fn draw_cover(account: &Account, name: &str, albums: &[&Value]) -> Result<
         covers.push(cover_image(account, &text(album, "id"), 600).await?);
     }
     let name = name.to_owned();
-    tokio::task::spawn_blocking(move || cover::render(&name, &newest, &covers)).await.map_err(|error| AccountError(error.to_string()))
+    tokio::task::spawn_blocking(move || cover::render(&name, &newest, &covers))
+        .await
+        .map_err(|error| AccountError(error.to_string()))
 }
 
-async fn save_playlist(account: &Account, existing: Option<&Value>, title: &str, songs: &[String]) -> Result<String, AccountError> {
+async fn save_playlist(
+    account: &Account,
+    existing: Option<&Value>,
+    title: &str,
+    songs: &[String],
+) -> Result<String, AccountError> {
     let mut params: Vec<(&str, String)> = songs.iter().map(|id| ("songId", id.clone())).collect();
     match existing {
         Some(playlist) => {
@@ -194,7 +269,12 @@ async fn save_playlist(account: &Account, existing: Option<&Value>, title: &str,
     }
 }
 
-async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher, state: &mut State) -> Result<String, AccountError> {
+async fn run(
+    client: &reqwest::Client,
+    settings: &Settings,
+    enricher: &Enricher,
+    state: &mut State,
+) -> Result<String, AccountError> {
     let account = Account::sign_in(client.clone(), &settings.url, &settings.username, &settings.password).await?;
     let songs = account.all("song?_sort=album&_order=ASC").await?;
     let albums = account.all("album?_sort=name&_order=ASC").await?;
@@ -225,7 +305,10 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
         if artist_songs.len() < settings.min_tracks || settings.skip.contains(&lower) || lower == "various artists" {
             continue;
         }
-        let album_names: Vec<String> = albums_by_artist.get(id).map(|list| list.iter().map(|album| text(album, "name")).collect()).unwrap_or_default();
+        let album_names: Vec<String> = albums_by_artist
+            .get(id)
+            .map(|list| list.iter().map(|album| text(album, "name")).collect())
+            .unwrap_or_default();
         let top = match enricher.apple_top(id) {
             Some(top) => top,
             None => match apple.top_songs(name, &album_names).await {
@@ -234,12 +317,25 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
             },
         };
         tracing::debug!(name, top = top.len(), "apple top songs");
-        wanted.push((id.clone(), name.clone(), choose(&apple::ranked(&top), &enricher.deezer_top(id), artist_songs, settings.max_tracks)));
+        wanted.push((
+            id.clone(),
+            name.clone(),
+            choose(
+                &apple::ranked(&top),
+                &enricher.deezer_top(id),
+                artist_songs,
+                settings.max_tracks,
+            ),
+        ));
     }
     let playlists = account.all("playlist").await?;
     let ours: HashMap<String, &Value> = playlists
         .iter()
-        .filter(|playlist| text(playlist, "ownerId") == account.id && playlist["sync"] != true && text(playlist, "name").starts_with(PREFIX))
+        .filter(|playlist| {
+            text(playlist, "ownerId") == account.id
+                && playlist["sync"] != true
+                && text(playlist, "name").starts_with(PREFIX)
+        })
         .map(|playlist| (text(playlist, "name"), playlist))
         .collect();
     let titles: HashSet<String> = wanted.iter().map(|(_, name, _)| format!("{PREFIX}{name}")).collect();
@@ -248,13 +344,27 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
         let title = format!("{PREFIX}{name}");
         let existing = ours.get(&title).copied();
         let playlist_id = save_playlist(&account, existing, &title, songs).await?;
-        if existing.is_some() { updated += 1 } else { created += 1 }
-        account.update_playlist(&playlist_id, &title, &comment(name, songs.len())).await?;
+        if existing.is_some() {
+            updated += 1
+        } else {
+            created += 1
+        }
+        account
+            .update_playlist(&playlist_id, &title, &comment(name, songs.len()))
+            .await?;
         let artist_albums = albums_by_artist.get(artist_id).map(Vec::as_slice).unwrap_or_default();
         if artist_albums.is_empty() {
             continue;
         }
-        let signature = format!("{COVER_VERSION}|{name}|{}", artist_albums.iter().take(COVERS).map(|album| format!("{}@{}", text(album, "id"), text(album, "updatedAt"))).collect::<Vec<_>>().join(","));
+        let signature = format!(
+            "{COVER_VERSION}|{name}|{}",
+            artist_albums
+                .iter()
+                .take(COVERS)
+                .map(|album| format!("{}@{}", text(album, "id"), text(album, "updatedAt")))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         let has_image = existing.is_some_and(|playlist| !text(playlist, "uploadedImage").is_empty());
         if has_image && state.covers.get(&playlist_id) == Some(&signature) {
             continue;
@@ -271,15 +381,22 @@ async fn run(client: &reqwest::Client, settings: &Settings, enricher: &Enricher,
     }
     for playlist in &playlists {
         let name = text(playlist, "name");
-        let mine = text(playlist, "ownerId") == account.id && playlist["sync"] != true && name.starts_with(PREFIX) && !titles.contains(&name);
-        let legacy = playlist["sync"] == true && name.starts_with(PREFIX) && text(playlist, "path").contains("/_playlists/");
+        let mine = text(playlist, "ownerId") == account.id
+            && playlist["sync"] != true
+            && name.starts_with(PREFIX)
+            && !titles.contains(&name);
+        let legacy =
+            playlist["sync"] == true && name.starts_with(PREFIX) && text(playlist, "path").contains("/_playlists/");
         if mine || legacy {
             account.delete_playlist(&text(playlist, "id")).await?;
             state.covers.remove(&text(playlist, "id"));
             removed += 1;
         }
     }
-    Ok(format!("{} artists: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed", wanted.len()))
+    Ok(format!(
+        "{} artists: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed",
+        wanted.len()
+    ))
 }
 
 #[cfg(test)]
@@ -290,8 +407,17 @@ mod tests {
     #[test]
     fn credits_album_artists_or_falls_back_to_the_album_artist() {
         let credited = json!({ "participants": { "albumartist": [{ "id": "a", "name": "Ana Reyes" }, { "id": "b", "name": "Theo Brandt" }] }, "albumArtistId": "x", "albumArtist": "Reyes & Brandt" });
-        assert_eq!(album_artists(&credited), [("a".to_owned(), "Ana Reyes".to_owned()), ("b".to_owned(), "Theo Brandt".to_owned())]);
-        assert_eq!(album_artists(&json!({ "albumArtistId": "x", "albumArtist": "Lume" })), [("x".to_owned(), "Lume".to_owned())]);
+        assert_eq!(
+            album_artists(&credited),
+            [
+                ("a".to_owned(), "Ana Reyes".to_owned()),
+                ("b".to_owned(), "Theo Brandt".to_owned())
+            ]
+        );
+        assert_eq!(
+            album_artists(&json!({ "albumArtistId": "x", "albumArtist": "Lume" })),
+            [("x".to_owned(), "Lume".to_owned())]
+        );
         assert!(album_artists(&json!({})).is_empty());
     }
 
@@ -316,8 +442,14 @@ mod tests {
             json!({ "id": "trap", "title": "Ночной TRAP", "playCount": 0, "duration": 200.0 }),
             json!({ "id": "played", "title": "Тихий двор", "playCount": 1, "duration": 200.0 }),
         ];
-        let deezer = [("Morning Paradise".to_owned(), 343_400), ("Ночной TRAP".to_owned(), 187_966)];
-        assert_eq!(choose(&[], &deezer, &songs, 5), ["paradise", "trap", "played", "intro", "skit"]);
+        let deezer = [
+            ("Morning Paradise".to_owned(), 343_400),
+            ("Ночной TRAP".to_owned(), 187_966),
+        ];
+        assert_eq!(
+            choose(&[], &deezer, &songs, 5),
+            ["paradise", "trap", "played", "intro", "skit"]
+        );
     }
 
     #[test]

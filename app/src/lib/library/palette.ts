@@ -5,10 +5,12 @@ import { medianCut } from './medianCut.ts';
 import { savedPalette } from './queries.ts';
 import { COVER_PX, PALETTE } from '../tuning.ts';
 
-
 async function extract(albumId: string): Promise<string[]> {
 	const response = await fetch(coverUrl(requireCredentials(), albumId, COVER_PX.paletteSample));
-	const bitmap = await createImageBitmap(await response.blob(), { resizeWidth: PALETTE.coverSamplePx, resizeHeight: PALETTE.coverSamplePx });
+	const bitmap = await createImageBitmap(await response.blob(), {
+		resizeWidth: PALETTE.coverSamplePx,
+		resizeHeight: PALETTE.coverSamplePx
+	});
 	const canvas = new OffscreenCanvas(PALETTE.coverSamplePx, PALETTE.coverSamplePx);
 	const context = canvas.getContext('2d')!;
 	context.drawImage(bitmap, 0, 0);

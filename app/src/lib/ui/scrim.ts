@@ -19,17 +19,43 @@ const shade = (alpha: number) => `rgba(${SCRIM.rgb}, ${alpha})`;
 function layers(width: number): Layer[] {
 	if (formFactor.phone) {
 		const { topAlpha, topEndRatio, bottomFromRatio, bottomAlpha } = SCRIM.phone;
-		return [{ vertical: true, stops: [[0, topAlpha], [topEndRatio, 0], [bottomFromRatio, 0], [1, bottomAlpha]] }];
+		return [
+			{
+				vertical: true,
+				stops: [
+					[0, topAlpha],
+					[topEndRatio, 0],
+					[bottomFromRatio, 0],
+					[1, bottomAlpha]
+				]
+			}
+		];
 	}
 	return [
-		{ vertical: false, stops: [[0, SCRIM.edgeAlpha], [Math.min(SCRIM.nearPx / width, SCRIM.fadeEndRatio), SCRIM.nearAlpha], [SCRIM.fadeEndRatio, 0]] },
-		{ vertical: true, stops: [[SCRIM.bottomFromRatio, 0], [1, SCRIM.bottomAlpha]] }
+		{
+			vertical: false,
+			stops: [
+				[0, SCRIM.edgeAlpha],
+				[Math.min(SCRIM.nearPx / width, SCRIM.fadeEndRatio), SCRIM.nearAlpha],
+				[SCRIM.fadeEndRatio, 0]
+			]
+		},
+		{
+			vertical: true,
+			stops: [
+				[SCRIM.bottomFromRatio, 0],
+				[1, SCRIM.bottomAlpha]
+			]
+		}
 	];
 }
 
 export const scrimBackground = (width: number) =>
 	layers(width)
-		.map(({ vertical, stops }) => `linear-gradient(${vertical ? 180 : 90}deg, ${stops.map(([ratio, alpha]) => `${shade(alpha)} ${ratio * 100}%`).join(', ')})`)
+		.map(
+			({ vertical, stops }) =>
+				`linear-gradient(${vertical ? 180 : 90}deg, ${stops.map(([ratio, alpha]) => `${shade(alpha)} ${ratio * 100}%`).join(', ')})`
+		)
 		.join(', ');
 
 export function paintScrim(context: CanvasRenderingContext2D, width: number, height: number) {

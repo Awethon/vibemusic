@@ -65,7 +65,12 @@ export function reorderUpNextRows(fromUserQueue: boolean, fromPosition: number, 
 
 export function removeRowAfterSwipe(row: HTMLElement) {
 	animateQueueChange(
-		() => editQueue(row.dataset.uq !== undefined ? { op: 'removeQueued', index: Number(row.dataset.uq) } : { op: 'removeSource', index: Number(row.dataset.qi) }),
+		() =>
+			editQueue(
+				row.dataset.uq !== undefined
+					? { op: 'removeQueued', index: Number(row.dataset.uq) }
+					: { op: 'removeSource', index: Number(row.dataset.qi) }
+			),
 		{ skipRow: row }
 	);
 }

@@ -26,7 +26,14 @@ export function liftRowForSwipe(row: HTMLElement) {
 	const lifted = row.cloneNode(true) as HTMLElement;
 	for (const node of [lifted, ...lifted.querySelectorAll('[id]')]) node.removeAttribute('id');
 	lifted.classList.add('row-lift');
-	Object.assign(lifted.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, transform: '', opacity: '' });
+	Object.assign(lifted.style, {
+		left: `${rect.left}px`,
+		top: `${rect.top}px`,
+		width: `${rect.width}px`,
+		height: `${rect.height}px`,
+		transform: '',
+		opacity: ''
+	});
 	document.body.append(lifted);
 	row.style.visibility = 'hidden';
 	const scroller = row.closest<HTMLElement>('.q-scroll');

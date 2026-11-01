@@ -2,8 +2,25 @@ import { GESTURE, PANEL, ROW_SWIPE } from '../tuning.ts';
 import { closeAllMenus } from '../ui/menu.svelte.ts';
 import { bodyHasClass, setBodyClass } from './dom.ts';
 import { applyPanelProgress, panelProgress, panelProgressOnScreen, snapPanel } from './panel.ts';
-import { animateRailTo, applyRailProgress, commitRailState, isInRailGestureZone, railProgress, railProgressForDelta, stopRailAnimation } from './rail.ts';
-import { dropLiftedRow, liftRowForSwipe, moveLiftedRow, queueRowAtEvent, rowSwipeProgress, slideLiftedRowOut, springLiftedRowBack, swipe } from './rowSwipe.ts';
+import {
+	animateRailTo,
+	applyRailProgress,
+	commitRailState,
+	isInRailGestureZone,
+	railProgress,
+	railProgressForDelta,
+	stopRailAnimation
+} from './rail.ts';
+import {
+	dropLiftedRow,
+	liftRowForSwipe,
+	moveLiftedRow,
+	queueRowAtEvent,
+	rowSwipeProgress,
+	slideLiftedRowOut,
+	springLiftedRowBack,
+	swipe
+} from './rowSwipe.ts';
 
 type Zone = 'rail' | 'panel' | 'row';
 

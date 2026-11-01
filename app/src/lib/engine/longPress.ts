@@ -23,7 +23,9 @@ export function installLongPress(): () => void {
 			target,
 			timer: setTimeout(() => {
 				press = null;
-				const opened = !target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
+				const opened = !target.dispatchEvent(
+					new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 })
+				);
 				if (!opened) return;
 				swallowClick = true;
 				navigator.vibrate?.(10);
@@ -32,7 +34,12 @@ export function installLongPress(): () => void {
 	};
 
 	const move = (event: PointerEvent) => {
-		if (press && event.pointerId === press.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > LAYOUT.longPressMovePx) cancel();
+		if (
+			press &&
+			event.pointerId === press.pointerId &&
+			Math.hypot(event.clientX - press.x, event.clientY - press.y) > LAYOUT.longPressMovePx
+		)
+			cancel();
 	};
 
 	const click = (event: MouseEvent) => {

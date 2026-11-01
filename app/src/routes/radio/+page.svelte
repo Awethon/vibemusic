@@ -73,24 +73,47 @@
 
 	function stationMenu(event: MouseEvent, index: number) {
 		const station = stations.value[index];
-		const items: MenuItem[] = [{ label: playerQueue().currentTrackId === station.id && player.playing ? 'Pause' : 'Play', run: () => choose(index) }];
-		if (admin) items.push({ separator: true }, { label: 'Edit station', run: () => startEditing(station.id) }, { label: 'Remove station', run: () => remove(station.id, station.title) });
+		const items: MenuItem[] = [
+			{ label: playerQueue().currentTrackId === station.id && player.playing ? 'Pause' : 'Play', run: () => choose(index) }
+		];
+		if (admin)
+			items.push(
+				{ separator: true },
+				{ label: 'Edit station', run: () => startEditing(station.id) },
+				{ label: 'Remove station', run: () => remove(station.id, station.title) }
+			);
 		openMenu(event, items);
 	}
 </script>
 
 <section class="view" {@attach viewEnter}>
-	<div class="vhead"><div><h1 class="display">Radio</h1><p class="sub">{plural(stations.value.length, 'station')} from Navidrome</p></div></div>
+	<div class="vhead">
+		<div>
+			<h1 class="display">Radio</h1>
+			<p class="sub">{plural(stations.value.length, 'station')} from Navidrome</p>
+		</div>
+	</div>
 	<div class="radio-grid">
 		{#each stations.value as station, index (station.id)}
 			{@const current = playerQueue().currentTrackId === station.id}
 			{@const onAir = current && player.playing}
-			<button class="radio-card" class:on={current} type="button" onclick={() => choose(index)} oncontextmenu={(event) => stationMenu(event, index)}>
-				<span class="radio-art"><span class="cover-icon"><Icon name="radio" /></span><span class="radio-play"><Icon name={onAir ? 'pause' : 'play'} /></span></span>
+			<button
+				class="radio-card"
+				class:on={current}
+				type="button"
+				onclick={() => choose(index)}
+				oncontextmenu={(event) => stationMenu(event, index)}
+			>
+				<span class="radio-art"
+					><span class="cover-icon"><Icon name="radio" /></span><span class="radio-play"><Icon name={onAir ? 'pause' : 'play'} /></span
+					></span
+				>
 				<span class="radio-text">
 					<b>{station.title}</b>
 					<small>{station.artist}</small>
-					{#if current && radioNow.stationId === station.id && radioNow.title}<span class="radio-song">{#if onAir}<span class="live-badge"><i></i></span>{/if}{radioNow.title}{radioNow.artist ? ` · ${radioNow.artist}` : ''}</span>{/if}
+					{#if current && radioNow.stationId === station.id && radioNow.title}<span class="radio-song"
+							>{#if onAir}<span class="live-badge"><i></i></span>{/if}{radioNow.title}{radioNow.artist ? ` · ${radioNow.artist}` : ''}</span
+						>{/if}
 				</span>
 			</button>
 		{/each}
@@ -105,7 +128,13 @@
 				<b>{draft.id ? 'Edit station' : 'New station'}</b>
 				<label>Name <input bind:value={draft.name} placeholder="Station name" required /></label>
 				<label>Stream address <input bind:value={draft.streamUrl} type="url" placeholder="https://radio.example/stream" required /></label>
-				<label><span>Website <small>optional</small></span><input bind:value={draft.homePageUrl} type="url" placeholder="https://radio.example" /></label>
+				<label
+					><span>Website <small>optional</small></span><input
+						bind:value={draft.homePageUrl}
+						type="url"
+						placeholder="https://radio.example"
+					/></label
+				>
 				{#if problem}<p class="radio-problem">{problem}</p>{/if}
 				<div class="radio-form-actions">
 					<button class="chip" type="button" onclick={() => (draft = null)}>Cancel</button>

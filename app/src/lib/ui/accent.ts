@@ -7,7 +7,8 @@ function colourfulness([red, green, blue]: Rgb) {
 	return (max - min) * (1 - Math.abs(max + min - 1) * 0.5);
 }
 
-const mostColourful = (colors: string[]) => colors.map(hexToRgb).reduce((winner, candidate) => (colourfulness(candidate) > colourfulness(winner) ? candidate : winner));
+const mostColourful = (colors: string[]) =>
+	colors.map(hexToRgb).reduce((winner, candidate) => (colourfulness(candidate) > colourfulness(winner) ? candidate : winner));
 
 export function accentFromPalette(colors: string[]): Rgb | null {
 	if (!colors.length) return null;
@@ -20,7 +21,9 @@ export function vividFromPalette(colors: string[]): string | null {
 	if (!colors.length) return null;
 	const [hue, saturation] = rgbToHsl(mostColourful(colors));
 	if (saturation < ACCENT.vividMinSaturation) return null;
-	return `rgb(${hslToUnitRgb([hue, ACCENT.vividSaturation, ACCENT.vividLightness]).map((channel) => Math.round(channel * 255)).join(' ')})`;
+	return `rgb(${hslToUnitRgb([hue, ACCENT.vividSaturation, ACCENT.vividLightness])
+		.map((channel) => Math.round(channel * 255))
+		.join(' ')})`;
 }
 
 export function blendAccent(current: Rgb, target: Rgb, blend: number): Rgb {

@@ -23,9 +23,13 @@
 
 	const rowMeasure = fixedRowMeasure(LAYOUT.artistRowHeightPx);
 	const artists = live(() => artistList(ui.artistSort, ui.filters), []);
-	const alphabetEntries = $derived(ui.artistSort === 'az' ? alphabetEntriesFor(artists.value, (artist) => alphabetBucket(withoutLeadingThe(artist.name))) : null);
+	const alphabetEntries = $derived(
+		ui.artistSort === 'az' ? alphabetEntriesFor(artists.value, (artist) => alphabetBucket(withoutLeadingThe(artist.name))) : null
+	);
 	const total = $derived(library.meta?.artists ?? 0);
-	const countLine = $derived(filtering() ? `${formatCount(artists.value.length)} of ${plural(total, 'artist')}${filterSuffix()}` : plural(total, 'artist'));
+	const countLine = $derived(
+		filtering() ? `${formatCount(artists.value.length)} of ${plural(total, 'artist')}${filterSuffix()}` : plural(total, 'artist')
+	);
 
 	let firstRender = true;
 	$effect(() => {
@@ -38,14 +42,23 @@
 </script>
 
 <section class="view" {@attach viewEnter}>
-	<div class="vhead"><div><h1 class="display">Artists</h1><p class="sub">{countLine}</p></div></div>
+	<div class="vhead">
+		<div>
+			<h1 class="display">Artists</h1>
+			<p class="sub">{countLine}</p>
+		</div>
+	</div>
 	<div class="toolbar">
 		<SortChips options={sorts} value={ui.artistSort} onchange={(sort) => (ui.artistSort = sort)} />
 		<div class="tb-right">
 			<Filters />
 			<div class="seg-toggle" role="group" aria-label="View">
-				<button type="button" class:on={ui.artistView === 'list'} aria-label="List view" title="List" onclick={() => setArtistView('list')}><Icon name="list" /></button>
-				<button type="button" class:on={ui.artistView === 'grid'} aria-label="Grid view" title="Grid" onclick={() => setArtistView('grid')}><Icon name="grid" /></button>
+				<button type="button" class:on={ui.artistView === 'list'} aria-label="List view" title="List" onclick={() => setArtistView('list')}
+					><Icon name="list" /></button
+				>
+				<button type="button" class:on={ui.artistView === 'grid'} aria-label="Grid view" title="Grid" onclick={() => setArtistView('grid')}
+					><Icon name="grid" /></button
+				>
 			</div>
 		</div>
 	</div>

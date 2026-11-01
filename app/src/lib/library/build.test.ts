@@ -1,6 +1,15 @@
 import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { nativeAlbum, nativeArtist, nativePlaylist, nativeSong, type NativeAlbum, type NativePlaylist, type NativePlaylistTrack, type NativeSong } from '../navidrome/schemas.ts';
+import {
+	nativeAlbum,
+	nativeArtist,
+	nativePlaylist,
+	nativeSong,
+	type NativeAlbum,
+	type NativePlaylist,
+	type NativePlaylistTrack,
+	type NativeSong
+} from '../navidrome/schemas.ts';
 import { applyChanges, buildLibrary, readMeta, readSyncState } from './build.ts';
 import { followsListening } from './fetch.ts';
 import type { LibraryChanges, LibrarySnapshot } from './snapshot.ts';
@@ -20,15 +29,50 @@ function library(): LibrarySnapshot {
 		const genre = GENRES[artist % GENRES.length];
 		for (let record = 0; record < 4; record++) {
 			const albumId = `al-${artist}-${record}`;
-			albums.push(nativeAlbum.parse({ id: albumId, name: `Record ${artist}.${record}`, albumArtistId: `ar-${artist}`, albumArtist: `Artist ${artist}`, maxYear: 1990 + record, genre, genres: [{ name: genre }], songCount: 10, duration: 2000, createdAt: '2026-01-01T00:00:00Z', importedAt: '2026-01-01T00:00:00Z', participants: { albumartist: [{ id: `ar-${artist}`, name: `Artist ${artist}` }] } }));
+			albums.push(
+				nativeAlbum.parse({
+					id: albumId,
+					name: `Record ${artist}.${record}`,
+					albumArtistId: `ar-${artist}`,
+					albumArtist: `Artist ${artist}`,
+					maxYear: 1990 + record,
+					genre,
+					genres: [{ name: genre }],
+					songCount: 10,
+					duration: 2000,
+					createdAt: '2026-01-01T00:00:00Z',
+					importedAt: '2026-01-01T00:00:00Z',
+					participants: { albumartist: [{ id: `ar-${artist}`, name: `Artist ${artist}` }] }
+				})
+			);
 			for (let track = 0; track < 10; track++) {
-				songs.push(nativeSong.parse({ id: `s-${artist}-${record}-${track}`, albumId, title: `Song ${artist}.${record}.${track}`, artist: `Artist ${artist}`, artistId: `ar-${artist}`, trackNumber: track + 1, discNumber: 1, duration: 200, genre, genres: [{ name: genre }], playCount: (artist * 7 + track * 3) % 11 }));
+				songs.push(
+					nativeSong.parse({
+						id: `s-${artist}-${record}-${track}`,
+						albumId,
+						title: `Song ${artist}.${record}.${track}`,
+						artist: `Artist ${artist}`,
+						artistId: `ar-${artist}`,
+						trackNumber: track + 1,
+						discNumber: 1,
+						duration: 200,
+						genre,
+						genres: [{ name: genre }],
+						playCount: (artist * 7 + track * 3) % 11
+					})
+				);
 			}
 		}
 	}
 	const playlists = [
 		nativePlaylist.parse({ id: 'pl-own', name: 'Mix', ownerId: USER, songCount: 3, updatedAt: '2026-02-01T00:00:00Z' }),
-		nativePlaylist.parse({ id: 'pl-smart', name: 'Most played', ownerId: USER, rules: { all: [{ gt: { playcount: 5 } }], sort: 'playcount' }, evaluatedAt: '2026-02-01T00:00:00Z' }),
+		nativePlaylist.parse({
+			id: 'pl-smart',
+			name: 'Most played',
+			ownerId: USER,
+			rules: { all: [{ gt: { playcount: 5 } }], sort: 'playcount' },
+			evaluatedAt: '2026-02-01T00:00:00Z'
+		}),
 		nativePlaylist.parse({ id: 'pl-this', name: 'This is Artist 3', ownerId: 'relay', songCount: 2, updatedAt: '2026-02-01T00:00:00Z' })
 	];
 	const playlistTracks = new Map<string, NativePlaylistTrack[]>([
@@ -36,7 +80,9 @@ function library(): LibrarySnapshot {
 		['pl-smart', ['s-5-1-1', 's-6-2-2'].map((id, index) => ({ id: String(index), mediaFileId: id }))],
 		['pl-this', ['s-3-0-0', 's-3-1-1'].map((id, index) => ({ id: String(index), mediaFileId: id }))]
 	]);
-	const artists = Array.from({ length: 12 }, (_, artist) => nativeArtist.parse({ id: `ar-${artist}`, imageHash: `hash-${artist}`, thumbHash: `thumb-${artist}`, dominantColor: '#202020' }));
+	const artists = Array.from({ length: 12 }, (_, artist) =>
+		nativeArtist.parse({ id: `ar-${artist}`, imageHash: `hash-${artist}`, thumbHash: `thumb-${artist}`, dominantColor: '#202020' })
+	);
 	return { albums, songs, playlists, playlistTracks, radioStations: [], artists };
 }
 
@@ -104,7 +150,9 @@ function withSongs(snapshot: LibrarySnapshot, change: (song: NativeSong) => Nati
 describe('applyChanges', () => {
 	it('matches a full rebuild after stars and plays, and rewrites little', () => {
 		const base = library();
-		const next = withSongs(base, (song) => (song.id === 's-4-1-3' ? { ...song, starred: true } : song.id.startsWith('s-7-') ? { ...song, playCount: song.playCount + 40 } : song));
+		const next = withSongs(base, (song) =>
+			song.id === 's-4-1-3' ? { ...song, starred: true } : song.id.startsWith('s-7-') ? { ...song, playCount: song.playCount + 40 } : song
+		);
 		const result = applied(base, next, []);
 		expect(result.changed).toBe(true);
 		expectSameLibrary(result.db, built(next));
@@ -122,7 +170,13 @@ describe('applyChanges', () => {
 
 	it('replaces a smart playlist whose tracks changed', () => {
 		const base = library();
-		const next: LibrarySnapshot = { ...base, playlistTracks: new Map([...base.playlistTracks, ['pl-smart', ['s-8-0-0', 's-5-1-1', 's-9-3-9'].map((id, index) => ({ id: String(index), mediaFileId: id }))]]) };
+		const next: LibrarySnapshot = {
+			...base,
+			playlistTracks: new Map([
+				...base.playlistTracks,
+				['pl-smart', ['s-8-0-0', 's-5-1-1', 's-9-3-9'].map((id, index) => ({ id: String(index), mediaFileId: id }))]
+			])
+		};
 		const result = applied(base, next, ['pl-smart']);
 		expect(result.changed).toBe(true);
 		expectSameLibrary(result.db, built(next));
@@ -130,8 +184,18 @@ describe('applyChanges', () => {
 
 	it('handles renamed, removed and new playlists, including a new "This is" playlist', () => {
 		const base = library();
-		const renamed = base.playlists.map((playlist): NativePlaylist => (playlist.id === 'pl-own' ? { ...playlist, name: 'Weekend mix', updatedAt: '2026-02-05T00:00:00Z' } : playlist)).filter((playlist) => playlist.id !== 'pl-this');
-		const added = nativePlaylist.parse({ id: 'pl-this-6', name: 'This is Artist 6', ownerId: 'relay', songCount: 1, updatedAt: '2026-02-05T00:00:00Z' });
+		const renamed = base.playlists
+			.map((playlist): NativePlaylist =>
+				playlist.id === 'pl-own' ? { ...playlist, name: 'Weekend mix', updatedAt: '2026-02-05T00:00:00Z' } : playlist
+			)
+			.filter((playlist) => playlist.id !== 'pl-this');
+		const added = nativePlaylist.parse({
+			id: 'pl-this-6',
+			name: 'This is Artist 6',
+			ownerId: 'relay',
+			songCount: 1,
+			updatedAt: '2026-02-05T00:00:00Z'
+		});
 		const tracks = new Map(base.playlistTracks);
 		tracks.delete('pl-this');
 		tracks.set('pl-this-6', [{ id: '0', mediaFileId: 's-6-0-0' }]);
@@ -143,17 +207,31 @@ describe('applyChanges', () => {
 
 	it('updates a new cover without rebuilding anything', () => {
 		const base = library();
-		const next: LibrarySnapshot = { ...base, albums: base.albums.map((album) => (album.id === 'al-2-1' ? { ...album, imageHash: '0123456789abcdef', dominantColor: '#336699', thumbHash: 'CSgGFwhHZZh/eHdzeUZnaXaJeffHd38M' } : album)) };
+		const next: LibrarySnapshot = {
+			...base,
+			albums: base.albums.map((album) =>
+				album.id === 'al-2-1'
+					? { ...album, imageHash: '0123456789abcdef', dominantColor: '#336699', thumbHash: 'CSgGFwhHZZh/eHdzeUZnaXaJeffHd38M' }
+					: album
+			)
+		};
 		const result = applied(base, next, []);
 		expect(result.changed).toBe(true);
 		expectSameLibrary(result.db, built(next));
-		expect(result.db.selectValue("select image_hash || ' ' || dominant_color from album where id = 'al-2-1'")).toBe('0123456789abcdef #336699');
+		expect(result.db.selectValue("select image_hash || ' ' || dominant_color from album where id = 'al-2-1'")).toBe(
+			'0123456789abcdef #336699'
+		);
 		expect(result.changedPages / result.pages).toBeLessThan(0.05);
 	});
 
 	it('updates a new artist photo without rebuilding anything', () => {
 		const base = library();
-		const next: LibrarySnapshot = { ...base, artists: base.artists.map((artist) => (artist.id === 'ar-5' ? { ...artist, imageHash: 'new-hash', thumbHash: 'new-thumb', dominantColor: '#aa5500' } : artist)) };
+		const next: LibrarySnapshot = {
+			...base,
+			artists: base.artists.map((artist) =>
+				artist.id === 'ar-5' ? { ...artist, imageHash: 'new-hash', thumbHash: 'new-thumb', dominantColor: '#aa5500' } : artist
+			)
+		};
 		const result = applied(base, next, []);
 		expect(result.changed).toBe(true);
 		expectSameLibrary(result.db, built(next));

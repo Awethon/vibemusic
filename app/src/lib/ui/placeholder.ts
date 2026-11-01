@@ -21,5 +21,12 @@ export type Placeholder = { color: string; thumb: string };
 export function placeholderStyle(art: Placeholder | undefined): string | undefined {
 	if (!art) return undefined;
 	const thumb = thumbUrl(art.thumb);
-	return [art.color && `background-color: ${art.color}`, thumb && `background-image: url("${thumb}"); background-size: cover; background-position: center`].filter(Boolean).join('; ') || undefined;
+	return (
+		[
+			art.color && `background-color: ${art.color}`,
+			thumb && `background-image: url("${thumb}"); background-size: cover; background-position: center`
+		]
+			.filter(Boolean)
+			.join('; ') || undefined
+	);
 }

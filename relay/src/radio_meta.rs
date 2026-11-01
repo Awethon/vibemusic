@@ -12,13 +12,22 @@ pub struct NowPlaying {
 pub fn from_icy(meta: &str) -> Option<NowPlaying> {
     let start = meta.find("StreamTitle='")? + "StreamTitle='".len();
     let rest = &meta[start..];
-    let text = rest.find("';").map_or(rest.trim_end_matches(['\0', '\'']), |end| &rest[..end]).trim();
+    let text = rest
+        .find("';")
+        .map_or(rest.trim_end_matches(['\0', '\'']), |end| &rest[..end])
+        .trim();
     if text.is_empty() {
         return None;
     }
     Some(match text.split_once(" - ") {
-        Some((artist, title)) => NowPlaying { title: title.trim().to_owned(), artist: artist.trim().to_owned() },
-        None => NowPlaying { title: text.to_owned(), artist: String::new() },
+        Some((artist, title)) => NowPlaying {
+            title: title.trim().to_owned(),
+            artist: artist.trim().to_owned(),
+        },
+        None => NowPlaying {
+            title: text.to_owned(),
+            artist: String::new(),
+        },
     })
 }
 
@@ -31,7 +40,12 @@ pub struct IcyStripper {
 
 impl IcyStripper {
     pub fn new(every: usize) -> Self {
-        Self { every, audio_left: every, meta_left: None, meta: Vec::new() }
+        Self {
+            every,
+            audio_left: every,
+            meta_left: None,
+            meta: Vec::new(),
+        }
     }
 
     pub fn feed(&mut self, mut chunk: &[u8]) -> (Vec<u8>, Option<NowPlaying>) {
@@ -94,7 +108,10 @@ impl OggTags {
             if self.pending.len() < 27 + segments {
                 break;
             }
-            let lacing: Vec<usize> = self.pending[27..27 + segments].iter().map(|&value| value as usize).collect();
+            let lacing: Vec<usize> = self.pending[27..27 + segments]
+                .iter()
+                .map(|&value| value as usize)
+                .collect();
             let size = 27 + segments + lacing.iter().sum::<usize>();
             if self.pending.len() < size {
                 if self.pending.len() > MAX_PENDING_BYTES {
@@ -127,7 +144,9 @@ impl OggTags {
 }
 
 fn comments(packet: &[u8]) -> Option<NowPlaying> {
-    let body = packet.strip_prefix(b"OpusTags").or_else(|| packet.strip_prefix(b"\x03vorbis"))?;
+    let body = packet
+        .strip_prefix(b"OpusTags")
+        .or_else(|| packet.strip_prefix(b"\x03vorbis"))?;
     let mut at = 0;
     let mut read = |count: usize| -> Option<&[u8]> {
         let slice = body.get(at..at + count)?;
@@ -142,7 +161,9 @@ fn comments(packet: &[u8]) -> Option<NowPlaying> {
     for _ in 0..count {
         let size = length(read(4)?);
         let entry = String::from_utf8_lossy(read(size)?).into_owned();
-        let Some((key, value)) = entry.split_once('=') else { continue };
+        let Some((key, value)) = entry.split_once('=') else {
+            continue;
+        };
         match key.to_ascii_uppercase().as_str() {
             "TITLE" => now.title = value.trim().to_owned(),
             "ARTIST" => now.artist = value.trim().to_owned(),
@@ -184,11 +205,25 @@ mod tests {
 
     #[test]
     fn reads_the_song_from_opus_tags_split_across_chunks() {
-        let stream = [page(7, 0x02, b"OpusHead........"), page(7, 0, &opus_tags(&["ARTIST=June Rivers", "title=Good Night", "x".repeat(600).as_str()]))].concat();
+        let stream = [
+            page(7, 0x02, b"OpusHead........"),
+            page(
+                7,
+                0,
+                &opus_tags(&["ARTIST=June Rivers", "title=Good Night", "x".repeat(600).as_str()]),
+            ),
+        ]
+        .concat();
         let mut tags = OggTags::default();
         let (first, second) = stream.split_at(40);
         assert_eq!(tags.feed(first), None);
-        assert_eq!(tags.feed(second), Some(NowPlaying { title: "Good Night".into(), artist: "June Rivers".into() }));
+        assert_eq!(
+            tags.feed(second),
+            Some(NowPlaying {
+                title: "Good Night".into(),
+                artist: "June Rivers".into()
+            })
+        );
     }
 
     #[test]
@@ -204,6 +239,12 @@ mod tests {
         let (audio, now) = stripper.feed(&stream[..7]);
         let (rest, later) = stripper.feed(&stream[7..]);
         assert_eq!([audio, rest].concat(), b"abcdefgh");
-        assert_eq!(now.or(later), Some(NowPlaying { title: "Good Night".into(), artist: "June Rivers".into() }));
+        assert_eq!(
+            now.or(later),
+            Some(NowPlaying {
+                title: "Good Night".into(),
+                artist: "June Rivers".into()
+            })
+        );
     }
 }

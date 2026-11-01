@@ -17,14 +17,24 @@
 <section id="classic" aria-label="Now playing">
 	<header class="cl-head">
 		<span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>
-		<button class="icon-btn" type="button" aria-label="Exit full screen" onclick={() => setFullScreen(false)}><Icon name="collapse" /></button>
+		<button class="icon-btn" type="button" aria-label="Exit full screen" onclick={() => setFullScreen(false)}
+			><Icon name="collapse" /></button
+		>
 	</header>
 	<div class="cl-stage" class:solo={noLyrics}>
 		<div class="cl-left">
 			<Cover albumId={track?.albumId} icon={isRadio(track?.id) ? 'radio' : undefined} size={COVER_PX.nowClassic} eager />
 			<h1>{track?.title ?? ''}</h1>
-			<p>{#if track}<TrackLinks {track} />{/if}</p>
+			<p>
+				{#if track}<TrackLinks {track} />{/if}
+			</p>
 		</div>
-		<LyricsLines outerClass="cl-lyrics" innerClass="cl-lines" outerId="clLyrics" focusRatio={LYRICS.focusLineRatio.classic} visible={ui.fullScreen && ui.fullScreenStyle === 'classic'} />
+		<LyricsLines
+			outerClass="cl-lyrics"
+			innerClass="cl-lines"
+			outerId="clLyrics"
+			focusRatio={LYRICS.focusLineRatio.classic}
+			visible={ui.fullScreen && ui.fullScreenStyle === 'classic'}
+		/>
 	</div>
 </section>

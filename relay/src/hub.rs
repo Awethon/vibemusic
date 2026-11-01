@@ -62,13 +62,16 @@ impl Room {
 
     fn announce_devices(&mut self) {
         let active = self.active.clone();
-        self.devices.retain(|device| device.connection.is_some() || active.as_deref() == Some(device.id.as_str()));
+        self.devices
+            .retain(|device| device.connection.is_some() || active.as_deref() == Some(device.id.as_str()));
         self.broadcast(&self.device_list(), None);
     }
 
     fn playback_message(&self) -> Value {
         match &self.playback {
-            Some((playback, at)) => json!({ "type": "playback", "playback": playback, "ageMs": at.elapsed().as_millis() as u64 }),
+            Some((playback, at)) => {
+                json!({ "type": "playback", "playback": playback, "ageMs": at.elapsed().as_millis() as u64 })
+            }
             None => json!({ "type": "playback", "playback": null, "ageMs": 0 }),
         }
     }
@@ -90,14 +93,21 @@ pub struct Hub {
 impl Hub {
     pub fn join(&mut self, user: &str, device_id: &str, name: &str, outbox: Outbox) -> u64 {
         self.next_connection += 1;
-        let connection = Connection { id: self.next_connection, outbox };
+        let connection = Connection {
+            id: self.next_connection,
+            outbox,
+        };
         let room = self.rooms.entry(user.to_owned()).or_default();
         match room.devices.iter_mut().find(|device| device.id == device_id) {
             Some(device) => {
                 device.name = name.to_owned();
                 device.connection = Some(connection);
             }
-            None => room.devices.push(Device { id: device_id.to_owned(), name: name.to_owned(), connection: Some(connection) }),
+            None => room.devices.push(Device {
+                id: device_id.to_owned(),
+                name: name.to_owned(),
+                connection: Some(connection),
+            }),
         }
         let mut welcome = room.device_list();
         welcome["type"] = json!("welcome");
@@ -112,7 +122,9 @@ impl Hub {
 
     pub fn leave(&mut self, user: &str, device_id: &str, connection_id: u64) {
         let Some(room) = self.rooms.get_mut(user) else { return };
-        let Some(index) = room.devices.iter().position(|device| device.id == device_id) else { return };
+        let Some(index) = room.devices.iter().position(|device| device.id == device_id) else {
+            return;
+        };
         if room.devices[index].connection.as_ref().map(|connection| connection.id) != Some(connection_id) {
             return;
         }
@@ -155,22 +167,36 @@ impl Hub {
                 room.broadcast(&room.playback_message(), Some(device_id));
             }
             Some("command") => {
-                if let Some(active) = room.active.clone().filter(|active| active != device_id && room.online(active)) {
-                    room.send(&active, &json!({ "type": "command", "command": message["command"], "from": device_id }));
+                if let Some(active) = room
+                    .active
+                    .clone()
+                    .filter(|active| active != device_id && room.online(active))
+                {
+                    room.send(
+                        &active,
+                        &json!({ "type": "command", "command": message["command"], "from": device_id }),
+                    );
                 }
             }
             Some("claim") if !is_active => {
                 let previous = room.active.replace(device_id.to_owned());
                 if let Some(previous) = previous {
-                    room.send(&previous, &json!({ "type": "release", "to": device_id, "handoff": false }));
+                    room.send(
+                        &previous,
+                        &json!({ "type": "release", "to": device_id, "handoff": false }),
+                    );
                 }
                 room.announce_devices();
             }
             Some("transfer") => {
-                let Some(to) = message["to"].as_str().filter(|to| room.online(to)) else { return };
+                let Some(to) = message["to"].as_str().filter(|to| room.online(to)) else {
+                    return;
+                };
                 match room.active.clone() {
                     Some(active) if active == to => {}
-                    Some(active) if room.online(&active) => room.send(&active, &json!({ "type": "release", "to": to, "handoff": true })),
+                    Some(active) if room.online(&active) => {
+                        room.send(&active, &json!({ "type": "release", "to": to, "handoff": true }))
+                    }
                     _ => room.take_over(to),
                 }
             }
@@ -206,7 +232,10 @@ mod tests {
     }
 
     fn types(messages: &[Value]) -> Vec<&str> {
-        messages.iter().map(|message| message["type"].as_str().unwrap()).collect()
+        messages
+            .iter()
+            .map(|message| message["type"].as_str().unwrap())
+            .collect()
     }
 
     #[test]
@@ -214,7 +243,10 @@ mod tests {
         let mut hub = Hub::default();
         let (_, mut alice) = connect(&mut hub, "alice", "a1");
         let (_, mut bob) = connect(&mut hub, "bob", "b1");
-        assert_eq!(drain(&mut alice).last().unwrap()["devices"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            drain(&mut alice).last().unwrap()["devices"].as_array().unwrap().len(),
+            1
+        );
         assert_eq!(drain(&mut bob)[0]["devices"][0]["id"], "b1");
         hub.receive("bob", "b1", &json!({ "type": "claim" }));
         hub.receive("bob", "b1", &json!({ "type": "queue", "queue": [1] }));
@@ -229,7 +261,11 @@ mod tests {
         hub.receive("u", "player", &json!({ "type": "claim" }));
         drain(&mut player);
         drain(&mut remote);
-        hub.receive("u", "remote", &json!({ "type": "command", "command": { "kind": "next" } }));
+        hub.receive(
+            "u",
+            "remote",
+            &json!({ "type": "command", "command": { "kind": "next" } }),
+        );
         let received = drain(&mut player);
         assert_eq!(types(&received), ["command"]);
         assert_eq!(received[0]["from"], "remote");
@@ -260,7 +296,11 @@ mod tests {
         let release = drain(&mut player);
         assert_eq!(release[0]["type"], "release");
         assert_eq!(release[0]["handoff"], true);
-        hub.receive("u", "player", &json!({ "type": "handoff", "to": "target", "queue": ["q"], "playback": { "position": 42 } }));
+        hub.receive(
+            "u",
+            "player",
+            &json!({ "type": "handoff", "to": "target", "queue": ["q"], "playback": { "position": 42 } }),
+        );
         let received = drain(&mut target);
         assert_eq!(types(&received), ["takeover", "devices"]);
         assert_eq!(received[0]["playback"]["position"], 42);

@@ -29,7 +29,8 @@ function closeTopmost() {
 
 function onKeydown(event: KeyboardEvent) {
 	if (event.key === 'Escape' && closeTopmost()) return;
-	if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen) return;
+	if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen)
+		return;
 	if (event.key === '/') ui.searchOpen = true;
 	else if (event.code === 'Space') togglePlay();
 	else if (event.shiftKey && event.key === 'ArrowRight') playNextTrack();

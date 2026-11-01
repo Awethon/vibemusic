@@ -1,33 +1,49 @@
 export const ICONS = Object.freeze({
 	play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11.3-7.2c.6-.4.6-1.3 0-1.7L8.6 3.9C7.9 3.5 7 4 7 4.8z"/></svg>',
-	pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>',
+	pause:
+		'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>',
 	prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 5.6v12.8c0 .8-.9 1.2-1.5.8L7.4 13c-.6-.4-.6-1.3 0-1.7l9.1-6.3c.6-.5 1.5 0 1.5.6z"/><rect x="5" y="5" width="2.2" height="14" rx="1"/></svg>',
 	next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5.6v12.8c0 .8.9 1.2 1.5.8l9.1-6.2c.6-.4.6-1.3 0-1.7L7.5 5C6.9 4.5 6 5 6 5.6z"/><rect x="16.8" y="5" width="2.2" height="14" rx="1"/></svg>',
 	vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
 	mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
-	expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>',
-	collapse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10h-6V4M4 14h6v6M14 10l6.5-6.5M10 14l-6.5 6.5"/></svg>',
-	close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+	expand:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>',
+	collapse:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10h-6V4M4 14h6v6M14 10l6.5-6.5M10 14l-6.5 6.5"/></svg>',
+	close:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 	down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
-	heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></svg>',
-	search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>',
+	heart:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></svg>',
+	search:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>',
 	gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12.00 3.25L12.31 3.26L12.61 3.27L12.91 3.30L13.22 3.34L13.52 3.38L13.82 3.45L14.09 3.62L14.33 3.87L14.54 4.19L14.71 4.55L14.86 4.93L14.99 5.28L15.13 5.58L15.29 5.82L15.48 5.98L15.71 6.06L15.99 6.08L16.32 6.05L16.70 5.99L17.09 5.93L17.49 5.90L17.88 5.91L18.22 6.00L18.49 6.15L18.70 6.38L18.90 6.61L19.08 6.86L19.25 7.11L19.42 7.36L19.58 7.63L19.73 7.89L19.86 8.16L19.99 8.44L20.11 8.72L20.22 9.01L20.31 9.30L20.31 9.62L20.21 9.95L20.03 10.29L19.80 10.62L19.55 10.94L19.32 11.23L19.12 11.50L18.99 11.76L18.95 12.00L18.99 12.24L19.12 12.50L19.32 12.77L19.55 13.06L19.80 13.38L20.03 13.71L20.21 14.05L20.31 14.38L20.31 14.70L20.22 14.99L20.11 15.28L19.99 15.56L19.86 15.84L19.73 16.11L19.58 16.38L19.42 16.64L19.25 16.89L19.08 17.14L18.90 17.39L18.70 17.62L18.49 17.85L18.22 18.00L17.88 18.09L17.49 18.10L17.09 18.07L16.70 18.01L16.32 17.95L15.99 17.92L15.71 17.94L15.48 18.02L15.29 18.18L15.13 18.42L14.99 18.72L14.86 19.07L14.71 19.45L14.54 19.81L14.33 20.13L14.09 20.38L13.82 20.55L13.52 20.62L13.22 20.66L12.91 20.70L12.61 20.73L12.31 20.74L12.00 20.75L11.69 20.74L11.39 20.73L11.09 20.70L10.78 20.66L10.48 20.62L10.18 20.55L9.91 20.38L9.67 20.13L9.46 19.81L9.29 19.45L9.14 19.07L9.01 18.72L8.87 18.42L8.71 18.18L8.53 18.02L8.29 17.94L8.01 17.92L7.68 17.95L7.30 18.01L6.91 18.07L6.51 18.10L6.12 18.09L5.78 18.00L5.51 17.85L5.30 17.62L5.10 17.39L4.92 17.14L4.75 16.89L4.58 16.64L4.42 16.38L4.27 16.11L4.14 15.84L4.01 15.56L3.89 15.28L3.78 14.99L3.69 14.70L3.69 14.38L3.79 14.05L3.97 13.71L4.20 13.38L4.45 13.06L4.68 12.77L4.88 12.50L5.01 12.24L5.05 12.00L5.01 11.76L4.88 11.50L4.68 11.23L4.45 10.94L4.20 10.62L3.97 10.29L3.79 9.95L3.69 9.62L3.69 9.30L3.78 9.01L3.89 8.72L4.01 8.44L4.14 8.16L4.27 7.89L4.42 7.62L4.58 7.36L4.75 7.11L4.92 6.86L5.10 6.61L5.30 6.38L5.51 6.15L5.78 6.00L6.12 5.91L6.51 5.90L6.91 5.93L7.30 5.99L7.68 6.05L8.01 6.08L8.29 6.06L8.52 5.98L8.71 5.82L8.87 5.58L9.01 5.28L9.14 4.93L9.29 4.55L9.46 4.19L9.67 3.87L9.91 3.62L10.18 3.45L10.48 3.38L10.78 3.34L11.09 3.30L11.39 3.27L11.69 3.26Z M15.50 12a3.50 3.50 0 1 1-7.00 0a3.50 3.50 0 1 1 7.00 0Z"/></svg>',
 	list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
 	home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6L12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>',
-	queue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 11h16M4 16h9"/><path d="M17 15v5l4-2.5z" fill="currentColor" stroke-linejoin="round"/></svg>',
+	queue:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 11h16M4 16h9"/><path d="M17 15v5l4-2.5z" fill="currentColor" stroke-linejoin="round"/></svg>',
 	mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/></svg>',
 	plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
-	radio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8.5" width="18" height="12" rx="2.5"/><path d="M7 8.5l9-5"/><circle cx="15.5" cy="14.5" r="2.6"/><path d="M6.8 12.8h3.4M6.8 16.2h3.4"/></svg>',
-	timeline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="9" height="4" rx="2"/><rect x="9" y="10" width="11.5" height="4" rx="2"/><rect x="6" y="15.5" width="8" height="4" rx="2"/></svg>',
-	lists: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h11M4 11.5h11M4 16.5h6.5"/><circle cx="16.5" cy="17" r="2.5"/><path d="M19 17V8.5l2-1"/></svg>',
+	radio:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8.5" width="18" height="12" rx="2.5"/><path d="M7 8.5l9-5"/><circle cx="15.5" cy="14.5" r="2.6"/><path d="M6.8 12.8h3.4M6.8 16.2h3.4"/></svg>',
+	timeline:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="9" height="4" rx="2"/><rect x="9" y="10" width="11.5" height="4" rx="2"/><rect x="6" y="15.5" width="8" height="4" rx="2"/></svg>',
+	lists:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h11M4 11.5h11M4 16.5h6.5"/><circle cx="16.5" cy="17" r="2.5"/><path d="M19 17V8.5l2-1"/></svg>',
 	fold: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9 4.5v15M15.5 10l-2 2 2 2"/></svg>',
-	unfold: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9 4.5v15M13.5 10l2 2-2 2"/></svg>',
+	unfold:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9 4.5v15M13.5 10l2 2-2 2"/></svg>',
 	grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
-	speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="4" width="11" height="16" rx="2.5"/><circle cx="12" cy="13.8" r="2.8"/><path d="M12 7.9h.01"/></svg>',
-	laptop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M2.5 18.5h19"/></svg>',
-	desktop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>',
-	phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/></svg>',
-	smart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/></svg>'
+	speaker:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="4" width="11" height="16" rx="2.5"/><circle cx="12" cy="13.8" r="2.8"/><path d="M12 7.9h.01"/></svg>',
+	laptop:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M2.5 18.5h19"/></svg>',
+	desktop:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>',
+	phone:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/></svg>',
+	smart:
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4.5h-4.5"/></svg>'
 });
 
 export type IconName = keyof typeof ICONS;

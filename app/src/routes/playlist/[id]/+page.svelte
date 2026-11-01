@@ -37,7 +37,9 @@
 			<div>
 				<p class="eyebrow">{playlistKindLabel(playlist.value)}</p>
 				<h1 class="display">{playlist.value.name}</h1>
-				{#if playlist.value.kind === 'artist'}<p class="sub"><a href={resolve('/artist/[id]', { id: playlist.value.artistId })}>{playlist.value.name.replace(/^This is /, '')}</a></p>{/if}
+				{#if playlist.value.kind === 'artist'}<p class="sub">
+						<a href={resolve('/artist/[id]', { id: playlist.value.artistId })}>{playlist.value.name.replace(/^This is /, '')}</a>
+					</p>{/if}
 				{#if updateLine}<p class="sub smart-line"><Icon name="smart" /><span>{updateLine}</span></p>{/if}
 				<p class="genres">{plural(tracks.value.length, 'track')} · {longDuration(duration)}</p>
 				<div style:margin-top="20px"><PlayButton tracks={playable} sourceName={playlist.value.name} listKey="playlist:{id}" /></div>
@@ -46,7 +48,16 @@
 		{#if tracks.value.length}
 			<VirtualGrid items={rows} key={(row) => `${row.index}`} measure={rowMeasure} className="tracks wide">
 				{#snippet item(row)}
-					<TrackRow tracks={tracks.value} index={row.index} sourceName={playlist.value?.name ?? ''} listKey="playlist:{id}" number={row.index + 1} showArtist showAlbum playlist={playlist.value ?? undefined} />
+					<TrackRow
+						tracks={tracks.value}
+						index={row.index}
+						sourceName={playlist.value?.name ?? ''}
+						listKey="playlist:{id}"
+						number={row.index + 1}
+						showArtist
+						showAlbum
+						playlist={playlist.value ?? undefined}
+					/>
 				{/snippet}
 			</VirtualGrid>
 		{:else if tracks.loaded}

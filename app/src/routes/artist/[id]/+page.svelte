@@ -2,7 +2,16 @@
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { albumsByArtist, artistById, artistPlaylist, playlistTracks, tracksByIds, withoutDisliked, type Artist, type Track } from '#lib/library/queries.ts';
+	import {
+		albumsByArtist,
+		artistById,
+		artistPlaylist,
+		playlistTracks,
+		tracksByIds,
+		withoutDisliked,
+		type Artist,
+		type Track
+	} from '#lib/library/queries.ts';
 	import { artistInfo } from '#lib/navidrome/artistInfo.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
@@ -12,7 +21,6 @@
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 	import { ARTIST_PAGE, COVER_PX } from '#lib/tuning.ts';
-
 
 	const id = $derived(page.params.id ?? '');
 	const artist = live(() => artistById(id), null);
@@ -57,7 +65,11 @@
 			<div class="artist-intro">
 				<p class="eyebrow">Artist</p>
 				<h1 class="display">{artist.value.name}</h1>
-				<p class="sub">{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}{artist.value.firstYear ? ` · since ${artist.value.firstYear}` : ''}</p>
+				<p class="sub">
+					{plural(artist.value.albumCount, 'album')} · {plural(artist.value.trackCount, 'track')}{artist.value.firstYear
+						? ` · since ${artist.value.firstYear}`
+						: ''}
+				</p>
 				{#if biography}
 					<p class="bio" class:open={expanded}>{biography}</p>
 					<button class="ghost" type="button" onclick={() => (expanded = !expanded)}>{expanded ? 'Show less' : 'Read more'}</button>
@@ -69,7 +81,13 @@
 				<div>
 					<h2 class="section-title">Popular</h2>
 					{#if thisIs.value}
-						<TrackList tracks={thisIs.value.tracks.slice(0, ARTIST_PAGE.popularCount)} sourceName={thisIs.value.playlist.name} listKey="playlist:{thisIs.value.playlist.id}" playlist={thisIs.value.playlist} showAlbum />
+						<TrackList
+							tracks={thisIs.value.tracks.slice(0, ARTIST_PAGE.popularCount)}
+							sourceName={thisIs.value.playlist.name}
+							listKey="playlist:{thisIs.value.playlist.id}"
+							playlist={thisIs.value.playlist}
+							showAlbum
+						/>
 					{:else}
 						<TrackList tracks={popular} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
 					{/if}
@@ -77,7 +95,9 @@
 				{#if thisIs.value}
 					{@const playlist = thisIs.value.playlist}
 					<div class="this-is-card">
-						<a href={resolve('/playlist/[id]', { id: playlist.id })} data-id={playlist.id}><PlaylistMosaic {playlist} size={COVER_PX.artistPlaylist} /></a>
+						<a href={resolve('/playlist/[id]', { id: playlist.id })} data-id={playlist.id}
+							><PlaylistMosaic {playlist} size={COVER_PX.artistPlaylist} /></a
+						>
 						<a class="t" href={resolve('/playlist/[id]', { id: playlist.id })}>{playlist.name}</a>
 						<span class="s">{playlistMetaLine(playlist)}</span>
 						<PlayButton tracks={withoutDisliked(thisIs.value.tracks).tracks} sourceName={playlist.name} listKey="playlist:{playlist.id}" />
@@ -93,7 +113,9 @@
 			<h2 class="section-title">Similar in your library</h2>
 			<div class="artist-strip">
 				{#each similar as other (other.id)}
-					<a href={resolve('/artist/[id]', { id: other.id })} data-preview-album={other.newestAlbumId}>{other.name}<sup>{other.albumCount}</sup></a>
+					<a href={resolve('/artist/[id]', { id: other.id })} data-preview-album={other.newestAlbumId}
+						>{other.name}<sup>{other.albumCount}</sup></a
+					>
 				{/each}
 			</div>
 		{/if}

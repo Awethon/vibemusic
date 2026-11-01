@@ -76,7 +76,12 @@ struct Entry<T> {
 
 impl<T> Entry<T> {
     fn fresh(&self, now: u64, fresh_ms: u64) -> bool {
-        now.saturating_sub(self.at) < if self.value.is_some() { fresh_ms } else { MISSING_FRESH_MS }
+        now.saturating_sub(self.at)
+            < if self.value.is_some() {
+                fresh_ms
+            } else {
+                MISSING_FRESH_MS
+            }
     }
 }
 
@@ -138,7 +143,11 @@ struct Changes {
 
 impl Changes {
     fn is_empty(&self) -> bool {
-        self.release_groups.is_empty() && self.mb_artists.is_empty() && self.deezer.is_empty() && self.artist_matches.is_empty() && self.apple.is_empty()
+        self.release_groups.is_empty()
+            && self.mb_artists.is_empty()
+            && self.deezer.is_empty()
+            && self.artist_matches.is_empty()
+            && self.apple.is_empty()
     }
 
     fn message(&self, at: u64) -> Value {
@@ -169,11 +178,17 @@ pub struct Enricher {
 }
 
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|elapsed| elapsed.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn valid_mbid(id: &str) -> bool {
-    id.len() == 36 && id.chars().all(|character| character.is_ascii_hexdigit() || character == '-')
+    id.len() == 36
+        && id
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || character == '-')
 }
 
 fn clip(text: &str) -> String {
@@ -205,7 +220,10 @@ impl State {
     }
 
     fn needs_artist(&self, id: &str, now: u64) -> bool {
-        self.cache.mb_artists.get(id).is_none_or(|entry| !entry.fresh(now, MUSICBRAINZ_FRESH_MS) || entry.value.as_ref().is_some_and(|artist| artist.countries.is_none()))
+        self.cache.mb_artists.get(id).is_none_or(|entry| {
+            !entry.fresh(now, MUSICBRAINZ_FRESH_MS)
+                || entry.value.as_ref().is_some_and(|artist| artist.countries.is_none())
+        })
     }
 
     fn answer_artist(&mut self, id: &str, since: u64, now: u64, reply: &mut Changes) {
@@ -219,7 +237,12 @@ impl State {
 
     fn answer(&mut self, request: EnrichRequest, now: u64) -> Changes {
         let mut reply = Changes::default();
-        for id in request.release_groups.into_iter().filter(|id| valid_mbid(id)).take(MAX_RELEASE_GROUPS) {
+        for id in request
+            .release_groups
+            .into_iter()
+            .filter(|id| valid_mbid(id))
+            .take(MAX_RELEASE_GROUPS)
+        {
             let entry = self.cache.release_groups.get(&id).cloned();
             match entry {
                 Some(entry) => {
@@ -236,8 +259,22 @@ impl State {
                 None => self.queue_musicbrainz(MbJob::ReleaseGroup(id)),
             }
         }
-        for search in request.mb_search.into_iter().filter(|search| !search.id.is_empty() && !search.name.trim().is_empty()).take(MAX_ARTISTS) {
-            let search = SearchRequest { id: clip(&search.id), name: clip(&search.name), albums: search.albums.iter().take(MAX_RELEASE_GROUPS).map(|title| clip(title)).collect() };
+        for search in request
+            .mb_search
+            .into_iter()
+            .filter(|search| !search.id.is_empty() && !search.name.trim().is_empty())
+            .take(MAX_ARTISTS)
+        {
+            let search = SearchRequest {
+                id: clip(&search.id),
+                name: clip(&search.name),
+                albums: search
+                    .albums
+                    .iter()
+                    .take(MAX_RELEASE_GROUPS)
+                    .map(|title| clip(title))
+                    .collect(),
+            };
             match self.cache.artist_matches.get(&search.id).cloned() {
                 Some(entry) => {
                     if entry.at > request.since {
@@ -253,7 +290,12 @@ impl State {
                 None => self.queue_musicbrainz(MbJob::Search(search)),
             }
         }
-        for artist in request.artists.into_iter().filter(|artist| !artist.id.is_empty() && !artist.name.trim().is_empty()).take(MAX_ARTISTS) {
+        for artist in request
+            .artists
+            .into_iter()
+            .filter(|artist| !artist.id.is_empty() && !artist.name.trim().is_empty())
+            .take(MAX_ARTISTS)
+        {
             let artist = ArtistRequest {
                 id: clip(&artist.id),
                 name: clip(&artist.name),
@@ -290,16 +332,26 @@ impl State {
 
 impl Enricher {
     pub fn new(path: Option<PathBuf>, apple: Apple) -> Arc<Self> {
-        let cache = path.as_ref().and_then(|path| std::fs::read(path).ok()).and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default();
+        let cache = path
+            .as_ref()
+            .and_then(|path| std::fs::read(path).ok())
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
         let (updates, _) = broadcast::channel(64);
         let enricher = Arc::new(Self {
-            state: Mutex::new(State { cache, ..State::default() }),
+            state: Mutex::new(State {
+                cache,
+                ..State::default()
+            }),
             musicbrainz_ready: Notify::new(),
             deezer_ready: Notify::new(),
             apple_ready: Notify::new(),
             apple,
             updates,
-            client: reqwest::Client::builder().timeout(Duration::from_secs(20)).build().expect("http client"),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .build()
+                .expect("http client"),
             path,
         });
         tokio::spawn(enricher.clone().run_musicbrainz());
@@ -310,12 +362,25 @@ impl Enricher {
     }
 
     pub fn deezer_top(&self, artist_id: &str) -> Vec<(String, u64)> {
-        self.state.lock().unwrap().cache.deezer.get(artist_id).and_then(|entry| entry.value.as_ref()).map(|artist| artist.top.clone()).unwrap_or_default()
+        self.state
+            .lock()
+            .unwrap()
+            .cache
+            .deezer
+            .get(artist_id)
+            .and_then(|entry| entry.value.as_ref())
+            .map(|artist| artist.top.clone())
+            .unwrap_or_default()
     }
 
     pub fn apple_top(&self, artist_id: &str) -> Option<Vec<String>> {
         let state = self.state.lock().unwrap();
-        state.cache.apple.get(artist_id).filter(|entry| entry.fresh(now_ms(), APPLE_FRESH_MS)).map(|entry| entry.value.clone().unwrap_or_default())
+        state
+            .cache
+            .apple
+            .get(artist_id)
+            .filter(|entry| entry.fresh(now_ms(), APPLE_FRESH_MS))
+            .map(|entry| entry.value.clone().unwrap_or_default())
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
@@ -327,7 +392,12 @@ impl Enricher {
         let (reply, musicbrainz, deezer, apple) = {
             let mut state = self.state.lock().unwrap();
             let reply = state.answer(request, now);
-            (reply, !state.musicbrainz.is_empty(), !state.deezer.is_empty(), !state.apple.is_empty())
+            (
+                reply,
+                !state.musicbrainz.is_empty(),
+                !state.deezer.is_empty(),
+                !state.apple.is_empty(),
+            )
         };
         if apple {
             self.apple_ready.notify_one();
@@ -527,7 +597,8 @@ impl Enricher {
             flush.tick().await;
             let (message, snapshot) = {
                 let mut state = self.state.lock().unwrap();
-                let message = (!state.changes.is_empty()).then(|| std::mem::take(&mut state.changes).message(now_ms()).to_string());
+                let message = (!state.changes.is_empty())
+                    .then(|| std::mem::take(&mut state.changes).message(now_ms()).to_string());
                 let due = state.unsaved && last_save.elapsed() >= SAVE_EVERY && self.path.is_some();
                 let snapshot = due.then(|| serde_json::to_vec(&state.cache).ok()).flatten();
                 if snapshot.is_some() {
@@ -541,7 +612,10 @@ impl Enricher {
             if let (Some(bytes), Some(path)) = (snapshot, &self.path) {
                 last_save = tokio::time::Instant::now();
                 let temporary = path.with_extension("tmp");
-                if let Err(error) = tokio::fs::write(&temporary, bytes).await.and(tokio::fs::rename(&temporary, path).await) {
+                if let Err(error) = tokio::fs::write(&temporary, bytes)
+                    .await
+                    .and(tokio::fs::rename(&temporary, path).await)
+                {
                     tracing::warn!(%error, path = %path.display(), "could not save the enrichment cache");
                 }
             }
@@ -561,7 +635,12 @@ mod tests {
             mb_search: Vec::new(),
             since,
             release_groups: vec![GROUP.into(), "not-an-id".into()],
-            artists: vec![ArtistRequest { id: "nd-1".into(), name: "Glass Harbor".into(), songs: vec!["Lighthouse".into()], albums: vec!["Second Wind".into()] }],
+            artists: vec![ArtistRequest {
+                id: "nd-1".into(),
+                name: "Glass Harbor".into(),
+                songs: vec!["Lighthouse".into()],
+                albums: vec!["Second Wind".into()],
+            }],
         }
     }
 
@@ -579,8 +658,17 @@ mod tests {
     #[test]
     fn answers_only_what_changed_since_the_last_answer_and_queues_the_album_artist() {
         let mut state = State::default();
-        let group = ReleaseGroup { artists: vec![ARTIST.into()], tags: vec![Tag("idm".into(), 9)] };
-        state.cache.release_groups.insert(GROUP.into(), Entry { at: 500, value: Some(group.clone()) });
+        let group = ReleaseGroup {
+            artists: vec![ARTIST.into()],
+            tags: vec![Tag("idm".into(), 9)],
+        };
+        state.cache.release_groups.insert(
+            GROUP.into(),
+            Entry {
+                at: 500,
+                value: Some(group.clone()),
+            },
+        );
         let reply = state.answer(request(0), 1_000);
         assert_eq!(reply.release_groups.get(GROUP), Some(&Some(group)));
         assert!(matches!(state.musicbrainz.front(), Some((MbJob::Artist(id), 0)) if id == ARTIST));
@@ -590,7 +678,10 @@ mod tests {
     #[test]
     fn refreshes_stale_entries_and_retries_missing_ones_sooner() {
         let mut state = State::default();
-        state.cache.release_groups.insert(GROUP.into(), Entry { at: 0, value: None });
+        state
+            .cache
+            .release_groups
+            .insert(GROUP.into(), Entry { at: 0, value: None });
         state.answer(request(0), MISSING_FRESH_MS - 1);
         assert!(state.musicbrainz.is_empty());
         state.answer(request(0), MISSING_FRESH_MS + 1);

@@ -38,7 +38,8 @@ async function readLegacy(match: (name: string) => boolean): Promise<Uint8Array 
 	if (!directory) return null;
 	try {
 		for await (const [name, handle] of directory.entries()) {
-			if (handle.kind === 'file' && match(name)) return new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer());
+			if (handle.kind === 'file' && match(name))
+				return new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer());
 		}
 	} catch {
 		return null;
@@ -162,10 +163,23 @@ async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ me
 	}
 	const writeStarted = performance.now();
 	const snapshotBytes = await writeSnapshot(database);
-	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes, steps: snapshot.steps ?? {} } };
+	return {
+		meta,
+		timings: {
+			fetchMs,
+			buildMs: writeStarted - buildStarted,
+			writeMs: performance.now() - writeStarted,
+			snapshotBytes,
+			steps: snapshot.steps ?? {}
+		}
+	};
 }
 
-async function syncChanges(http: NavidromeHttp, albumIds: string[], artistIds: string[]): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
+async function syncChanges(
+	http: NavidromeHttp,
+	albumIds: string[],
+	artistIds: string[]
+): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
 	const meta = db && readMeta(db);
 	const sync = db && readSyncState(db);
 	if (!meta || !sync || Date.now() - Date.parse(sync.fullSyncAt) > LIBRARY_SYNC.fullSyncIntervalMs) return null;
@@ -211,7 +225,13 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 		}
 		case 'query': {
 			const columns: string[] = [];
-			const rows = requireDatabase().exec({ sql: request.sql, bind: request.params, rowMode: 'array', returnValue: 'resultRows', columnNames: columns });
+			const rows = requireDatabase().exec({
+				sql: request.sql,
+				bind: request.params,
+				rowMode: 'array',
+				returnValue: 'resultRows',
+				columnNames: columns
+			});
 			return { columns, rows } as WorkerResults['query'];
 		}
 		case 'persist':
@@ -242,7 +262,13 @@ self.addEventListener('message', async (event: MessageEvent<WorkerEnvelope>) => 
 	try {
 		reply = { id, ok: true, value: await handle(id, request) };
 	} catch (error) {
-		reply = { id, ok: false, error: error instanceof Error ? error.message : String(error), expired: error instanceof SessionExpiredError, unreachable: error instanceof NavidromeUnreachableError };
+		reply = {
+			id,
+			ok: false,
+			error: error instanceof Error ? error.message : String(error),
+			expired: error instanceof SessionExpiredError,
+			unreachable: error instanceof NavidromeUnreachableError
+		};
 	}
 	self.postMessage(reply);
 });

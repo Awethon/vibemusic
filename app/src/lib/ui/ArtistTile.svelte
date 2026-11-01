@@ -23,7 +23,10 @@
 		<span class="art"><ArtistPhoto artistId={artist.id} fallbackAlbumId={artist.newestAlbumId} size={COVER_PX.tile} /></span>
 	{:else}
 		<span class="art" class:quad={coverCount === 4} class:duo={coverCount === 2}>
-			{#each artist.coverAlbumIds.slice(0, coverCount) as albumId (albumId)}<Cover {albumId} size={coverCount > 1 ? COVER_PX.tileQuarter : COVER_PX.tile} />{/each}
+			{#each artist.coverAlbumIds.slice(0, coverCount) as albumId (albumId)}<Cover
+					{albumId}
+					size={coverCount > 1 ? COVER_PX.tileQuarter : COVER_PX.tile}
+				/>{/each}
 		</span>
 	{/if}
 	<span class="t">{artist.name}</span><span class="s">{plural(artist.albumCount, 'album')} · {plural(artist.trackCount, 'track')}</span>

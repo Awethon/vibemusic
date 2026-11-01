@@ -12,7 +12,14 @@
 		alphabetEntries = null,
 		className = '',
 		item
-	}: { items: T[]; key: (item: T) => string; measure: Measure; alphabetEntries?: AlphabetEntry[] | null; className?: string; item: Snippet<[T, number]> } = $props();
+	}: {
+		items: T[];
+		key: (item: T) => string;
+		measure: Measure;
+		alphabetEntries?: AlphabetEntry[] | null;
+		className?: string;
+		item: Snippet<[T, number]>;
+	} = $props();
 
 	let container = $state<HTMLElement | null>(null);
 	let geometry = $state<Geometry | null>(null);
@@ -34,12 +41,17 @@
 		const scrolledInto = scroller.scrollTop - offsetWithinScroller(scroller);
 		const rows = Math.ceil(items.length / geometry.columns);
 		const firstRow = Math.max(0, Math.floor(scrolledInto / geometry.rowHeight) - LAYOUT.virtualOverscanRows);
-		const lastRow = Math.min(rows - 1, Math.floor((scrolledInto + scroller.clientHeight) / geometry.rowHeight) + LAYOUT.virtualOverscanRows);
+		const lastRow = Math.min(
+			rows - 1,
+			Math.floor((scrolledInto + scroller.clientHeight) / geometry.rowHeight) + LAYOUT.virtualOverscanRows
+		);
 		const first = firstRow * geometry.columns;
 		const last = Math.min(items.length - 1, (lastRow + 1) * geometry.columns - 1);
 		if (first !== range.first || last !== range.last) range = { first, last };
 		if (alphabetEntries) {
-			const probeIndex = Math.floor(Math.max(0, scrolledInto + stickyHeight(scroller) + LAYOUT.alphabetProbeOffsetPx) / geometry.rowHeight) * geometry.columns;
+			const probeIndex =
+				Math.floor(Math.max(0, scrolledInto + stickyHeight(scroller) + LAYOUT.alphabetProbeOffsetPx) / geometry.rowHeight) *
+				geometry.columns;
 			let entryIndex = 0;
 			for (let index = 0; index < alphabetEntries.length; index++) {
 				if (alphabetEntries[index].index <= probeIndex) entryIndex = index;
@@ -121,7 +133,9 @@
 				class="vcell"
 				data-id={key(cell.value)}
 				style:width="{geometry.itemWidth}px"
-				style:transform="translate({(cell.index % geometry.columns) * (geometry.itemWidth + geometry.gapX)}px, {Math.floor(cell.index / geometry.columns) * geometry.rowHeight}px)"
+				style:transform="translate({(cell.index % geometry.columns) * (geometry.itemWidth + geometry.gapX)}px, {Math.floor(
+					cell.index / geometry.columns
+				) * geometry.rowHeight}px)"
 			>
 				{@render item(cell.value, cell.index)}
 			</div>

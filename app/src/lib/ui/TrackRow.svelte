@@ -14,7 +14,16 @@
 		showArtist,
 		showAlbum,
 		playlist
-	}: { tracks: Track[]; index: number; sourceName: string; listKey: string; number: number | string; showArtist: boolean; showAlbum: boolean; playlist?: Playlist } = $props();
+	}: {
+		tracks: Track[];
+		index: number;
+		sourceName: string;
+		listKey: string;
+		number: number | string;
+		showArtist: boolean;
+		showAlbum: boolean;
+		playlist?: Playlist;
+	} = $props();
 
 	const track = $derived(tracks[index]);
 	const skipping = $derived(skipsDisliked(playlist));
@@ -38,7 +47,9 @@
 	oncontextmenu={(event) => openMenu(event, trackMenu(tracks, index, sourceName, listKey, playlist))}
 >
 	<span class="n">{number}</span>
-	<span class="tt"><b>{track.title}</b>{#if showArtist}<small>{track.artist}</small>{/if}</span>
+	<span class="tt"
+		><b>{track.title}</b>{#if showArtist}<small>{track.artist}</small>{/if}</span
+	>
 	{#if showAlbum}<span class="al">{track.album}</span>{/if}
 	<span class="d">{isRadio(track.id) ? 'Live' : clock(track.duration)}</span>
 </div>

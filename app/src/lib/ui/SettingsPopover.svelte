@@ -29,7 +29,11 @@
 		if (!anchor || !element) return;
 		const width = element.offsetWidth;
 		const bottom = innerHeight - anchor.top + POPOVER.anchorGapPx;
-		position = { left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - width - POPOVER.edgeMarginPx)), bottom, maxHeight: innerHeight - bottom - POPOVER.edgeMarginPx };
+		position = {
+			left: Math.max(POPOVER.edgeMarginPx, Math.min(anchor.left, innerWidth - width - POPOVER.edgeMarginPx)),
+			bottom,
+			maxHeight: innerHeight - bottom - POPOVER.edgeMarginPx
+		};
 	}
 
 	$effect(() => {
@@ -59,9 +63,25 @@
 
 <svelte:document onfullscreenchange={() => (fullScreen = !!document.fullscreenElement)} />
 
-<svelte:window onpointerdown={(event) => ui.settingsOpen && !element?.contains(event.target as Node) && !(event.target as Element).closest('#bSettings') && (ui.settingsOpen = false)} />
+<svelte:window
+	onpointerdown={(event) =>
+		ui.settingsOpen &&
+		!element?.contains(event.target as Node) &&
+		!(event.target as Element).closest('#bSettings') &&
+		(ui.settingsOpen = false)}
+/>
 
-<div id="settings" class="pop" class:open={ui.settingsOpen} role="dialog" aria-label="Settings" bind:this={element} style:left={formFactor.phone ? undefined : `${position.left}px`} style:bottom={formFactor.phone ? undefined : `${position.bottom}px`} style:max-height={formFactor.phone ? undefined : `${position.maxHeight}px`}>
+<div
+	id="settings"
+	class="pop"
+	class:open={ui.settingsOpen}
+	role="dialog"
+	aria-label="Settings"
+	bind:this={element}
+	style:left={formFactor.phone ? undefined : `${position.left}px`}
+	style:bottom={formFactor.phone ? undefined : `${position.bottom}px`}
+	style:max-height={formFactor.phone ? undefined : `${position.maxHeight}px`}
+>
 	{#if !formFactor.phone}
 		<section class="set-group wide">
 			<p class="pop-title">Full-screen style</p>
@@ -77,21 +97,35 @@
 	{/if}
 	<section class="set-group">
 		<p class="pop-title">Background</p>
-		<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button>
+		<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}
+			><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button
+		>
 	</section>
 	<section class="set-group">
 		<p class="pop-title">{formFactor.phone ? 'Tabs' : 'Sidebar'}</p>
-		{#if !formFactor.phone}<button type="button" class="set-row" class:on={ui.showTimeline} onclick={() => setNavItem('timeline', !ui.showTimeline)}><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button>{/if}
-		<button type="button" class="set-row" class:on={ui.showRadio} onclick={() => setNavItem('radio', !ui.showRadio)}><span>Radio<small>Stations configured in Navidrome</small></span><span class="switch"></span></button>
+		{#if !formFactor.phone}<button
+				type="button"
+				class="set-row"
+				class:on={ui.showTimeline}
+				onclick={() => setNavItem('timeline', !ui.showTimeline)}
+				><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button
+			>{/if}
+		<button type="button" class="set-row" class:on={ui.showRadio} onclick={() => setNavItem('radio', !ui.showRadio)}
+			><span>Radio<small>Stations configured in Navidrome</small></span><span class="switch"></span></button
+		>
 	</section>
 	{#if !formFactor.phone}
 		<section class="set-group">
 			<p class="pop-title">Window</p>
-			<button type="button" class="set-row" class:on={fullScreen} onclick={toggleBrowserFullScreen}><span>Full screen<small>Hide the browser’s tabs and toolbar</small></span><span class="switch"></span></button>
+			<button type="button" class="set-row" class:on={fullScreen} onclick={toggleBrowserFullScreen}
+				><span>Full screen<small>Hide the browser’s tabs and toolbar</small></span><span class="switch"></span></button
+			>
 		</section>
 		<section class="set-group">
 			<p class="pop-title">Glass</p>
-			<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}><span>Liquid glass<small>Refracting glass for the player, panels and menus</small></span><span class="switch"></span></button>
+			<button type="button" class="set-row" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}
+				><span>Liquid glass<small>Refracting glass for the player, panels and menus</small></span><span class="switch"></span></button
+			>
 			<button
 				type="button"
 				class="set-row"
@@ -105,11 +139,23 @@
 	<section class="set-group">
 		<p class="pop-title">Library</p>
 		<button type="button" class="set-row" disabled={library.status === 'syncing'} onclick={() => resyncLibrary(true)}>
-			<span>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small>{library.meta ? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}` : 'Not synced yet'}</small></span>
+			<span
+				>{library.status === 'syncing' ? 'Syncing…' : 'Resync now'}<small
+					>{library.meta
+						? `Synced ${relativeTime(library.meta.syncedAt)}${import.meta.env.DEV && library.leader ? ' · this tab syncs' : ''}`
+						: 'Not synced yet'}</small
+				></span
+			>
 		</button>
-		{#if import.meta.env.DEV && library.timings}<p class="set-foot">Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(library.timings.fetchMs)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}</p>{/if}
+		{#if import.meta.env.DEV && library.timings}<p class="set-foot">
+				Last sync {seconds(library.timings.fetchMs + library.timings.buildMs + library.timings.writeMs)} · download {seconds(
+					library.timings.fetchMs
+				)} · build {seconds(library.timings.buildMs)}<br />{slowestSteps(library.timings.steps)}
+			</p>{/if}
 		{#if library.error}<p class="set-foot">{library.error}</p>{/if}
-		<button type="button" class="set-row" onclick={signOut}><span>Sign out<small>{session.credentials?.username ?? ''}</small></span></button>
+		<button type="button" class="set-row" onclick={signOut}
+			><span>Sign out<small>{session.credentials?.username ?? ''}</small></span></button
+		>
 		{#if import.meta.env.DEV}<p class="set-foot">Field renderer · {ui.fieldRenderer || 'none'}</p>{/if}
 	</section>
 </div>

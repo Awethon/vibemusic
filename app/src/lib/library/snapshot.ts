@@ -43,7 +43,12 @@ export type LibraryMeta = {
 	playlists: number;
 };
 
-export type EnrichmentRequest = { since: number; releaseGroups: string[]; artists: { id: string; name: string; songs: string[]; albums: string[] }[]; mbSearch: { id: string; name: string; albums: string[] }[] };
+export type EnrichmentRequest = {
+	since: number;
+	releaseGroups: string[];
+	artists: { id: string; name: string; songs: string[]; albums: string[] }[];
+	mbSearch: { id: string; name: string; albums: string[] }[];
+};
 
 export type Enrichment = {
 	at: number;

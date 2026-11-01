@@ -1,7 +1,14 @@
 import { PLAYBACK } from '../tuning.ts';
 import { createAnalysis, createIdleFeatures, OUTPUT_DELAY_SECONDS, type Analysis, type AudioFeatures } from '../visual/analysis.ts';
 
-type Deck = { element: HTMLAudioElement; trackId: string; source: MediaElementAudioSourceNode | null; startAt: number | null; pendingSeek: (() => void) | null; blocked: boolean };
+type Deck = {
+	element: HTMLAudioElement;
+	trackId: string;
+	source: MediaElementAudioSourceNode | null;
+	startAt: number | null;
+	pendingSeek: (() => void) | null;
+	blocked: boolean;
+};
 
 export type EngineListener = {
 	ended(): void;
@@ -13,7 +20,8 @@ export type StartResult = 'playing' | 'blocked' | 'stopped';
 
 const MAX_DELAY_SECONDS = 1;
 
-const appleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const appleMobile = () =>
+	/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 export class AudioEngine {
 	private readonly decks: [Deck, Deck];
@@ -35,15 +43,26 @@ export class AudioEngine {
 		element.preload = 'auto';
 		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false };
 		element.addEventListener('playing', () => {
-			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > PLAYBACK.startToleranceSeconds) element.currentTime = deck.startAt;
+			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > PLAYBACK.startToleranceSeconds)
+				element.currentTime = deck.startAt;
 			deck.startAt = null;
 		});
 		const fromActive = (handler: () => void) => () => {
 			if (this.decks[this.activeDeck] === deck) handler();
 		};
-		element.addEventListener('ended', fromActive(() => this.listener.ended()));
-		element.addEventListener('error', fromActive(() => this.listener.failed(element.error?.message || 'Playback failed')));
-		for (const name of ['play', 'pause', 'playing', 'waiting', 'durationchange', 'seeked']) element.addEventListener(name, fromActive(() => this.listener.changed()));
+		element.addEventListener(
+			'ended',
+			fromActive(() => this.listener.ended())
+		);
+		element.addEventListener(
+			'error',
+			fromActive(() => this.listener.failed(element.error?.message || 'Playback failed'))
+		);
+		for (const name of ['play', 'pause', 'playing', 'waiting', 'durationchange', 'seeked'])
+			element.addEventListener(
+				name,
+				fromActive(() => this.listener.changed())
+			);
 		return deck;
 	}
 

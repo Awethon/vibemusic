@@ -50,13 +50,22 @@
 		const shareId = id;
 		share = null;
 		problem = '';
-		void fetch(`/relay/share/${encodeURIComponent(shareId)}`).then(async (response) => {
-			if (response.ok) {
-				share = (await response.json()) as Share;
-				if (!share.tracks?.length) problem = 'This share is empty.';
-				else load(0, false);
-			} else problem = response.status === 410 ? 'This link has expired.' : response.status === 404 ? 'This link doesn’t exist.' : 'Couldn’t open this link. Try again in a moment.';
-		}, () => (problem = 'Couldn’t open this link. Try again in a moment.'));
+		void fetch(`/relay/share/${encodeURIComponent(shareId)}`).then(
+			async (response) => {
+				if (response.ok) {
+					share = (await response.json()) as Share;
+					if (!share.tracks?.length) problem = 'This share is empty.';
+					else load(0, false);
+				} else
+					problem =
+						response.status === 410
+							? 'This link has expired.'
+							: response.status === 404
+								? 'This link doesn’t exist.'
+								: 'Couldn’t open this link. Try again in a moment.';
+			},
+			() => (problem = 'Couldn’t open this link. Try again in a moment.')
+		);
 	});
 
 	$effect(() => {
@@ -80,7 +89,12 @@
 
 	$effect(() => {
 		if (!track || !('mediaSession' in navigator)) return;
-		navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.artist, album: track.album, artwork: [{ src: coverUrl(track.id, 512), sizes: '512x512', type: 'image/jpeg' }] });
+		navigator.mediaSession.metadata = new MediaMetadata({
+			title: track.title,
+			artist: track.artist,
+			album: track.album,
+			artwork: [{ src: coverUrl(track.id, 512), sizes: '512x512', type: 'image/jpeg' }]
+		});
 		navigator.mediaSession.setActionHandler('play', () => void audio.play());
 		navigator.mediaSession.setActionHandler('pause', () => audio.pause());
 		navigator.mediaSession.setActionHandler('previoustrack', previous);
@@ -88,7 +102,10 @@
 	});
 
 	async function coverAccent(url: string) {
-		const bitmap = await createImageBitmap(await (await fetch(url)).blob(), { resizeWidth: PALETTE.coverSamplePx, resizeHeight: PALETTE.coverSamplePx });
+		const bitmap = await createImageBitmap(await (await fetch(url)).blob(), {
+			resizeWidth: PALETTE.coverSamplePx,
+			resizeHeight: PALETTE.coverSamplePx
+		});
 		const canvas = new OffscreenCanvas(PALETTE.coverSamplePx, PALETTE.coverSamplePx);
 		const context = canvas.getContext('2d')!;
 		context.drawImage(bitmap, 0, 0);
@@ -210,8 +227,16 @@
 			<div class="sb-center">
 				<div class="sb-ctrl">
 					<button class="icon-btn" type="button" aria-label="Previous" onclick={previous}><Icon name="prev" /></button>
-					<button class="play" type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}><Icon name={playing ? 'pause' : 'play'} /></button>
-					<button class="icon-btn" type="button" aria-label="Next" disabled={!several || index + 1 >= (share?.tracks.length ?? 0)} onclick={next}><Icon name="next" /></button>
+					<button class="play" type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}
+						><Icon name={playing ? 'pause' : 'play'} /></button
+					>
+					<button
+						class="icon-btn"
+						type="button"
+						aria-label="Next"
+						disabled={!several || index + 1 >= (share?.tracks.length ?? 0)}
+						onclick={next}><Icon name="next" /></button
+					>
 				</div>
 				<div class="sb-seek">
 					<span class="time">{clock(shown)}</span>
@@ -227,9 +252,17 @@
 				</div>
 			</div>
 			<div class="sb-right">
-				<button class="icon-btn sb-mute" type="button" aria-label="Mute" onclick={() => setVolume(volume ? 0 : 0.8)}><Icon name={volume === 0 ? 'mute' : 'vol'} /></button>
+				<button class="icon-btn sb-mute" type="button" aria-label="Mute" onclick={() => setVolume(volume ? 0 : 0.8)}
+					><Icon name={volume === 0 ? 'mute' : 'vol'} /></button
+				>
 				<Slider ratio={volume} className="vol" onchange={setVolume} />
-				{#if several}<button class="icon-btn" class:on={queueOpen} type="button" aria-label="Tracks" onclick={() => (queueOpen = !queueOpen)}><Icon name="queue" /></button>{/if}
+				{#if several}<button
+						class="icon-btn"
+						class:on={queueOpen}
+						type="button"
+						aria-label="Tracks"
+						onclick={() => (queueOpen = !queueOpen)}><Icon name="queue" /></button
+					>{/if}
 			</div>
 		</div>
 	{/if}

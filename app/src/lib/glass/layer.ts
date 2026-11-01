@@ -15,7 +15,8 @@ const PLAYER_RENDERED = 'vibemusic:glass-player-rendered';
 
 function effectiveOpacity(element: Element): number {
 	let opacity = 1;
-	for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+	for (let node: Element | null = element; node && node !== document.body; node = node.parentElement)
+		opacity *= Number(getComputedStyle(node).opacity);
 	return opacity;
 }
 
@@ -23,7 +24,8 @@ function surfaces(selector: string): GlassShape[] {
 	const shapes: GlassShape[] = [];
 	for (const element of document.querySelectorAll(selector)) {
 		const rect = element.getBoundingClientRect();
-		if (rect.width < 2 || rect.height < 2 || rect.right <= 0 || rect.bottom <= 0 || rect.left >= innerWidth || rect.top >= innerHeight) continue;
+		if (rect.width < 2 || rect.height < 2 || rect.right <= 0 || rect.bottom <= 0 || rect.left >= innerWidth || rect.top >= innerHeight)
+			continue;
 		const backing = element.id === 'rail' ? getComputedStyle(element, '::before') : getComputedStyle(element);
 		const alpha = effectiveOpacity(element) * Number(backing.opacity);
 		if (alpha < 0.02) continue;
@@ -60,7 +62,9 @@ function subtract(rect: Region, cut: Region): Region[] {
 function drawAreas(shapes: GlassShape[], params: GlassParams): Region[][] {
 	const margin = glassMargin(params);
 	const areas = shapes.map((shape) => around(shape, margin));
-	return areas.map((area, index) => areas.slice(index + 1).reduce((pieces, later) => pieces.flatMap((piece) => subtract(piece, later)), [area]));
+	return areas.map((area, index) =>
+		areas.slice(index + 1).reduce((pieces, later) => pieces.flatMap((piece) => subtract(piece, later)), [area])
+	);
 }
 
 const inside = (node: Node, selector: string) => (node instanceof Element ? node : node.parentElement)?.closest(selector) != null;
@@ -115,13 +119,28 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	const observer = new MutationObserver((records) => {
 		if (records.some((record) => !inside(record.target, above))) pageDirty = true;
 	});
-	observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true, attributeFilter: ['class', 'style', 'src', 'hidden'] });
+	observer.observe(document.body, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		characterData: true,
+		attributeFilter: ['class', 'style', 'src', 'hidden']
+	});
 	addEventListener('scroll', markDirty, true);
 	addEventListener('load', markDirty, true);
 	addEventListener('resize', markDirty);
 	if (level === 'popups') addEventListener(PLAYER_RENDERED, markDirty);
 
-	const pageAnimating = () => document.getAnimations().some((animation) => animation.playState === 'running' && animation.effect instanceof KeyframeEffect && animation.effect.target instanceof Element && !animation.effect.target.closest(above));
+	const pageAnimating = () =>
+		document
+			.getAnimations()
+			.some(
+				(animation) =>
+					animation.playState === 'running' &&
+					animation.effect instanceof KeyframeEffect &&
+					animation.effect.target instanceof Element &&
+					!animation.effect.target.closest(above)
+			);
 
 	const tick = () => {
 		frame = requestAnimationFrame(tick);

@@ -42,7 +42,10 @@ export function animateRailTo(targetProgress: number) {
 	rail.target = targetProgress;
 	stopRailAnimation();
 	const startProgress = rail.progress;
-	const durationMs = prefersReducedMotion() || document.hidden ? 0 : Math.max(RAIL.animationMinMs, RAIL.animationMs * Math.abs(targetProgress - startProgress));
+	const durationMs =
+		prefersReducedMotion() || document.hidden
+			? 0
+			: Math.max(RAIL.animationMinMs, RAIL.animationMs * Math.abs(targetProgress - startProgress));
 	if (!durationMs) {
 		applyRailProgress(targetProgress);
 		settleRail(targetProgress === 1, true);

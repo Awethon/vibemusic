@@ -68,7 +68,15 @@ export type AlbumSort = 'mostPlayed' | 'recentlyAdded' | 'byArtist' | 'az' | 'ne
 export type ArtistSort = 'mostAlbums' | 'az';
 export type Filters = { genres: string[]; decades: number[] };
 
-type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'disliked' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & { genres?: string; credits?: string; starred?: number; disliked?: number; coverAlbumIds?: string; mosaicAlbumIds?: string; readonly?: number };
+type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'disliked' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & {
+	genres?: string;
+	credits?: string;
+	starred?: number;
+	disliked?: number;
+	coverAlbumIds?: string;
+	mosaicAlbumIds?: string;
+	readonly?: number;
+};
 
 const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.artist, album.year, album.genres, album.song_count as songCount,
 	album.duration, album.created, album.play_count as playCount, album.play_date as playDate, album.starred,
@@ -86,17 +94,27 @@ const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.ow
 	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 8)) as mosaicAlbumIds`;
 
-const toAlbum = (row: Raw<Album>): Album => ({ ...row, genres: JSON.parse(row.genres ?? '[]'), credits: JSON.parse(row.credits ?? '[]'), starred: row.starred === 1 });
+const toAlbum = (row: Raw<Album>): Album => ({
+	...row,
+	genres: JSON.parse(row.genres ?? '[]'),
+	credits: JSON.parse(row.credits ?? '[]'),
+	starred: row.starred === 1
+});
 const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1, disliked: row.disliked === 1 });
 
-export const skipsDisliked = (playlist: Pick<Playlist, 'kind'> | null | undefined) => playlist?.kind === 'genre' || playlist?.kind === 'artist';
+export const skipsDisliked = (playlist: Pick<Playlist, 'kind'> | null | undefined) =>
+	playlist?.kind === 'genre' || playlist?.kind === 'artist';
 
 export function withoutDisliked(tracks: Track[], index = -1) {
 	const kept = tracks.filter((track, position) => !track.disliked || position === index);
 	return { tracks: kept, index: index < 0 ? 0 : kept.indexOf(tracks[index]) };
 }
 const toArtist = (row: Raw<Artist>): Artist => ({ ...row, coverAlbumIds: JSON.parse(row.coverAlbumIds ?? '[]') });
-const toPlaylist = (row: Raw<Playlist>): Playlist => ({ ...row, readonly: row.readonly === 1, mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]') });
+const toPlaylist = (row: Raw<Playlist>): Playlist => ({
+	...row,
+	readonly: row.readonly === 1,
+	mosaicAlbumIds: JSON.parse(row.mosaicAlbumIds ?? '[]')
+});
 
 const albums = async (sql: string, params: SqlParam[] = []) => (await query<Raw<Album>>(sql, params)).map(toAlbum);
 const tracks = async (sql: string, params: SqlParam[] = []) => (await query<Raw<Track>>(sql, params)).map(toTrack);
@@ -109,7 +127,9 @@ function albumFilterSql(filters: Filters): { sql: string; params: SqlParam[] } {
 	const parts: string[] = [];
 	const params: SqlParam[] = [];
 	if (filters.genres.length) {
-		parts.push(`exists (select 1 from album_genre where album_genre.album_id = album.id and album_genre.genre in (${placeholders(filters.genres)}))`);
+		parts.push(
+			`exists (select 1 from album_genre where album_genre.album_id = album.id and album_genre.genre in (${placeholders(filters.genres)}))`
+		);
 		params.push(...filters.genres);
 	}
 	if (filters.decades.length) {
@@ -142,8 +162,14 @@ export function albumWall(sort: AlbumSort, filters: Filters): Promise<AlbumSumma
 
 export function artistList(sort: ArtistSort, filters: Filters) {
 	const filter = albumFilterSql(filters);
-	const where = filter.sql === '1' ? '' : `where exists (select 1 from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) and ${filter.sql})`;
-	return artists(`select ${ARTIST_COLUMNS}, artist.name_order as nameOrder from artist ${where} order by ${ARTIST_ORDER[sort]}`, filter.params);
+	const where =
+		filter.sql === '1'
+			? ''
+			: `where exists (select 1 from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) and ${filter.sql})`;
+	return artists(
+		`select ${ARTIST_COLUMNS}, artist.name_order as nameOrder from artist ${where} order by ${ARTIST_ORDER[sort]}`,
+		filter.params
+	);
 }
 
 export function artistStrip(filters: Filters, limit: number) {
@@ -166,12 +192,19 @@ export async function decadeCounts(): Promise<{ decade: number; albums: number }
 
 export const albumById = async (id: string) => (await albums(`select ${ALBUM_COLUMNS} from album where id = ?`, [id]))[0] ?? null;
 
-export const albumsByArtist = (artistId: string) => albums(`select ${ALBUM_COLUMNS} from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = ?) order by year desc, created desc`, [artistId]);
+export const albumsByArtist = (artistId: string) =>
+	albums(
+		`select ${ALBUM_COLUMNS} from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = ?) order by year desc, created desc`,
+		[artistId]
+	);
 
 export const artistById = async (id: string) => (await artists(`select ${ARTIST_COLUMNS} from artist where id = ?`, [id]))[0] ?? null;
 
 export const albumTracks = (albumId: string) =>
-	tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.album_id = ? order by track.disc_no, track.track_no, track.title`, [albumId]);
+	tracks(
+		`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.album_id = ? order by track.disc_no, track.track_no, track.title`,
+		[albumId]
+	);
 
 export const artistTracks = (artistId: string) =>
 	tracks(
@@ -191,7 +224,8 @@ const ID_CHUNK = 5000;
 
 async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
 	const byId = new Map<string, T>();
-	for (let start = 0; start < ids.length; start += ID_CHUNK) for (const row of await load(ids.slice(start, start + ID_CHUNK))) byId.set(row.id, row);
+	for (let start = 0; start < ids.length; start += ID_CHUNK)
+		for (const row of await load(ids.slice(start, start + ID_CHUNK))) byId.set(row.id, row);
 	return ids.map((id) => byId.get(id)).filter((row): row is T => !!row);
 }
 
@@ -224,26 +258,37 @@ const stationTrack = (station: RadioStation): Track => ({
 	disliked: false
 });
 
-export const radioStations = () => query<RadioStation>('select id, name, stream_url as streamUrl, home_page_url as homePageUrl from radio_station order by name collate nocase');
+export const radioStations = () =>
+	query<RadioStation>(
+		'select id, name, stream_url as streamUrl, home_page_url as homePageUrl from radio_station order by name collate nocase'
+	);
 
 export const radioTracks = async () => (await radioStations()).map(stationTrack);
 
 export async function tracksByIds(ids: string[]) {
 	const stations = ids.some(isRadio) ? await radioTracks() : [];
-	const found = await inChunks([...new Set(ids.filter((id) => !isRadio(id)))], (chunk) => tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk));
+	const found = await inChunks([...new Set(ids.filter((id) => !isRadio(id)))], (chunk) =>
+		tracks(`select ${TRACK_COLUMNS} from track join album on album.id = track.album_id where track.id in (${placeholders(chunk)})`, chunk)
+	);
 	const byId = new Map([...found, ...stations].map((track) => [track.id, track]));
 	return ids.map((id) => byId.get(id)).filter((track): track is Track => !!track);
 }
 
 export const allPlaylists = () => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind != 'artist' order by name collate nocase`);
 
-export const artistPlaylist = async (artistId: string) => (await playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'artist' and artist_id = ? limit 1`, [artistId]))[0] ?? null;
+export const artistPlaylist = async (artistId: string) =>
+	(await playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'artist' and artist_id = ? limit 1`, [artistId]))[0] ?? null;
 
-export const playlistById = async (id: string) => (await playlists(`select ${PLAYLIST_COLUMNS} from playlist where id = ?`, [id]))[0] ?? null;
+export const playlistById = async (id: string) =>
+	(await playlists(`select ${PLAYLIST_COLUMNS} from playlist where id = ?`, [id]))[0] ?? null;
 
-export const ownPlaylists = (ownerId: string) => playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'own' and owner_id = ? and readonly = 0 order by name collate nocase`, [ownerId]);
+export const ownPlaylists = (ownerId: string) =>
+	playlists(`select ${PLAYLIST_COLUMNS} from playlist where kind = 'own' and owner_id = ? and readonly = 0 order by name collate nocase`, [
+		ownerId
+	]);
 
-export const albumsByIds = (ids: string[]) => inChunks(ids, (chunk) => albums(`select ${ALBUM_COLUMNS} from album where id in (${placeholders(chunk)})`, chunk));
+export const albumsByIds = (ids: string[]) =>
+	inChunks(ids, (chunk) => albums(`select ${ALBUM_COLUMNS} from album where id in (${placeholders(chunk)})`, chunk));
 
 export const recentlyPlayedAlbums = (limit: number) =>
 	albums(`select ${ALBUM_COLUMNS} from album where play_date != '' order by play_date desc limit ?`, [limit]);
@@ -251,23 +296,35 @@ export const recentlyPlayedAlbums = (limit: number) =>
 const PREFIX_END = '\uffff';
 
 async function matchingRefs(kind: string, needle: string, limit: number): Promise<string[]> {
-	const prefixed = await query<{ ref: string }>('select ref from search_key where kind = ? and text >= ? and text < ? limit ?', [kind, needle, needle + PREFIX_END, limit]);
+	const prefixed = await query<{ ref: string }>('select ref from search_key where kind = ? and text >= ? and text < ? limit ?', [
+		kind,
+		needle,
+		needle + PREFIX_END,
+		limit
+	]);
 	const refs = prefixed.map((row) => row.ref);
 	if (refs.length >= limit) return refs;
 	const useIndex = [...needle].length >= 3;
 	const remaining = limit - refs.length;
 	const substring = useIndex
-		? await query<{ ref: string }>('select ref from search where kind = ? and search match ? and instr(text, ?) != 1 limit ?', [kind, `"${needle.replaceAll('"', '""')}"`, needle, remaining])
-		: await query<{ ref: string }>(`select ref from search_key where kind = ? and text like ? escape '\\' and instr(text, ?) != 1 limit ?`, [
+		? await query<{ ref: string }>('select ref from search where kind = ? and search match ? and instr(text, ?) != 1 limit ?', [
 				kind,
-				`%${needle.replace(/[\\%_]/g, (character) => '\\' + character)}%`,
+				`"${needle.replaceAll('"', '""')}"`,
 				needle,
 				remaining
-			]);
+			])
+		: await query<{ ref: string }>(
+				`select ref from search_key where kind = ? and text like ? escape '\\' and instr(text, ?) != 1 limit ?`,
+				[kind, `%${needle.replace(/[\\%_]/g, (character) => '\\' + character)}%`, needle, remaining]
+			);
 	return [...refs, ...substring.map((row) => row.ref)];
 }
 
-async function inOrder<T extends { id: string }>(ids: string[], load: (sql: string, params: SqlParam[]) => Promise<T[]>, sql: string): Promise<T[]> {
+async function inOrder<T extends { id: string }>(
+	ids: string[],
+	load: (sql: string, params: SqlParam[]) => Promise<T[]>,
+	sql: string
+): Promise<T[]> {
 	if (!ids.length) return [];
 	const rows = await load(sql.replace('$ids', placeholders(ids)), ids);
 	const byId = new Map(rows.map((row) => [row.id, row]));
@@ -276,7 +333,10 @@ async function inOrder<T extends { id: string }>(ids: string[], load: (sql: stri
 
 export type SearchResults = { artists: Artist[]; albums: Album[]; playlists: Playlist[]; tracks: Track[] };
 
-export async function search(text: string, limits: { artists: number; albums: number; playlists: number; tracks: number }): Promise<SearchResults> {
+export async function search(
+	text: string,
+	limits: { artists: number; albums: number; playlists: number; tracks: number }
+): Promise<SearchResults> {
 	const needle = normalizeForSearch(text.trim());
 	if (!needle) return { artists: [], albums: [], playlists: [], tracks: [] };
 	const [artistIds, albumIds, playlistIds, trackIds] = await Promise.all([
@@ -294,14 +354,17 @@ export async function search(text: string, limits: { artists: number; albums: nu
 	return { artists: foundArtists, albums: foundAlbums, playlists: foundPlaylists, tracks: foundTracks };
 }
 
-export const timelineAlbums = () => query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year from album order by year, name');
+export const timelineAlbums = () =>
+	query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year from album order by year, name');
 
 export async function paletteLeads(): Promise<Map<string, string>> {
 	const rows = await query<{ albumId: string; colors: string }>('select album_id as albumId, colors from palette');
-	return new Map(rows.flatMap((row) => {
-		const lead = (JSON.parse(row.colors) as string[])[0];
-		return lead ? [[row.albumId, lead] as const] : [];
-	}));
+	return new Map(
+		rows.flatMap((row) => {
+			const lead = (JSON.parse(row.colors) as string[])[0];
+			return lead ? [[row.albumId, lead] as const] : [];
+		})
+	);
 }
 
 export async function savedPalette(albumId: string): Promise<string[] | null> {

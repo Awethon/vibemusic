@@ -1,17 +1,37 @@
 import { expect, it } from 'vitest';
 import { laneSpan, laneYears, layoutTimeline, markedBuckets, timelineLanes, type TimelineAlbum } from './timeline.ts';
 
-const album = (id: string, artistId: string, year: number): TimelineAlbum => ({ id, name: id, artistId, artist: artistId.toUpperCase(), year });
+const album = (id: string, artistId: string, year: number): TimelineAlbum => ({
+	id,
+	name: id,
+	artistId,
+	artist: artistId.toUpperCase(),
+	year
+});
 const metrics = { cover: 60, gap: 10, pad: 20, empty: 30, start: 200, tail: 100 };
 
 it('gives artists with enough albums their own lane, ordered by debut, and pools the rest', () => {
-	const lanes = timelineLanes([album('a1', 'late', 2010), album('a2', 'late', 2012), album('b1', 'early', 1995), album('b2', 'early', 1999), album('c1', 'once', 2001)], 2, 'Elsewhere');
+	const lanes = timelineLanes(
+		[
+			album('a1', 'late', 2010),
+			album('a2', 'late', 2012),
+			album('b1', 'early', 1995),
+			album('b2', 'early', 1999),
+			album('c1', 'once', 2001)
+		],
+		2,
+		'Elsewhere'
+	);
 	expect(lanes.map((lane) => lane.label)).toEqual(['EARLY', 'LATE', 'Elsewhere']);
 	expect(lanes[2].albums.map((entry) => entry.id)).toEqual(['c1']);
 });
 
 it('makes a year as wide as its busiest lane and keeps empty years thin', () => {
-	const lanes = timelineLanes([album('a1', 'a', 2000), album('a2', 'a', 2000), album('b1', 'b', 2000), album('b2', 'b', 2002)], 1, 'Elsewhere');
+	const lanes = timelineLanes(
+		[album('a1', 'a', 2000), album('a2', 'a', 2000), album('b1', 'b', 2000), album('b2', 'b', 2002)],
+		1,
+		'Elsewhere'
+	);
 	const layout = layoutTimeline(lanes, metrics);
 	expect(layout.buckets.map((bucket) => [bucket.key, bucket.width, bucket.count])).toEqual([
 		[1999, 30, 0],

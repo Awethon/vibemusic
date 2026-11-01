@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { setBodyClass } from '../engine/dom.ts';
 
-	let { ratio, onchange, onrelease, className = '', id }: { ratio: number; onchange: (ratio: number) => void; onrelease?: (ratio: number) => void; className?: string; id?: string } = $props();
+	let {
+		ratio,
+		onchange,
+		onrelease,
+		className = '',
+		id
+	}: { ratio: number; onchange: (ratio: number) => void; onrelease?: (ratio: number) => void; className?: string; id?: string } = $props();
 
 	let dragging = $state(false);
 
@@ -33,7 +39,19 @@
 	}
 </script>
 
-<div class="slider {className}" class:drag={dragging} {id} role="slider" tabindex="-1" aria-valuenow={Math.round(ratio * 100)} onpointerdown={down} onpointermove={move} onpointerup={release} onpointercancel={release} onlostpointercapture={release}>
+<div
+	class="slider {className}"
+	class:drag={dragging}
+	{id}
+	role="slider"
+	tabindex="-1"
+	aria-valuenow={Math.round(ratio * 100)}
+	onpointerdown={down}
+	onpointermove={move}
+	onpointerup={release}
+	onpointercancel={release}
+	onlostpointercapture={release}
+>
 	<div class="rail"><div class="fill" style:transform="scaleX({ratio})"></div></div>
 	<div class="knob" style:left="{ratio * 100}%"></div>
 </div>

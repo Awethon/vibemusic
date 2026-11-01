@@ -1,7 +1,8 @@
 import type { IconName } from '../ui/icons.ts';
 import { relay, type Device } from './relay.svelte.ts';
 
-export const deviceIcon = (device: Device | null): IconName => (!device ? 'speaker' : /iPhone|Android/.test(device.name) ? 'phone' : 'laptop');
+export const deviceIcon = (device: Device | null): IconName =>
+	!device ? 'speaker' : /iPhone|Android/.test(device.name) ? 'phone' : 'laptop';
 
 export function deviceLabels(): Map<string, string> {
 	const counts = new Map<string, number>();

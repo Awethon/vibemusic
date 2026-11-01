@@ -19,8 +19,12 @@ function plainBiography(html: string): string {
 async function fetchArtistInfo(artistId: string, artistName: string): Promise<ArtistInfo> {
 	const http = navidrome();
 	const [info, top] = await Promise.all([
-		http.subsonic<ArtistInfoResponse>('getArtistInfo2', { id: artistId, count: ARTIST_PAGE.similarCount, includeNotPresent: 'false' }).catch(() => ({}) as ArtistInfoResponse),
-		http.subsonic<TopSongsResponse>('getTopSongs', { artist: artistName, count: ARTIST_PAGE.topSongCount }).catch(() => ({}) as TopSongsResponse)
+		http
+			.subsonic<ArtistInfoResponse>('getArtistInfo2', { id: artistId, count: ARTIST_PAGE.similarCount, includeNotPresent: 'false' })
+			.catch(() => ({}) as ArtistInfoResponse),
+		http
+			.subsonic<TopSongsResponse>('getTopSongs', { artist: artistName, count: ARTIST_PAGE.topSongCount })
+			.catch(() => ({}) as TopSongsResponse)
 	]);
 	return {
 		biography: plainBiography(info.artistInfo2?.biography ?? ''),

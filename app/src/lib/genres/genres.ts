@@ -2,7 +2,20 @@ import tree from './tree.json';
 
 type Node = { parents?: string[]; aliases?: string[] };
 
-const IGNORED = new Set(['other', 'others', 'unknown', 'misc', 'miscellaneous', 'genre', 'none', 'various', 'instrumental', 'seenlive', 'favorites', 'favourites']);
+const IGNORED = new Set([
+	'other',
+	'others',
+	'unknown',
+	'misc',
+	'miscellaneous',
+	'genre',
+	'none',
+	'various',
+	'instrumental',
+	'seenlive',
+	'favorites',
+	'favourites'
+]);
 
 export const genreKey = (text: string) =>
 	text
@@ -22,7 +35,8 @@ export const TREE_VERSION = (() => {
 	return (value >>> 0).toString(36);
 })();
 const byKey = new Map<string, string>();
-for (const [name, node] of Object.entries(nodes)) for (const label of [name, ...(node.aliases ?? [])]) byKey.set(genreKey(label).join(''), name);
+for (const [name, node] of Object.entries(nodes))
+	for (const label of [name, ...(node.aliases ?? [])]) byKey.set(genreKey(label).join(''), name);
 
 const known = (words: string[]) => {
 	for (let start = 0; start < words.length; start++) {
@@ -49,7 +63,14 @@ export function createGenreResolver() {
 
 	return {
 		genresOf(rawGenres: string[]): string[] {
-			return [...new Set(rawGenres.flatMap(splitGenres).map(resolve).filter((name): name is string => !!name))];
+			return [
+				...new Set(
+					rawGenres
+						.flatMap(splitGenres)
+						.map(resolve)
+						.filter((name): name is string => !!name)
+				)
+			];
 		},
 		knownGenre(raw: string): string | null {
 			const words = genreKey(raw);
@@ -81,7 +102,8 @@ export const parentsOf = (name: string) => nodes[name]?.parents ?? [];
 export type GenreResolver = ReturnType<typeof createGenreResolver>;
 
 const children = new Map<string, string[]>();
-for (const [name, node] of Object.entries(nodes)) for (const parent of node.parents ?? []) children.set(parent, [...(children.get(parent) ?? []), name]);
+for (const [name, node] of Object.entries(nodes))
+	for (const parent of node.parents ?? []) children.set(parent, [...(children.get(parent) ?? []), name]);
 
 const breadth = new Map<string, number>();
 
@@ -106,5 +128,7 @@ const REGIONAL: Record<string, Record<string, string>> = {
 };
 
 export function regionalGenres(genres: string[], countries: string[]): string[] {
-	return countries.flatMap((country) => Object.entries(REGIONAL[country] ?? {}).flatMap(([genre, regional]) => (genres.includes(genre) ? [regional] : [])));
+	return countries.flatMap((country) =>
+		Object.entries(REGIONAL[country] ?? {}).flatMap(([genre, regional]) => (genres.includes(genre) ? [regional] : []))
+	);
 }

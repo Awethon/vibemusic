@@ -36,7 +36,14 @@
 		<button class="icon-btn" type="button" aria-label="Close now playing" onclick={() => setFullScreen(false)}><Icon name="down" /></button>
 		<span class="eyebrow">{playerQueue().sourceName ? `Playing from ${playerQueue().sourceName}` : 'Now playing'}</span>
 		{#if showDevices}
-			<button class="icon-btn" class:on={remote} id={ui.fullScreen ? 'bDevice' : undefined} type="button" aria-label="Devices" onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button>
+			<button
+				class="icon-btn"
+				class:on={remote}
+				id={ui.fullScreen ? 'bDevice' : undefined}
+				type="button"
+				aria-label="Devices"
+				onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button
+			>
 		{:else}
 			<span></span>
 		{/if}
@@ -82,9 +89,13 @@
 		<div class="nf-ctrl">
 			{#if live}<span></span>{:else}<LikeButton className="nf-like" />{/if}
 			<button class="icon-btn" type="button" aria-label="Previous" onclick={playPreviousTrack}><Icon name="prev" /></button>
-			<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}><Icon name={player.playing ? 'pause' : 'play'} /></button>
+			<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}
+				><Icon name={player.playing ? 'pause' : 'play'} /></button
+			>
 			<button class="icon-btn" type="button" aria-label="Next" onclick={playNextTrack}><Icon name="next" /></button>
-			<button class="icon-btn nf-queue" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel(true, 'queue')}><Icon name="queue" /></button>
+			<button class="icon-btn nf-queue" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel(true, 'queue')}
+				><Icon name="queue" /></button
+			>
 		</div>
 	</div>
 </section>

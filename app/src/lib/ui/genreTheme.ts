@@ -6,7 +6,8 @@ const colourfulness = (rgb: Rgb) => {
 	return saturation * (1 - Math.abs(lightness - 0.5) * GENRE_COVER.offMidLightnessPenalty);
 };
 
-const hsl = (hue: number, saturation: number, lightness: number) => `hsl(${hue.toFixed(1)} ${(saturation * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
+const hsl = (hue: number, saturation: number, lightness: number) =>
+	`hsl(${hue.toFixed(1)} ${(saturation * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
 
 export function genreTheme(colors: string[]) {
 	if (!colors.length) return { accent: 'hsl(260 40% 80%)', deep: 'hsl(260 12% 7%)' };

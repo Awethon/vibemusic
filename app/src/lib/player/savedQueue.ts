@@ -19,7 +19,11 @@ export async function saveQueue(state: queue.QueueState, positionSeconds: number
 	const trackIds = queue.savedOrder(state).trackIds.filter((trackId) => !isRadio(trackId));
 	try {
 		localStorage.setItem(SOURCE_NAME_KEY, state.sourceName);
-		await navidrome().subsonic('savePlayQueue', { id: trackIds, current: state.currentTrackId, position: Math.round(positionSeconds * 1000) });
+		await navidrome().subsonic('savePlayQueue', {
+			id: trackIds,
+			current: state.currentTrackId,
+			position: Math.round(positionSeconds * 1000)
+		});
 	} catch {
 		return;
 	}
@@ -29,5 +33,10 @@ export async function fetchSavedQueue(): Promise<SavedQueue | null> {
 	const saved = (await navidrome().subsonic<SubsonicPlayQueue>('getPlayQueue')).playQueue;
 	const trackIds = saved?.entry?.map((entry) => entry.id) ?? [];
 	if (!trackIds.length) return null;
-	return { trackIds, currentTrackId: saved?.current ?? '', positionSeconds: (saved?.position ?? 0) / 1000, sourceName: localStorage.getItem(SOURCE_NAME_KEY) ?? '' };
+	return {
+		trackIds,
+		currentTrackId: saved?.current ?? '',
+		positionSeconds: (saved?.position ?? 0) / 1000,
+		sourceName: localStorage.getItem(SOURCE_NAME_KEY) ?? ''
+	};
 }

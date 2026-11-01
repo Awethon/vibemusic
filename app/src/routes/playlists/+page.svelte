@@ -5,7 +5,12 @@
 	import { plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
 
-	const titles: Record<PlaylistKind, string> = { own: 'Your playlists', smart: 'Smart playlists', genre: 'Genre playlists', artist: 'Artist playlists' };
+	const titles: Record<PlaylistKind, string> = {
+		own: 'Your playlists',
+		smart: 'Smart playlists',
+		genre: 'Genre playlists',
+		artist: 'Artist playlists'
+	};
 	const playlists = live(allPlaylists, []);
 
 	const blocks = $derived(
@@ -15,10 +20,17 @@
 			.toSorted((a, b) => b.playlists.length - a.playlists.length)
 	);
 	const count = (kind: PlaylistKind) => playlists.value.filter((playlist) => playlist.kind === kind).length;
-	const summary = $derived(`${plural(playlists.value.length, 'playlist')}${count('smart') ? ` · ${count('smart')} smart` : ''}${count('genre') ? ` · ${count('genre')} by genre` : ''}`);
+	const summary = $derived(
+		`${plural(playlists.value.length, 'playlist')}${count('smart') ? ` · ${count('smart')} smart` : ''}${count('genre') ? ` · ${count('genre')} by genre` : ''}`
+	);
 </script>
 
 <section class="view" {@attach viewEnter}>
-	<div class="vhead"><div><h1 class="display">Playlists</h1><p class="sub">{summary}</p></div></div>
+	<div class="vhead">
+		<div>
+			<h1 class="display">Playlists</h1>
+			<p class="sub">{summary}</p>
+		</div>
+	</div>
 	{#if blocks.length}<Bento {blocks} />{/if}
 </section>

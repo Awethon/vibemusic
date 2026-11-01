@@ -2,7 +2,20 @@ import { GENRE_PLAYLISTS, HIDDEN_GENRE_PLAYLISTS } from '../tuning.ts';
 import { descendantCount, parentsOf, withAncestors } from './genres.ts';
 import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
 
-export type GenreSong = { id: string; title: string; duration: number; year: number; albumId: string; artistId: string; genres: string[]; plays: number; starred: boolean; fans: number | null; popularity: number | null; rank: number | null };
+export type GenreSong = {
+	id: string;
+	title: string;
+	duration: number;
+	year: number;
+	albumId: string;
+	artistId: string;
+	genres: string[];
+	plays: number;
+	starred: boolean;
+	fans: number | null;
+	popularity: number | null;
+	rank: number | null;
+};
 export type GenrePlaylist = { genre: string; songs: GenreSong[] };
 
 type Rules = { readonly [Key in keyof typeof GENRE_PLAYLISTS]: number };
@@ -19,7 +32,10 @@ const artistCount = (songs: GenreSong[]) => new Set(songs.map((song) => song.art
 
 function qualifies(genre: string, songs: GenreSong[], rules: Rules) {
 	const root = parentsOf(genre).length === 0;
-	return songs.length >= (root ? rules.rootMinSongs : rules.subMinSongs) && artistCount(songs) >= (root ? rules.rootMinArtists : rules.subMinArtists);
+	return (
+		songs.length >= (root ? rules.rootMinSongs : rules.subMinSongs) &&
+		artistCount(songs) >= (root ? rules.rootMinArtists : rules.subMinArtists)
+	);
 }
 
 function overlaps(ids: Set<string>, other: Set<string>) {
@@ -28,7 +44,11 @@ function overlaps(ids: Set<string>, other: Set<string>) {
 	return shared;
 }
 
-export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS, hidden: readonly string[] = HIDDEN_GENRE_PLAYLISTS): GenrePlaylist[] {
+export function chooseGenres(
+	songs: GenreSong[],
+	rules: Rules = GENRE_PLAYLISTS,
+	hidden: readonly string[] = HIDDEN_GENRE_PLAYLISTS
+): GenrePlaylist[] {
 	const byGenre = new Map<string, GenreSong[]>();
 	for (const song of songs) {
 		for (const genre of song.genres) {
@@ -37,17 +57,30 @@ export function chooseGenres(songs: GenreSong[], rules: Rules = GENRE_PLAYLISTS,
 			else byGenre.set(genre, [song]);
 		}
 	}
-	const candidates = [...byGenre].filter(([genre, members]) => !hidden.includes(genre) && qualifies(genre, members, rules)).toSorted(([a, aSongs], [b, bSongs]) => withAncestors(a).length - withAncestors(b).length || descendantCount(a) - descendantCount(b) || bSongs.length - aSongs.length || a.localeCompare(b));
+	const candidates = [...byGenre]
+		.filter(([genre, members]) => !hidden.includes(genre) && qualifies(genre, members, rules))
+		.toSorted(
+			([a, aSongs], [b, bSongs]) =>
+				withAncestors(a).length - withAncestors(b).length ||
+				descendantCount(a) - descendantCount(b) ||
+				bSongs.length - aSongs.length ||
+				a.localeCompare(b)
+		);
 	const chosen: { genre: string; ids: Set<string>; picked: Set<string>; best: GenreSong[] }[] = [];
 	for (const [genre, members] of candidates) {
 		if (chosen.length >= rules.maxPlaylists) break;
 		const ids = new Set(members.map((song) => song.id));
 		const ancestors = new Set(withAncestors(genre));
-		const repeats = chosen.some((other) => (ancestors.has(other.genre) ? ids.size / other.ids.size >= rules.maxParentShare : overlaps(ids, other.ids) / ids.size >= rules.maxSiblingShare));
+		const repeats = chosen.some((other) =>
+			ancestors.has(other.genre)
+				? ids.size / other.ids.size >= rules.maxParentShare
+				: overlaps(ids, other.ids) / ids.size >= rules.maxSiblingShare
+		);
 		if (repeats) continue;
 		const best = pickBest(members, rules);
 		const picked = new Set(best.map((song) => song.id));
-		if (chosen.some((other) => !ancestors.has(other.genre) && overlaps(picked, other.picked) / picked.size >= rules.maxPickedShare)) continue;
+		if (chosen.some((other) => !ancestors.has(other.genre) && overlaps(picked, other.picked) / picked.size >= rules.maxPickedShare))
+			continue;
 		chosen.push({ genre, ids, picked, best });
 	}
 	return chosen.map(({ genre, best }) => ({ genre, songs: best }));
@@ -67,7 +100,9 @@ function allot(weights: Map<string, number>, available: Map<string, number>, siz
 		let candidates = open((artist) => Math.min(cap, available.get(artist)!));
 		if (!candidates.length) candidates = open((artist) => available.get(artist)!);
 		if (!candidates.length) break;
-		const next = candidates.reduce((best, artist) => (weights.get(artist)! / (2 * seats.get(artist)! + 1) > weights.get(best)! / (2 * seats.get(best)! + 1) ? artist : best));
+		const next = candidates.reduce((best, artist) =>
+			weights.get(artist)! / (2 * seats.get(artist)! + 1) > weights.get(best)! / (2 * seats.get(best)! + 1) ? artist : best
+		);
 		seats.set(next, seats.get(next)! + 1);
 		total++;
 	}
@@ -76,9 +111,17 @@ function allot(weights: Map<string, number>, available: Map<string, number>, siz
 
 const FILLER = /(^|[^\p{L}])(skit|intro|outro|interlude|prelude|скит|интро|аутро|интерлюдия)([^\p{L}]|$)/iu;
 
-const isFiller = (song: GenreSong, rules: Rules) => song.popularity === null && song.rank === null && (song.duration < rules.minSongSeconds || FILLER.test(song.title));
+const isFiller = (song: GenreSong, rules: Rules) =>
+	song.popularity === null && song.rank === null && (song.duration < rules.minSongSeconds || FILLER.test(song.title));
 
-const versionOrder = (song: GenreSong) => [Number(isOtherRecording(song.title)), song.year || Number.MAX_SAFE_INTEGER, Number(!isPlainTitle(song.title)), -song.plays, -Number(song.starred), Number(song.popularity === null)];
+const versionOrder = (song: GenreSong) => [
+	Number(isOtherRecording(song.title)),
+	song.year || Number.MAX_SAFE_INTEGER,
+	Number(!isPlainTitle(song.title)),
+	-song.plays,
+	-Number(song.starred),
+	Number(song.popularity === null)
+];
 
 function preferredVersion(a: GenreSong, b: GenreSong) {
 	const left = versionOrder(a);
@@ -127,7 +170,9 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 	const byPopularity = (a: GenreSong, b: GenreSong) => (b.rank ?? 0) - (a.rank ?? 0) || score(b) - score(a) || a.id.localeCompare(b.id);
 	const seats = allot(weights, new Map([...byArtist].map(([artist, songs]) => [artist, songs.length])), size, rules);
 	const picked = [...seats].flatMap(([artist, count]) => byArtist.get(artist)!.toSorted(byPopularity).slice(0, count));
-	const ranked = picked.map((song) => ({ song, score: score(song) + rules.weeklyNoise * hash(`${song.id}:${week}`) })).toSorted((a, b) => b.score - a.score);
+	const ranked = picked
+		.map((song) => ({ song, score: score(song) + rules.weeklyNoise * hash(`${song.id}:${week}`) }))
+		.toSorted((a, b) => b.score - a.score);
 	const gap = Math.min(rules.artistGap, Math.max(1, Math.floor((seats.size - 1) / 2)));
 	const ordered: GenreSong[] = [];
 	const left = new Map([...seats].map(([artist, count]) => [artist, Math.min(count, byArtist.get(artist)!.length)]));
@@ -136,7 +181,8 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 		const allowed = (entry: (typeof ranked)[number]) => !recent.has(entry.song.artistId);
 		const most = Math.max(...left.values());
 		const crowded = [...left.values()].filter((count) => count === most).length;
-		const urgent = (entry: (typeof ranked)[number]) => left.get(entry.song.artistId) === most && (most - 1) * (gap + 1) + crowded >= ranked.length;
+		const urgent = (entry: (typeof ranked)[number]) =>
+			left.get(entry.song.artistId) === most && (most - 1) * (gap + 1) + crowded >= ranked.length;
 		const index = [ranked.findIndex((entry) => allowed(entry) && urgent(entry)), ranked.findIndex(allowed), 0].find((found) => found >= 0)!;
 		const [{ song }] = ranked.splice(index, 1);
 		left.set(song.artistId, left.get(song.artistId)! - 1);

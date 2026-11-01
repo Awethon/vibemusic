@@ -8,7 +8,16 @@ import { connectRemote, localPosition, pauseLocal, returnToLocal, runLocally, st
 import * as queue from './queue.ts';
 import { currentTrack, ensureTracks, onQueueChange, player, queueChanged, queueState, setStarred } from './state.svelte.ts';
 
-type Playback = { trackId: string; playing: boolean; position: number; duration: number; volume: number; muted: boolean; starred: boolean; waiting: boolean };
+type Playback = {
+	trackId: string;
+	playing: boolean;
+	position: number;
+	duration: number;
+	volume: number;
+	muted: boolean;
+	starred: boolean;
+	waiting: boolean;
+};
 
 let mirroring = false;
 let mirroredAt = 0;

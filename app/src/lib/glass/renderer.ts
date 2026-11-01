@@ -10,7 +10,14 @@ type Program = { program: WebGLProgram; u: Record<string, WebGLUniformLocation |
 const TINT: [number, number, number] = [0.04, 0.045, 0.06];
 
 export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolean) {
-	const gl = canvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true, depth: false, stencil: false, preserveDrawingBuffer: keepFrame });
+	const gl = canvas.getContext('webgl2', {
+		antialias: false,
+		alpha: true,
+		premultipliedAlpha: true,
+		depth: false,
+		stencil: false,
+		preserveDrawingBuffer: keepFrame
+	});
 	if (!gl) return null;
 	const context = gl;
 
@@ -66,7 +73,13 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.deleteFramebuffer(item.fbo);
 	}
 
-	type Slot = { scene: WebGLTexture; size: [number, number]; version: number; blur: { scale: number; h: Target; v: Target } | null; blurKey: string };
+	type Slot = {
+		scene: WebGLTexture;
+		size: [number, number];
+		version: number;
+		blur: { scale: number; h: Target; v: Target } | null;
+		blurKey: string;
+	};
 	const slots: Slot[] = [];
 	const slotAt = (index: number) => (slots[index] ??= { scene: texture(true), size: [1, 1], version: 0, blur: null, blurKey: '' });
 	let width = 0;
@@ -167,7 +180,12 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		if (shown.length) {
 			context.uniform4fv(
 				u['uRects[0]'],
-				shown.flatMap((shape) => [(shape.x + shape.width / 2) * dpr, (shape.y + shape.height / 2) * dpr, (shape.width / 2) * dpr, (shape.height / 2) * dpr])
+				shown.flatMap((shape) => [
+					(shape.x + shape.width / 2) * dpr,
+					(shape.y + shape.height / 2) * dpr,
+					(shape.width / 2) * dpr,
+					(shape.height / 2) * dpr
+				])
 			);
 			context.uniform2fv(
 				u['uShape[0]'],

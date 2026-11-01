@@ -1,8 +1,17 @@
 import { z } from 'zod';
 
-const optionalNumber = z.number().nullish().transform((value) => value ?? 0);
-const optionalString = z.string().nullish().transform((value) => value ?? '');
-const optionalDate = z.string().nullish().transform((value) => (value && !value.startsWith('0001') ? value : ''));
+const optionalNumber = z
+	.number()
+	.nullish()
+	.transform((value) => value ?? 0);
+const optionalString = z
+	.string()
+	.nullish()
+	.transform((value) => value ?? '');
+const optionalDate = z
+	.string()
+	.nullish()
+	.transform((value) => (value && !value.startsWith('0001') ? value : ''));
 
 export const nativeAlbum = z.object({
 	id: z.string(),
@@ -13,7 +22,10 @@ export const nativeAlbum = z.object({
 	orderAlbumName: optionalString,
 	maxYear: optionalNumber,
 	genre: optionalString,
-	genres: z.array(z.object({ name: z.string() })).nullish().transform((value) => value ?? []),
+	genres: z
+		.array(z.object({ name: z.string() }))
+		.nullish()
+		.transform((value) => value ?? []),
 	songCount: optionalNumber,
 	duration: optionalNumber,
 	createdAt: optionalDate,
@@ -21,9 +33,15 @@ export const nativeAlbum = z.object({
 	importedAt: optionalDate,
 	playCount: optionalNumber,
 	playDate: optionalDate,
-	starred: z.boolean().nullish().transform((value) => value ?? false),
+	starred: z
+		.boolean()
+		.nullish()
+		.transform((value) => value ?? false),
 	starredAt: optionalDate,
-	missing: z.boolean().nullish().transform((value) => value ?? false),
+	missing: z
+		.boolean()
+		.nullish()
+		.transform((value) => value ?? false),
 	mbzReleaseGroupId: optionalString,
 	imageHash: optionalString,
 	dominantColor: optionalString,
@@ -46,10 +64,16 @@ export const nativeSong = z.object({
 	suffix: optionalString,
 	bitRate: optionalNumber,
 	genre: optionalString,
-	genres: z.array(z.object({ name: z.string() })).nullish().transform((value) => value ?? []),
+	genres: z
+		.array(z.object({ name: z.string() }))
+		.nullish()
+		.transform((value) => value ?? []),
 	playCount: optionalNumber,
 	playDate: optionalDate,
-	starred: z.boolean().nullish().transform((value) => value ?? false),
+	starred: z
+		.boolean()
+		.nullish()
+		.transform((value) => value ?? false),
 	starredAt: optionalDate,
 	rating: optionalNumber
 });
@@ -69,9 +93,15 @@ export const nativePlaylist = z.object({
 	duration: optionalNumber,
 	updatedAt: optionalDate,
 	evaluatedAt: optionalDate,
-	rules: z.unknown().nullish().transform((value) => value ?? null),
+	rules: z
+		.unknown()
+		.nullish()
+		.transform((value) => value ?? null),
 	uploadedImage: optionalString,
-	sync: z.boolean().nullish().transform((value) => value ?? false)
+	sync: z
+		.boolean()
+		.nullish()
+		.transform((value) => value ?? false)
 });
 
 export const nativeArtist = z.object({

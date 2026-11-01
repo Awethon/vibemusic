@@ -3,7 +3,23 @@
 	import { registerLayout } from '../engine/layout.svelte.ts';
 	import { formFactor } from './formFactor.svelte.ts';
 
-	let { id, items, minItemWidthPx, gapPx, rows, phone, item }: { id: string; items: T[]; minItemWidthPx: number; gapPx: number; rows: number; phone: { columns: number; rows: number; gapPx: number }; item: Snippet<[T]> } = $props();
+	let {
+		id,
+		items,
+		minItemWidthPx,
+		gapPx,
+		rows,
+		phone,
+		item
+	}: {
+		id: string;
+		items: T[];
+		minItemWidthPx: number;
+		gapPx: number;
+		rows: number;
+		phone: { columns: number; rows: number; gapPx: number };
+		item: Snippet<[T]>;
+	} = $props();
 
 	let container = $state<HTMLElement | null>(null);
 	let columns = $state(0);
@@ -28,7 +44,13 @@
 		{/each}
 	</div>
 {:else}
-	<div class="shelf" {id} bind:this={container} style:--gap="{gapPx}px" style:grid-template-columns={columns ? `repeat(${columns}, minmax(0, 1fr))` : undefined}>
+	<div
+		class="shelf"
+		{id}
+		bind:this={container}
+		style:--gap="{gapPx}px"
+		style:grid-template-columns={columns ? `repeat(${columns}, minmax(0, 1fr))` : undefined}
+	>
 		{#each items.slice(0, columns * rows) as value, index (index)}
 			{@render item(value)}
 		{/each}

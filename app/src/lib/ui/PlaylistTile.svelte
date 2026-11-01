@@ -18,6 +18,8 @@
 	oncontextmenu={(event) => openMenu(event, playlistMenu(playlist))}
 >
 	<PlaylistMosaic {playlist} />
-	<span class="t">{#if playlist.kind === 'smart'}<SmartIcon />{/if}{playlist.name}</span>
+	<span class="t"
+		>{#if playlist.kind === 'smart'}<SmartIcon />{/if}{playlist.name}</span
+	>
 	<span class="s">{variant === 'card' ? playlistMetaLine(playlist) : playlistKindLabel(playlist)}</span>
 </a>

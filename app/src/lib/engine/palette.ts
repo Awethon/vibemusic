@@ -7,7 +7,11 @@ let shownColors: string[] = [];
 let requestNumber = 0;
 let playingAlbumId = '';
 
-const preview = { albumId: null as string | null, pageAlbumId: null as string | null, revertTimer: undefined as ReturnType<typeof setTimeout> | undefined };
+const preview = {
+	albumId: null as string | null,
+	pageAlbumId: null as string | null,
+	revertTimer: undefined as ReturnType<typeof setTimeout> | undefined
+};
 
 export function attachField(attached: Field | null) {
 	field = attached;

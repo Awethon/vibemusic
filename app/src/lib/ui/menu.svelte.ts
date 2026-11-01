@@ -1,6 +1,7 @@
 import { ui } from './state.svelte.ts';
 
-export type MenuItem = { label: string; hint?: string; run: () => void | Promise<void> } | { separator: true } | { heading: string } | { group: MenuItem[] };
+export type MenuItem =
+	{ label: string; hint?: string; run: () => void | Promise<void> } | { separator: true } | { heading: string } | { group: MenuItem[] };
 
 export const menu = $state({ open: false, x: 0, y: 0, items: [] as MenuItem[] });
 

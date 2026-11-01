@@ -14,18 +14,40 @@
 </script>
 
 {#if album}
-	<a class="jump" href={resolve('/album/[id]', { id: album.id })} data-id="album:{album.id}" data-preview-album={album.id} oncontextmenu={(event) => openMenu(event, albumMenu(album))}>
+	<a
+		class="jump"
+		href={resolve('/album/[id]', { id: album.id })}
+		data-id="album:{album.id}"
+		data-preview-album={album.id}
+		oncontextmenu={(event) => openMenu(event, albumMenu(album))}
+	>
 		<span class="j-art"><Cover albumId={album.id} size={COVER_PX.card} /></span>
 		<span class="j-text"><b>{album.name}</b><small>Album · {album.artist}</small></span>
 	</a>
 {:else if artist}
-	<a class="jump" href={resolve('/artist/[id]', { id: artist.id })} data-id="artist:{artist.id}" data-preview-album={artist.newestAlbumId} oncontextmenu={(event) => openMenu(event, artistMenu(artist))}>
+	<a
+		class="jump"
+		href={resolve('/artist/[id]', { id: artist.id })}
+		data-id="artist:{artist.id}"
+		data-preview-album={artist.newestAlbumId}
+		oncontextmenu={(event) => openMenu(event, artistMenu(artist))}
+	>
 		<span class="j-art round"><Cover albumId={artist.newestAlbumId} size={COVER_PX.card} /></span>
 		<span class="j-text"><b>{artist.name}</b><small>Artist · {plural(artist.albumCount, 'album')}</small></span>
 	</a>
 {:else if playlist}
-	<a class="jump" href={resolve('/playlist/[id]', { id: playlist.id })} data-id="playlist:{playlist.id}" data-preview-album={playlist.mosaicAlbumIds[0]} oncontextmenu={(event) => openMenu(event, playlistMenu(playlist))}>
+	<a
+		class="jump"
+		href={resolve('/playlist/[id]', { id: playlist.id })}
+		data-id="playlist:{playlist.id}"
+		data-preview-album={playlist.mosaicAlbumIds[0]}
+		oncontextmenu={(event) => openMenu(event, playlistMenu(playlist))}
+	>
 		<PlaylistMosaic {playlist} mini />
-		<span class="j-text"><b>{#if playlist.kind === 'smart'}<SmartIcon />{/if}{playlist.name}</b><small>{playlistKindLabel(playlist)}</small></span>
+		<span class="j-text"
+			><b
+				>{#if playlist.kind === 'smart'}<SmartIcon />{/if}{playlist.name}</b
+			><small>{playlistKindLabel(playlist)}</small></span
+		>
 	</a>
 {/if}

@@ -35,7 +35,12 @@
 	function measureGeometry(): Geometry[] {
 		return [...(bento?.querySelectorAll<HTMLElement>('.bb-body') ?? [])].map((body) => {
 			const kind = body.dataset.body as PlaylistKind;
-			return { kind, width: body.clientWidth, chrome: (body.parentElement?.offsetHeight ?? 0) - body.offsetHeight, count: blocks.find((block) => block.kind === kind)?.playlists.length ?? 0 };
+			return {
+				kind,
+				width: body.clientWidth,
+				chrome: (body.parentElement?.offsetHeight ?? 0) - body.offsetHeight,
+				count: blocks.find((block) => block.kind === kind)?.playlists.length ?? 0
+			};
 		});
 	}
 
@@ -43,15 +48,50 @@
 		if (item.kind === 'genre') {
 			const gap = tileGap();
 			const maxTiles = BENTO.genreMaxColumns * BENTO.genreMaxRows;
-			const columns = Math.max(1, Math.min(solo ? maxTiles : BENTO.genreMaxColumns, Math.floor((item.width + gap) / (Math.min(room, solo ? BENTO.soloTileMinPx : BENTO.genreTileMinPx) + gap))));
+			const columns = Math.max(
+				1,
+				Math.min(
+					solo ? maxTiles : BENTO.genreMaxColumns,
+					Math.floor((item.width + gap) / (Math.min(room, solo ? BENTO.soloTileMinPx : BENTO.genreTileMinPx) + gap))
+				)
+			);
 			const tileSize = Math.floor(Math.min(room, (item.width - gap * (columns - 1)) / columns));
-			const rows = Math.max(1, Math.min(BENTO.genreMaxRows, solo ? Infinity : Math.floor(maxTiles / columns), Math.floor((room + gap) / (tileSize + gap)), Math.ceil(item.count / columns)));
+			const rows = Math.max(
+				1,
+				Math.min(
+					BENTO.genreMaxRows,
+					solo ? Infinity : Math.floor(maxTiles / columns),
+					Math.floor((room + gap) / (tileSize + gap)),
+					Math.ceil(item.count / columns)
+				)
+			);
 			return { columns, rows, tileSize, rowHeight: tileSize, itemCount: columns * rows, bodyHeight: rows * tileSize + (rows - 1) * gap };
 		}
 		const maxItems = BENTO.listMaxColumns * BENTO.listMaxRows;
-		const columns = Math.max(1, Math.min(solo ? BENTO.soloListMaxColumns : BENTO.listMaxColumns, Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx))));
-		const rows = Math.max(1, Math.min(BENTO.listMaxRows, Math.floor(maxItems / columns), Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)), Math.ceil(item.count / columns)));
-		return { columns, rows, tileSize: 0, rowHeight: BENTO.rowHeightPx, itemCount: columns * rows, bodyHeight: rows * BENTO.rowHeightPx + (rows - 1) * BENTO.rowGapPx };
+		const columns = Math.max(
+			1,
+			Math.min(
+				solo ? BENTO.soloListMaxColumns : BENTO.listMaxColumns,
+				Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx))
+			)
+		);
+		const rows = Math.max(
+			1,
+			Math.min(
+				BENTO.listMaxRows,
+				Math.floor(maxItems / columns),
+				Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)),
+				Math.ceil(item.count / columns)
+			)
+		);
+		return {
+			columns,
+			rows,
+			tileSize: 0,
+			rowHeight: BENTO.rowHeightPx,
+			itemCount: columns * rows,
+			bodyHeight: rows * BENTO.rowHeightPx + (rows - 1) * BENTO.rowGapPx
+		};
 	}
 
 	function stackedRoom(stack: Geometry[], height: number, gap: number) {
@@ -79,14 +119,18 @@
 
 	const rowStep = (item: Geometry, plan: Plan) => (item.kind === 'genre' ? plan.tileSize + tileGap() : BENTO.rowHeightPx + BENTO.rowGapPx);
 
-	const sideHeight = (side: Geometry[], planned: [PlaylistKind, Plan][], gap: number) => side.reduce((sum, item, index) => sum + item.chrome + planned[index][1].bodyHeight, 0) + gap * (side.length - 1);
+	const sideHeight = (side: Geometry[], planned: [PlaylistKind, Plan][], gap: number) =>
+		side.reduce((sum, item, index) => sum + item.chrome + planned[index][1].bodyHeight, 0) + gap * (side.length - 1);
 
 	function grownPlan(item: Geometry, plan: Plan, extra: number): Plan {
 		if (extra < 1) return plan;
 		if (item.kind === 'genre') {
 			const gap = tileGap();
 			const widest = Math.floor((item.width - gap * (plan.columns - 1)) / plan.columns);
-			const tileSize = Math.max(plan.tileSize, Math.min(widest, Math.floor(plan.tileSize * BENTO.growMaxRatio), plan.tileSize + Math.floor(extra / plan.rows)));
+			const tileSize = Math.max(
+				plan.tileSize,
+				Math.min(widest, Math.floor(plan.tileSize * BENTO.growMaxRatio), plan.tileSize + Math.floor(extra / plan.rows))
+			);
 			return { ...plan, tileSize, rowHeight: tileSize, bodyHeight: plan.rows * tileSize + (plan.rows - 1) * gap };
 		}
 		const rowHeight = Math.min(Math.floor(BENTO.rowHeightPx * BENTO.growMaxRatio), plan.rowHeight + Math.floor(extra / plan.rows));
@@ -102,7 +146,8 @@
 		});
 	}
 
-	const showsEverything = (side: Geometry[], planned: [PlaylistKind, Plan][]) => side.every((item, index) => planned[index][1].itemCount >= item.count);
+	const showsEverything = (side: Geometry[], planned: [PlaylistKind, Plan][]) =>
+		side.every((item, index) => planned[index][1].itemCount >= item.count);
 
 	function fittedLayout(): Layout {
 		const height = fillHeight();
@@ -132,15 +177,32 @@
 		return { plans: Object.fromEntries([...left, ...right]), aligned };
 	}
 
-	const signature = (all: Record<string, Plan>) => Object.entries(all).map(([kind, plan]) => `${kind}:${plan.itemCount}|${plan.columns}|${plan.tileSize}|${plan.rowHeight}|${plan.bodyHeight}`).join(',');
+	const signature = (all: Record<string, Plan>) =>
+		Object.entries(all)
+			.map(([kind, plan]) => `${kind}:${plan.itemCount}|${plan.columns}|${plan.tileSize}|${plan.rowHeight}|${plan.bodyHeight}`)
+			.join(',');
 
 	function stackedPlans(): Record<string, Plan> {
 		return Object.fromEntries(
 			blocks.map((block) => [
 				block.kind,
 				block.kind === 'genre'
-					? { columns: BENTO.phoneGenreColumns, rows: BENTO.phoneGenreRows, tileSize: 0, rowHeight: 0, itemCount: BENTO.phoneGenreColumns * BENTO.phoneGenreRows, bodyHeight: 0 }
-					: { columns: 1, rows: BENTO.phoneListRows, tileSize: 0, rowHeight: BENTO.rowHeightPx, itemCount: BENTO.phoneListRows, bodyHeight: 0 }
+					? {
+							columns: BENTO.phoneGenreColumns,
+							rows: BENTO.phoneGenreRows,
+							tileSize: 0,
+							rowHeight: 0,
+							itemCount: BENTO.phoneGenreColumns * BENTO.phoneGenreRows,
+							bodyHeight: 0
+						}
+					: {
+							columns: 1,
+							rows: BENTO.phoneListRows,
+							tileSize: 0,
+							rowHeight: BENTO.rowHeightPx,
+							itemCount: BENTO.phoneListRows,
+							bodyHeight: 0
+						}
 			])
 		);
 	}
@@ -174,13 +236,30 @@
 	});
 </script>
 
-<div class="bento" class:stacked={formFactor.phone} class:solo id="bento" bind:this={bento} style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`} style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined} style:align-items={aligned ? 'stretch' : 'start'}>
+<div
+	class="bento"
+	class:stacked={formFactor.phone}
+	class:solo
+	id="bento"
+	bind:this={bento}
+	style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`}
+	style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined}
+	style:align-items={aligned ? 'stretch' : 'start'}
+>
 	{#each blocks as block, index (block.kind)}
 		{@const plan = plans[block.kind]}
-		<section class="bento-block" data-kind={block.kind} style:grid-row={!formFactor.phone && blocks.length > 2 && index === 0 ? 'span 2' : undefined}>
+		<section
+			class="bento-block"
+			data-kind={block.kind}
+			style:grid-row={!formFactor.phone && blocks.length > 2 && index === 0 ? 'span 2' : undefined}
+		>
 			<div class="bb-head">
 				<h2 class="section-title">{block.title} <small>{block.playlists.length}</small></h2>
-				<a class="see-all" href={resolve('/playlists/[kind]', { kind: block.kind })} hidden={!!plan && block.playlists.length <= plan.itemCount}>See all</a>
+				<a
+					class="see-all"
+					href={resolve('/playlists/[kind]', { kind: block.kind })}
+					hidden={!!plan && block.playlists.length <= plan.itemCount}>See all</a
+				>
 			</div>
 			<div
 				class="bb-body"
@@ -188,8 +267,18 @@
 				style:gap={solo && block.kind === 'genre' ? `${BENTO.soloTileGapPx}px` : undefined}
 				data-body={block.kind}
 				style:height={!formFactor.phone && plan ? `${plan.bodyHeight}px` : undefined}
-				style:grid-template-columns={plan ? (plan.tileSize ? `repeat(${plan.columns}, ${plan.tileSize}px)` : `repeat(${plan.columns}, minmax(0, 1fr))`) : undefined}
-				style:grid-auto-rows={plan ? (block.kind !== 'genre' ? `${plan.rowHeight}px` : plan.tileSize ? `${plan.tileSize}px` : 'auto') : undefined}
+				style:grid-template-columns={plan
+					? plan.tileSize
+						? `repeat(${plan.columns}, ${plan.tileSize}px)`
+						: `repeat(${plan.columns}, minmax(0, 1fr))`
+					: undefined}
+				style:grid-auto-rows={plan
+					? block.kind !== 'genre'
+						? `${plan.rowHeight}px`
+						: plan.tileSize
+							? `${plan.tileSize}px`
+							: 'auto'
+					: undefined}
 				style:--row-h={plan && block.kind !== 'genre' ? `${plan.rowHeight}px` : undefined}
 			>
 				{#if plan}

@@ -101,35 +101,35 @@
 {#if publicPage}
 	{@render children()}
 {:else}
-<Background />
-<GlassLayer level="rail" />
-{#if !signedIn}
-	<Login />
-{:else}
-	<div id="chrome">
-		{#if formFactor.phone}<PhoneTabs />{:else}<Rail />{/if}
-		<main id="main" tabindex="-1" bind:this={main}>
-			<LibraryGate>{@render children()}</LibraryGate>
-		</main>
-		{#if !formFactor.phone}<AlphabetNav />{/if}
-	</div>
-	{#if formFactor.phone}
-		<NowPhone />
+	<Background />
+	<GlassLayer level="rail" />
+	{#if !signedIn}
+		<Login />
 	{:else}
-		<NowClassic />
-		<Ambient />
+		<div id="chrome">
+			{#if formFactor.phone}<PhoneTabs />{:else}<Rail />{/if}
+			<main id="main" tabindex="-1" bind:this={main}>
+				<LibraryGate>{@render children()}</LibraryGate>
+			</main>
+			{#if !formFactor.phone}<AlphabetNav />{/if}
+		</div>
+		{#if formFactor.phone}
+			<NowPhone />
+		{:else}
+			<NowClassic />
+			<Ambient />
+		{/if}
+		<GlassLayer level="player" />
+		<Panel />
+		{#if formFactor.phone}<PhoneDock />{:else}<Capsule />{/if}
+		<GlassLayer level="popups" />
+		<SettingsPopover />
+		<DevicesPopover />
+		<FilterPopover />
+		<ContextMenu />
+		<SearchPalette />
+		<RemoteBanner />
+		<ConnectionNote />
+		<Toast />
 	{/if}
-	<GlassLayer level="player" />
-	<Panel />
-	{#if formFactor.phone}<PhoneDock />{:else}<Capsule />{/if}
-	<GlassLayer level="popups" />
-	<SettingsPopover />
-	<DevicesPopover />
-	<FilterPopover />
-	<ContextMenu />
-	<SearchPalette />
-	<RemoteBanner />
-	<ConnectionNote />
-	<Toast />
-{/if}
 {/if}

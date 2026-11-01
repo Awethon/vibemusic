@@ -3,7 +3,13 @@
 	import { currentLyricIndex, lyricsState } from '../player/lyricsState.svelte.ts';
 	import { player, seekTo, togglePlay } from '../player/player.svelte.ts';
 
-	let { outerClass, innerClass, outerId, focusRatio, visible }: { outerClass: string; innerClass: string; outerId?: string; focusRatio: number; visible: boolean } = $props();
+	let {
+		outerClass,
+		innerClass,
+		outerId,
+		focusRatio,
+		visible
+	}: { outerClass: string; innerClass: string; outerId?: string; focusRatio: number; visible: boolean } = $props();
 
 	let box = $state<HTMLElement | null>(null);
 	let lines = $state<HTMLElement | null>(null);

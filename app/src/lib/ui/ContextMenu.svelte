@@ -30,18 +30,30 @@
 
 {#snippet button(item: MenuItem)}
 	{#if 'run' in item}
-		<button type="button" role="menuitem" onclick={() => run(item)}>{item.label}{#if item.hint}<span>{item.hint}</span>{/if}</button>
+		<button type="button" role="menuitem" onclick={() => run(item)}
+			>{item.label}{#if item.hint}<span>{item.hint}</span>{/if}</button
+		>
 	{/if}
 {/snippet}
 
-<div id="ctx" class="menu" class:open={menu.open} role="menu" bind:this={element} style:left={formFactor.phone ? undefined : `${position.left}px`} style:top={formFactor.phone ? undefined : `${position.top}px`}>
+<div
+	id="ctx"
+	class="menu"
+	class:open={menu.open}
+	role="menu"
+	bind:this={element}
+	style:left={formFactor.phone ? undefined : `${position.left}px`}
+	style:top={formFactor.phone ? undefined : `${position.top}px`}
+>
 	{#each menu.items as item, index (index)}
 		{#if 'separator' in item}
 			<hr />
 		{:else if 'heading' in item}
 			<p class="mh">{item.heading}</p>
 		{:else if 'group' in item}
-			<div class="mscroll">{#each item.group as child, childIndex (childIndex)}{@render button(child)}{/each}</div>
+			<div class="mscroll">
+				{#each item.group as child, childIndex (childIndex)}{@render button(child)}{/each}
+			</div>
 		{:else}
 			{@render button(item)}
 		{/if}

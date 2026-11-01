@@ -79,13 +79,42 @@ export const PRESETS: GlassPreset[] = [
 	{ id: 'clear', name: 'Clear lens', values: BASE },
 	{ id: 'frosted', name: 'Frosted', values: { ...BASE, frost: 6, tintA: 0.28, refl: 0.6 } },
 	{ id: 'prism', name: 'Prism', values: { ...BASE, disp: 0.08, rim: 0.6 } },
-	{ id: 'pebble', name: 'Pebble', values: { ...BASE, thick: 46, ior: 1.6, bevel: 44, curve: 2.2, body: 1, lens: 0.4, spec: 0.45, shadow: 0.38 } },
-	{ id: 'bubble', name: 'Soap bubble', values: { ...BASE, thick: 22, ior: 1.33, disp: 0.12, bevel: 30, lens: 0.3, irid: 0.75, refl: 0.9, tintA: 0, rim: 0.4 } },
+	{
+		id: 'pebble',
+		name: 'Pebble',
+		values: { ...BASE, thick: 46, ior: 1.6, bevel: 44, curve: 2.2, body: 1, lens: 0.4, spec: 0.45, shadow: 0.38 }
+	},
+	{
+		id: 'bubble',
+		name: 'Soap bubble',
+		values: { ...BASE, thick: 22, ior: 1.33, disp: 0.12, bevel: 30, lens: 0.3, irid: 0.75, refl: 0.9, tintA: 0, rim: 0.4 }
+	},
 	{ id: 'slab', name: 'Cut slab', values: { ...BASE, thick: 30, ior: 1.7, bevel: 16, curve: 1, cut: 0.25, lens: 0, spec: 0.3 } },
 	{
 		id: 'css',
 		name: 'CSS blur',
-		values: { ...BASE, thick: 0, ior: 1, bevel: 2, lens: 0, merge: 0, frost: 26, flip: 1, light: 0, elev: 45, spec: 0, refl: 0, rim: 0.14, rimDir: 0, tintA: 0.7, shadow: 0.45, shadowDist: 18, shadowBlur: 50, sat: 1.3, tilt: 0 }
+		values: {
+			...BASE,
+			thick: 0,
+			ior: 1,
+			bevel: 2,
+			lens: 0,
+			merge: 0,
+			frost: 26,
+			flip: 1,
+			light: 0,
+			elev: 45,
+			spec: 0,
+			refl: 0,
+			rim: 0.14,
+			rimDir: 0,
+			tintA: 0.7,
+			shadow: 0.45,
+			shadowDist: 18,
+			shadowBlur: 50,
+			sat: 1.3,
+			tilt: 0
+		}
 	}
 ];
 
@@ -119,7 +148,15 @@ export type GlassSlider = { key: GlassKey; label: string; min: number; max: numb
 export type GlassToggle = { key: GlassKey; label: string; toggle: true };
 export type GlassControl = GlassSlider | GlassToggle;
 
-const slider = (key: GlassKey, label: string, min: number, max: number, step: number, unit = '', note?: string): GlassSlider => ({ key, label, min, max, step, unit, note });
+const slider = (key: GlassKey, label: string, min: number, max: number, step: number, unit = '', note?: string): GlassSlider => ({
+	key,
+	label,
+	min,
+	max,
+	step,
+	unit,
+	note
+});
 
 export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 	{
@@ -156,7 +193,11 @@ export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 	},
 	{
 		title: 'Surface',
-		controls: [slider('tintA', 'Tint', 0, 0.9, 0.01), slider('shadow', 'Shadow', 0, 1, 0.01), slider('caustic', 'Caustic', 0, 1, 0.01, '', 'light focused onto the page below')]
+		controls: [
+			slider('tintA', 'Tint', 0, 0.9, 0.01),
+			slider('shadow', 'Shadow', 0, 1, 0.01),
+			slider('caustic', 'Caustic', 0, 1, 0.01, '', 'light focused onto the page below')
+		]
 	}
 ];
 
@@ -171,7 +212,31 @@ const LAB_ONLY: Partial<Record<GlassKey, { key: GlassKey; min: number; step: num
 	settle: { key: 'settle', min: 0.2, step: 0.05 },
 	flip: { key: 'flip', min: -1, step: 2 }
 };
-const LAB_ORDER: GlassKey[] = ['thick', 'bevel', 'curve', 'cut', 'body', 'lens', 'merge', 'ior', 'disp', 'frost', 'light', 'elev', 'spec', 'refl', 'studio', 'rim', 'irid', 'tintA', 'shadow', 'caustic', 'tilt', 'settle', 'flip'];
+const LAB_ORDER: GlassKey[] = [
+	'thick',
+	'bevel',
+	'curve',
+	'cut',
+	'body',
+	'lens',
+	'merge',
+	'ior',
+	'disp',
+	'frost',
+	'light',
+	'elev',
+	'spec',
+	'refl',
+	'studio',
+	'rim',
+	'irid',
+	'tintA',
+	'shadow',
+	'caustic',
+	'tilt',
+	'settle',
+	'flip'
+];
 const LAB_FIELDS = LAB_ORDER.map((key) => SLIDERS.get(key) ?? LAB_ONLY[key]!);
 const LAB_LINK_VERSION = 1;
 const LAB_SHAPE_GROUP = 3;

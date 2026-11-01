@@ -17,7 +17,9 @@ async function poll(trackId: string) {
 		const station = (await radioTracks()).find((candidate) => candidate.id === trackId);
 		if (!station) return;
 		Object.assign(radioNow, { stationId: trackId, title: now.title, artist: now.artist });
-		const shown = now.title ? { ...station, title: now.title, artist: now.artist ? `${now.artist} · ${station.title}` : station.title } : station;
+		const shown = now.title
+			? { ...station, title: now.title, artist: now.artist ? `${now.artist} · ${station.title}` : station.title }
+			: station;
 		const cached = trackById(trackId);
 		if (cached?.title !== shown.title || cached?.artist !== shown.artist) remember([shown]);
 	} catch {

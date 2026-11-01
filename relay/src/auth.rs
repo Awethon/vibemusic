@@ -15,11 +15,20 @@ pub struct Navidrome {
 
 impl Navidrome {
     pub fn new(url: String) -> Self {
-        Self { client: reqwest::Client::new(), url: url.trim_end_matches('/').to_owned() }
+        Self {
+            client: reqwest::Client::new(),
+            url: url.trim_end_matches('/').to_owned(),
+        }
     }
 
     pub async fn user_of(&self, token: &str) -> Option<String> {
-        let response = self.client.get(format!("{}/api/keepalive/keepalive", self.url)).header("x-nd-authorization", format!("Bearer {token}")).send().await.ok()?;
+        let response = self
+            .client
+            .get(format!("{}/api/keepalive/keepalive", self.url))
+            .header("x-nd-authorization", format!("Bearer {token}"))
+            .send()
+            .await
+            .ok()?;
         if !response.status().is_success() {
             return None;
         }
@@ -40,7 +49,10 @@ mod tests {
     #[test]
     fn reads_the_user_id_from_a_navidrome_token() {
         let payload = URL_SAFE_NO_PAD.encode(r#"{"adm":false,"sub":"friend","uid":"u-42"}"#);
-        assert_eq!(user_id_in(&format!("header.{payload}.signature")).as_deref(), Some("u-42"));
+        assert_eq!(
+            user_id_in(&format!("header.{payload}.signature")).as_deref(),
+            Some("u-42")
+        );
         assert_eq!(user_id_in("not-a-token"), None);
     }
 }

@@ -1,6 +1,8 @@
-const letters = (text: string) => [...text.toLowerCase().replaceAll('ё', 'е')].filter((character) => /[\p{L}\p{N}]/u.test(character)).join('');
+const letters = (text: string) =>
+	[...text.toLowerCase().replaceAll('ё', 'е')].filter((character) => /[\p{L}\p{N}]/u.test(character)).join('');
 
-const RECORDING = /(^|[^\p{L}])(remix|rmx|mix|live|instrumental|acoustic|unplugged|demo|cover|karaoke|rework|bootleg|reprise|ремикс|микс|кавер|инструментал|акустика|акустическая|лайв|концерт)([^\p{L}]|$)/iu;
+const RECORDING =
+	/(^|[^\p{L}])(remix|rmx|mix|live|instrumental|acoustic|unplugged|demo|cover|karaoke|rework|bootleg|reprise|ремикс|микс|кавер|инструментал|акустика|акустическая|лайв|концерт)([^\p{L}]|$)/iu;
 
 const FEATURING = [' feat.', ' feat ', ' ft.', ' ft ', ' featuring ', ' при уч', ' при участии', ' w/ '];
 

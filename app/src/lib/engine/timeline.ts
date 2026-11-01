@@ -44,7 +44,9 @@ export function layoutTimeline(lanes: Lane[], metrics: TimelineMetrics): Timelin
 		const counts = perLane.map((groups) => groups.get(key)?.length ?? 0);
 		const most = Math.max(...counts);
 		const width = most ? most * step - metrics.gap + metrics.pad : metrics.empty;
-		perLane.forEach((groups, lane) => groups.get(key)?.forEach((album, index) => positions.set(album.id, { x: x + metrics.pad / 2 + index * step, lane })));
+		perLane.forEach((groups, lane) =>
+			groups.get(key)?.forEach((album, index) => positions.set(album.id, { x: x + metrics.pad / 2 + index * step, lane }))
+		);
 		buckets.push({ key, ...describe(key), x, width, count: counts.reduce((total, count) => total + count, 0) });
 		x += width;
 	}

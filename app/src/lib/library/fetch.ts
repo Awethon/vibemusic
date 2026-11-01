@@ -1,6 +1,16 @@
 import type { z } from 'zod';
 import type { NavidromeHttp } from '../navidrome/http.ts';
-import { nativeAlbum, nativeArtist, nativePlaylist, nativePlaylistTrack, nativeSong, radioStation, type NativePlaylist, type NativePlaylistTrack, type RadioStation } from '../navidrome/schemas.ts';
+import {
+	nativeAlbum,
+	nativeArtist,
+	nativePlaylist,
+	nativePlaylistTrack,
+	nativeSong,
+	radioStation,
+	type NativePlaylist,
+	type NativePlaylistTrack,
+	type RadioStation
+} from '../navidrome/schemas.ts';
 import { LIBRARY_SYNC } from '../tuning.ts';
 import { newest, playlistSignature } from './build.ts';
 import type { SyncProgress } from './protocol.ts';
@@ -14,14 +24,18 @@ type RadioResponse = { internetRadioStations?: { internetRadioStation?: unknown[
 
 async function fetchRadioStations(http: NavidromeHttp): Promise<RadioStation[] | null> {
 	try {
-		return radioStation.array().parse((await http.subsonic<RadioResponse>('getInternetRadioStations')).internetRadioStations?.internetRadioStation ?? []);
+		return radioStation
+			.array()
+			.parse((await http.subsonic<RadioResponse>('getInternetRadioStations')).internetRadioStations?.internetRadioStation ?? []);
 	} catch {
 		return null;
 	}
 }
 
 async function fetchPlaylistTracks(http: NavidromeHttp, playlist: NativePlaylist): Promise<NativePlaylistTrack[]> {
-	return nativePlaylistTrack.array().parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, LIBRARY_SYNC.pageSize));
+	return nativePlaylistTrack
+		.array()
+		.parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, LIBRARY_SYNC.pageSize));
 }
 
 export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: SyncProgress) => void = () => {}): Promise<LibrarySnapshot> {
@@ -42,8 +56,24 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 	const [playlists, radioStations] = await Promise.all([timed('playlists', () => fetchPlaylists(http)), fetchRadioStations(http)]);
 	report({ playlistTotal: playlists.length });
 	const [albums, songs, artists] = await Promise.all([
-		timed('albums', async () => nativeAlbum.array().parse(await http.nativeAll('album?missing=false&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, albumTotal) => report({ albums: loaded, albumTotal })))),
-		timed('songs', async () => nativeSong.array().parse(await http.nativeAll('song?missing=false&_sort=album&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, trackTotal) => report({ tracks: loaded, trackTotal })))),
+		timed('albums', async () =>
+			nativeAlbum
+				.array()
+				.parse(
+					await http.nativeAll('album?missing=false&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, albumTotal) =>
+						report({ albums: loaded, albumTotal })
+					)
+				)
+		),
+		timed('songs', async () =>
+			nativeSong
+				.array()
+				.parse(
+					await http.nativeAll('song?missing=false&_sort=album&_order=ASC', LIBRARY_SYNC.pageSize, (loaded, trackTotal) =>
+						report({ tracks: loaded, trackTotal })
+					)
+				)
+		),
 		timed('artists', () => fetchArtistArt(http))
 	]);
 	const playlistTracks = await timed(
@@ -69,7 +99,13 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 	return { albums, songs, playlists, playlistTracks, radioStations: radioStations ?? [], artists, steps };
 }
 
-async function changedSince<T>(http: NavidromeHttp, path: string, schema: z.ZodType<T>, stampOf: (item: T) => string, mark: string): Promise<T[]> {
+async function changedSince<T>(
+	http: NavidromeHttp,
+	path: string,
+	schema: z.ZodType<T>,
+	stampOf: (item: T) => string,
+	mark: string
+): Promise<T[]> {
 	const since = mark ? Date.parse(mark) : -Infinity;
 	const found: T[] = [];
 	for (let start = 0, size = LIBRARY_SYNC.changePageSize; ; start += size, size *= 4) {
@@ -83,9 +119,34 @@ async function changedSince<T>(http: NavidromeHttp, path: string, schema: z.ZodT
 	}
 }
 
-const LISTENING_FIELDS = new Set(['loved', 'dateloved', 'lastplayed', 'daterated', 'playcount', 'rating', 'averagerating', 'albumrating', 'albumloved', 'albumplaycount', 'albumlastplayed', 'albumdateloved', 'albumdaterated', 'artistrating', 'artistloved', 'artistplaycount', 'artistlastplayed', 'artistdateloved', 'artistdaterated']);
+const LISTENING_FIELDS = new Set([
+	'loved',
+	'dateloved',
+	'lastplayed',
+	'daterated',
+	'playcount',
+	'rating',
+	'averagerating',
+	'albumrating',
+	'albumloved',
+	'albumplaycount',
+	'albumlastplayed',
+	'albumdateloved',
+	'albumdaterated',
+	'artistrating',
+	'artistloved',
+	'artistplaycount',
+	'artistlastplayed',
+	'artistdateloved',
+	'artistdaterated'
+]);
 
-export const followsListening = (rules: unknown) => (JSON.stringify(rules).toLowerCase().match(/[a-z_]+/g) ?? []).some((word) => LISTENING_FIELDS.has(word));
+export const followsListening = (rules: unknown) =>
+	(
+		JSON.stringify(rules)
+			.toLowerCase()
+			.match(/[a-z_]+/g) ?? []
+	).some((word) => LISTENING_FIELDS.has(word));
 
 async function fetchTotal(http: NavidromeHttp, path: string): Promise<number> {
 	return (await http.nativePage(path, 0, 1)).total;
@@ -93,27 +154,60 @@ async function fetchTotal(http: NavidromeHttp, path: string): Promise<number> {
 
 async function fetchAlbumSongs(http: NavidromeHttp, albumIds: string[]) {
 	const batches: string[][] = [];
-	for (let index = 0; index < albumIds.length; index += LIBRARY_SYNC.albumsPerSongRequest) batches.push(albumIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
-	const pages = await Promise.all(batches.map(async (ids) => nativeSong.array().parse(await http.nativeAll(`song?missing=false&${ids.map((id) => `album_id=${encodeURIComponent(id)}`).join('&')}&_sort=album&_order=ASC`, LIBRARY_SYNC.pageSize))));
+	for (let index = 0; index < albumIds.length; index += LIBRARY_SYNC.albumsPerSongRequest)
+		batches.push(albumIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
+	const pages = await Promise.all(
+		batches.map(async (ids) =>
+			nativeSong
+				.array()
+				.parse(
+					await http.nativeAll(
+						`song?missing=false&${ids.map((id) => `album_id=${encodeURIComponent(id)}`).join('&')}&_sort=album&_order=ASC`,
+						LIBRARY_SYNC.pageSize
+					)
+				)
+		)
+	);
 	return pages.flat();
 }
 
 async function fetchArtistArt(http: NavidromeHttp, artistIds?: string[]) {
-	if (!artistIds) return nativeArtist.array().parse(await http.nativeAll('artist?role=albumartist&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize));
+	if (!artistIds)
+		return nativeArtist.array().parse(await http.nativeAll('artist?role=albumartist&_sort=name&_order=ASC', LIBRARY_SYNC.pageSize));
 	const batches: string[][] = [];
-	for (let index = 0; index < artistIds.length; index += LIBRARY_SYNC.albumsPerSongRequest) batches.push(artistIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
-	const pages = await Promise.all(batches.map(async (ids) => nativeArtist.array().parse(await http.nativeAll(`artist?${ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')}`, LIBRARY_SYNC.pageSize))));
+	for (let index = 0; index < artistIds.length; index += LIBRARY_SYNC.albumsPerSongRequest)
+		batches.push(artistIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
+	const pages = await Promise.all(
+		batches.map(async (ids) =>
+			nativeArtist
+				.array()
+				.parse(await http.nativeAll(`artist?${ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')}`, LIBRARY_SYNC.pageSize))
+		)
+	);
 	return pages.flat();
 }
 
 async function fetchAlbumsById(http: NavidromeHttp, albumIds: string[]) {
 	const batches: string[][] = [];
-	for (let index = 0; index < albumIds.length; index += LIBRARY_SYNC.albumsPerSongRequest) batches.push(albumIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
-	const pages = await Promise.all(batches.map(async (ids) => nativeAlbum.array().parse(await http.nativeAll(`album?${ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')}`, LIBRARY_SYNC.pageSize))));
+	for (let index = 0; index < albumIds.length; index += LIBRARY_SYNC.albumsPerSongRequest)
+		batches.push(albumIds.slice(index, index + LIBRARY_SYNC.albumsPerSongRequest));
+	const pages = await Promise.all(
+		batches.map(async (ids) =>
+			nativeAlbum
+				.array()
+				.parse(await http.nativeAll(`album?${ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')}`, LIBRARY_SYNC.pageSize))
+		)
+	);
 	return pages.flat();
 }
 
-export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAlbums: number, refreshedAlbumIds: string[], refreshedArtistIds: string[]): Promise<LibraryChanges | null> {
+export async function fetchChanges(
+	http: NavidromeHttp,
+	sync: SyncState,
+	localAlbums: number,
+	refreshedAlbumIds: string[],
+	refreshedArtistIds: string[]
+): Promise<LibraryChanges | null> {
 	const { marks } = sync;
 	const [imported, refreshed, albumPlays, albumStars, songPlays, songStars, rated, playlists, radioStations] = await Promise.all([
 		changedSince(http, 'album?_sort=importedAt&_order=DESC', nativeAlbum, (album) => album.importedAt, marks.albumImported),
@@ -130,9 +224,16 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 	const importedIds = new Set(imported.map((album) => album.id));
 	if (albums.length > Math.max(LIBRARY_SYNC.fullSyncChangedAlbumMin, localAlbums * LIBRARY_SYNC.fullSyncChangedAlbumShare)) return null;
 	const listeningChanged = albumPlays.length + albumStars.length + songPlays.length + songStars.length > 0;
-	const stale = playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || (playlist.rules && (albums.length > 0 || (listeningChanged && followsListening(playlist.rules)))));
+	const stale = playlists.filter(
+		(playlist) =>
+			sync.playlists[playlist.id] !== playlistSignature(playlist) ||
+			(playlist.rules && (albums.length > 0 || (listeningChanged && followsListening(playlist.rules))))
+	);
 	const [albumSongs, playlistTracks, totals, artistArt] = await Promise.all([
-		fetchAlbumSongs(http, albums.filter((album) => !album.missing).map((album) => album.id)),
+		fetchAlbumSongs(
+			http,
+			albums.filter((album) => !album.missing).map((album) => album.id)
+		),
 		Promise.all(stale.map(async (playlist) => [playlist.id, await fetchPlaylistTracks(http, playlist)] as const)),
 		albums.length ? Promise.all([fetchTotal(http, 'album?missing=false'), fetchTotal(http, 'song?missing=false')]) : null,
 		albums.length ? fetchArtistArt(http) : refreshedArtistIds.length ? fetchArtistArt(http, refreshedArtistIds) : []

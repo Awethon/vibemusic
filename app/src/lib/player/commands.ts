@@ -14,7 +14,15 @@ export type Command =
 	| { kind: 'edit'; edit: queue.QueueEdit }
 	| { kind: 'liked'; trackId: string; starred: boolean };
 
-export const STARTS_PLAYBACK = new Set<Command['kind']>(['playList', 'togglePlay', 'next', 'previous', 'playQueuedAt', 'playSourceNow', 'seek']);
+export const STARTS_PLAYBACK = new Set<Command['kind']>([
+	'playList',
+	'togglePlay',
+	'next',
+	'previous',
+	'playQueuedAt',
+	'playSourceNow',
+	'seek'
+]);
 
 export function applyToQueue(state: queue.QueueState, command: Command, positionSeconds: number): queue.QueueEffect | null {
 	switch (command.kind) {

@@ -1,7 +1,17 @@
 <script lang="ts">
 	import { previewPalette } from '../engine/palette.ts';
 	import { history } from '../history.svelte.ts';
-	import { albumsByIds, albumTracks, artistById, playlistById, search, type Album, type Artist, type Playlist, type Track } from '../library/queries.ts';
+	import {
+		albumsByIds,
+		albumTracks,
+		artistById,
+		playlistById,
+		search,
+		type Album,
+		type Artist,
+		type Playlist,
+		type Track
+	} from '../library/queries.ts';
 	import { playTracks } from '../player/player.svelte.ts';
 	import { COVER_PX, SEARCH } from '../tuning.ts';
 	import { openAlbum, openArtist, openPlaylist } from './actions.ts';
@@ -12,7 +22,11 @@
 	import { playlistKindLabel } from './playlistText.ts';
 	import { ui } from './state.svelte.ts';
 
-	type Result = { kind: 'artist'; item: Artist } | { kind: 'album'; item: Album } | { kind: 'playlist'; item: Playlist } | { kind: 'track'; item: Track };
+	type Result =
+		| { kind: 'artist'; item: Artist }
+		| { kind: 'album'; item: Album }
+		| { kind: 'playlist'; item: Playlist }
+		| { kind: 'track'; item: Track };
 	type Group = { title: string; results: Result[] };
 
 	let text = $state('');
@@ -42,7 +56,12 @@
 	}
 
 	async function matches(query: string): Promise<Group[]> {
-		const found = await search(query, { artists: SEARCH.artistLimit, albums: SEARCH.albumLimit, playlists: SEARCH.playlistLimit, tracks: SEARCH.trackLimit });
+		const found = await search(query, {
+			artists: SEARCH.artistLimit,
+			albums: SEARCH.albumLimit,
+			playlists: SEARCH.playlistLimit,
+			tracks: SEARCH.trackLimit
+		});
 		return [
 			{ title: 'Artists', results: found.artists.map((item) => ({ kind: 'artist', item }) as Result) },
 			{ title: 'Albums', results: found.albums.map((item) => ({ kind: 'album', item }) as Result) },
@@ -93,7 +112,15 @@
 		else {
 			const track = result.item;
 			const tracks = await albumTracks(track.albumId);
-			playTracks(tracks, Math.max(0, tracks.findIndex((candidate) => candidate.id === track.id)), track.album, `album:${track.albumId}`);
+			playTracks(
+				tracks,
+				Math.max(
+					0,
+					tracks.findIndex((candidate) => candidate.id === track.id)
+				),
+				track.album,
+				`album:${track.albumId}`
+			);
 		}
 	}
 
@@ -106,11 +133,26 @@
 	}
 </script>
 
-<div id="palette" class:open={ui.searchOpen} role="dialog" aria-label="Search" tabindex="-1" onmousedown={(event) => event.target === event.currentTarget && close()}>
+<div
+	id="palette"
+	class:open={ui.searchOpen}
+	role="dialog"
+	aria-label="Search"
+	tabindex="-1"
+	onmousedown={(event) => event.target === event.currentTarget && close()}
+>
 	<div class="pal-box">
 		<div class="pal-input">
 			<span class="pal-ico"><Icon name="search" /></span>
-			<input bind:this={input} bind:value={text} type="text" placeholder="Artists, albums, tracks…" autocomplete="off" spellcheck="false" {onkeydown} />
+			<input
+				bind:this={input}
+				bind:value={text}
+				type="text"
+				placeholder="Artists, albums, tracks…"
+				autocomplete="off"
+				spellcheck="false"
+				{onkeydown}
+			/>
 			<button class="pal-close" type="button" onclick={close}>Cancel</button>
 		</div>
 		<div class="pal-results" bind:this={resultsBox}>
@@ -118,14 +160,22 @@
 				<p class="pal-group">{group.title}</p>
 				{#each group.results as result (result.kind + result.item.id)}
 					{@const index = flat.indexOf(result)}
-					<button type="button" class="pal-item" class:sel={index === selected} onclick={() => choose(result)} onmousemove={() => index !== selected && (selected = index)}>
+					<button
+						type="button"
+						class="pal-item"
+						class:sel={index === selected}
+						onclick={() => choose(result)}
+						onmousemove={() => index !== selected && (selected = index)}
+					>
 						{#if result.kind === 'artist'}
 							<span class="ai">{result.item.name.charAt(0).toUpperCase()}</span>
 							<div><b>{result.item.name}</b><small>Artist · {plural(result.item.albumCount, 'album')}</small></div>
 							<em>Open</em>
 						{:else if result.kind === 'album'}
 							<Cover albumId={result.item.id} size={COVER_PX.row} />
-							<div><b>{result.item.name}</b><small>Album · {result.item.artist}{result.item.year ? ` · ${result.item.year}` : ''}</small></div>
+							<div>
+								<b>{result.item.name}</b><small>Album · {result.item.artist}{result.item.year ? ` · ${result.item.year}` : ''}</small>
+							</div>
 							<em>Open</em>
 						{:else if result.kind === 'playlist'}
 							<span class="pal-art"><PlaylistMosaic playlist={result.item} mini /></span>

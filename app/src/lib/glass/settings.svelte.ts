@@ -9,7 +9,12 @@ type Stored = { enabled: boolean; preset: string; params: GlassParams };
 function load(): Stored {
 	try {
 		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<Stored> | null;
-		if (stored) return { enabled: !!stored.enabled, preset: stored.params ? (stored.preset ?? '') : DEFAULT_PRESET.id, params: { ...(stored.params ? BASE : DEFAULT_PRESET.values), ...stored.params } };
+		if (stored)
+			return {
+				enabled: !!stored.enabled,
+				preset: stored.params ? (stored.preset ?? '') : DEFAULT_PRESET.id,
+				params: { ...(stored.params ? BASE : DEFAULT_PRESET.values), ...stored.params }
+			};
 	} catch {
 		localStorage.removeItem(STORAGE_KEY);
 	}
@@ -34,7 +39,10 @@ export function setGlassEnabled(enabled: boolean) {
 
 export function setGlassParam(key: keyof GlassParams, value: number) {
 	glass.params[key] = value;
-	glass.preset = LOOKS.find((preset) => Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6))?.id ?? '';
+	glass.preset =
+		LOOKS.find((preset) =>
+			Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6)
+		)?.id ?? '';
 	save();
 }
 
@@ -48,6 +56,12 @@ export function applyGlassPreset(id: string) {
 
 export function applyGlassParams(params: GlassParams, preset: string) {
 	glass.params = { ...params };
-	glass.preset = LOOKS.some((candidate) => candidate.id === preset && Object.entries(candidate.values).every(([name, value]) => Math.abs(params[name as keyof GlassParams] - value) < 1e-6)) ? preset : '';
+	glass.preset = LOOKS.some(
+		(candidate) =>
+			candidate.id === preset &&
+			Object.entries(candidate.values).every(([name, value]) => Math.abs(params[name as keyof GlassParams] - value) < 1e-6)
+	)
+		? preset
+		: '';
 	save();
 }

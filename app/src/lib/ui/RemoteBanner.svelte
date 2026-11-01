@@ -18,7 +18,9 @@
 		<span>Tap anywhere to start playing here</span>
 	{:else}
 		<span class="rb-text"
-			>{#if player.waitingForTap}Tap the screen on <b>{deviceLabel(relay.active)}</b> to start playing there{:else}Playing on <b>{deviceLabel(relay.active)}</b><span class="rb-extra"> · this tab is a remote</span>{/if}</span
+			>{#if player.waitingForTap}Tap the screen on <b>{deviceLabel(relay.active)}</b> to start playing there{:else}Playing on <b
+					>{deviceLabel(relay.active)}</b
+				><span class="rb-extra"> · this tab is a remote</span>{/if}</span
 		>
 		<button type="button" onclick={() => playOn(relay.deviceId)}>Play here</button>
 	{/if}

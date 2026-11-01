@@ -15,8 +15,18 @@
 	{#if playlist.kind === 'genre'}
 		<GenreCover {playlist} {mini} {size} />
 	{:else if playlist.image && session.credentials}
-		<img src={playlistCoverUrl(session.credentials, playlist.id, playlist.image, mini ? 120 : size * 2)} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />
+		<img
+			src={playlistCoverUrl(session.credentials, playlist.id, playlist.image, mini ? 120 : size * 2)}
+			{@attach retryCover}
+			alt=""
+			loading="lazy"
+			decoding="async"
+			draggable="false"
+		/>
 	{:else}
-		{#each mosaicAlbumIds(playlist) as albumId, index (index)}<Cover {albumId} size={mini ? COVER_PX.mosaicMini : Math.round(size / 2)} />{/each}
+		{#each mosaicAlbumIds(playlist) as albumId, index (index)}<Cover
+				{albumId}
+				size={mini ? COVER_PX.mosaicMini : Math.round(size / 2)}
+			/>{/each}
 	{/if}
 </span>

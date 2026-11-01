@@ -26,7 +26,15 @@ export function startServices() {
 export function installShell(): () => void {
 	setRailExpanded(ui.railExpanded, true);
 	applyFullScreenStyleClass();
-	const cleanups = [installFormFactor(), installGestureRecognizer(), installIdleTracking(), installResizeRelayout(), installScreenEdges(), installKeyboard(), installLongPress()];
+	const cleanups = [
+		installFormFactor(),
+		installGestureRecognizer(),
+		installIdleTracking(),
+		installResizeRelayout(),
+		installScreenEdges(),
+		installKeyboard(),
+		installLongPress()
+	];
 	return () => cleanups.forEach((cleanup) => cleanup());
 }
 

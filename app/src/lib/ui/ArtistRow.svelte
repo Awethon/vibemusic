@@ -20,7 +20,9 @@
 >
 	<div>
 		<div class="name">{artist.name}</div>
-		<div class="meta">{plural(artist.albumCount, 'album')} · {plural(artist.trackCount, 'track')}{artist.firstYear ? ` · since ${artist.firstYear}` : ''}</div>
+		<div class="meta">
+			{plural(artist.albumCount, 'album')} · {plural(artist.trackCount, 'track')}{artist.firstYear ? ` · since ${artist.firstYear}` : ''}
+		</div>
 	</div>
 	<div class="stack">
 		{#if ARTIST_LIST.photos}

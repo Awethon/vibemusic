@@ -31,9 +31,18 @@
 				{/if}
 			</span>
 		</button>
-		{#if showDevices}<button class="icon-btn" class:on={ui.devicesOpen} id={ui.fullScreen ? undefined : 'bDevice'} type="button" aria-label="Devices" onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button>{/if}
+		{#if showDevices}<button
+				class="icon-btn"
+				class:on={ui.devicesOpen}
+				id={ui.fullScreen ? undefined : 'bDevice'}
+				type="button"
+				aria-label="Devices"
+				onclick={() => (ui.devicesOpen = !ui.devicesOpen)}><Icon name={remote ? deviceIcon(deviceById(relay.active)) : 'speaker'} /></button
+			>{/if}
 		{#if !live}<LikeButton className="pd-like" />{/if}
-		<button class="pd-play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}><Icon name={player.playing ? 'pause' : 'play'} /></button>
+		<button class="pd-play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}
+			><Icon name={player.playing ? 'pause' : 'play'} /></button
+		>
 		{#if !live}<i class="pd-progress" style:transform="scaleX({progress})"></i>{/if}
 	</div>
 {/if}

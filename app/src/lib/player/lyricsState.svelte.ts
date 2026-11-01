@@ -1,7 +1,11 @@
 import { currentLineIndex, lyricsFor, type Lyrics } from './lyrics.ts';
 import { player } from './player.svelte.ts';
 
-export const lyricsState = $state<{ trackId: string; lyrics: Lyrics | null; loading: boolean }>({ trackId: '', lyrics: null, loading: false });
+export const lyricsState = $state<{ trackId: string; lyrics: Lyrics | null; loading: boolean }>({
+	trackId: '',
+	lyrics: null,
+	loading: false
+});
 
 export function loadLyricsFor(trackId: string) {
 	if (lyricsState.trackId === trackId) return;

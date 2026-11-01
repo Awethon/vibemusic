@@ -124,7 +124,22 @@ export const BENTO = Object.freeze({
 export const HOME = Object.freeze({
 	artistStripCount: 14,
 	phoneArtistRows: 2,
-	playlistMixPattern: Object.freeze(['smart', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre', 'own', 'own', 'genre', 'smart', 'own', 'genre'])
+	playlistMixPattern: Object.freeze([
+		'smart',
+		'genre',
+		'own',
+		'own',
+		'genre',
+		'smart',
+		'own',
+		'genre',
+		'own',
+		'own',
+		'genre',
+		'smart',
+		'own',
+		'genre'
+	])
 });
 
 export const ALBUM_PAGE = Object.freeze({ moreByCount: 12 });

@@ -32,7 +32,10 @@ function glideFromPreviousPosition(tile: HTMLElement, previous: DOMRect, current
 	const offsetX = previous.left - current.left;
 	const offsetY = previous.top - current.top;
 	const scale = previous.width / current.width;
-	const unchanged = Math.abs(offsetX) < MOTION.flipMinOffsetPx && Math.abs(offsetY) < MOTION.flipMinOffsetPx && Math.abs(scale - 1) < MOTION.flipMinScaleChange;
+	const unchanged =
+		Math.abs(offsetX) < MOTION.flipMinOffsetPx &&
+		Math.abs(offsetY) < MOTION.flipMinOffsetPx &&
+		Math.abs(scale - 1) < MOTION.flipMinScaleChange;
 	if (unchanged) return;
 	const restingTransform = tile.style.transform || '';
 	tile.animate(
@@ -45,7 +48,12 @@ function glideFromPreviousPosition(tile: HTMLElement, previous: DOMRect, current
 }
 
 function fadeIn(tile: HTMLElement, delay: number, durationMs: number) {
-	tile.animate([{ opacity: 0 }, { opacity: 1 }], { duration: durationMs - MOTION.flipFadeShortenMs, delay, easing: EASING.standard, fill: 'backwards' });
+	tile.animate([{ opacity: 0 }, { opacity: 1 }], {
+		duration: durationMs - MOTION.flipFadeShortenMs,
+		delay,
+		easing: EASING.standard,
+		fill: 'backwards'
+	});
 }
 
 export function playTileFlip(previousPositions: Map<string, DOMRect>, durationMs: number = MOTION.flipMs) {

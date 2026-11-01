@@ -29,8 +29,14 @@ function keepPendingScrobbles(scrobbles: PendingScrobble[]) {
 async function sendScrobble(scrobble: PendingScrobble) {
 	await navidrome().subsonic('scrobble', { id: scrobble.trackId, submission: 'true', time: scrobble.time });
 	const playedAt = new Date(scrobble.time).toISOString();
-	await patchLibrary('update track set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [playedAt, scrobble.trackId]);
-	await patchLibrary('update album set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [playedAt, scrobble.albumId]);
+	await patchLibrary('update track set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
+		playedAt,
+		scrobble.trackId
+	]);
+	await patchLibrary('update album set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
+		playedAt,
+		scrobble.albumId
+	]);
 }
 
 async function submitScrobble(track: Track) {
@@ -45,7 +51,9 @@ async function submitScrobble(track: Track) {
 }
 
 export function announceNowPlaying(trackId: string) {
-	void navidrome().subsonic('scrobble', { id: trackId, submission: 'false' }).catch(() => {});
+	void navidrome()
+		.subsonic('scrobble', { id: trackId, submission: 'false' })
+		.catch(() => {});
 }
 
 export function resetListening() {

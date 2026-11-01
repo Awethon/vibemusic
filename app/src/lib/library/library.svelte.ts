@@ -13,9 +13,22 @@ import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
-type ChannelMessage = { kind: 'snapshot'; version: string } | { kind: 'patch'; sql: string; params: SqlParam[] } | { kind: 'resync'; full: boolean } | { kind: 'need-snapshot' };
+type ChannelMessage =
+	| { kind: 'snapshot'; version: string }
+	| { kind: 'patch'; sql: string; params: SqlParam[] }
+	| { kind: 'resync'; full: boolean }
+	| { kind: 'need-snapshot' };
 
-export const library = $state<{ status: Status; meta: LibraryMeta | null; revision: number; leader: boolean; error: string; openMs: number; timings: SyncTimings | null; progress: SyncProgress | null }>({
+export const library = $state<{
+	status: Status;
+	meta: LibraryMeta | null;
+	revision: number;
+	leader: boolean;
+	error: string;
+	openMs: number;
+	timings: SyncTimings | null;
+	progress: SyncProgress | null;
+}>({
 	status: 'idle',
 	meta: null,
 	revision: 0,
@@ -61,13 +74,18 @@ function onWorkerReply(event: MessageEvent<WorkerReply>) {
 	if (!waiter) return;
 	pending.delete(reply.id);
 	if (reply.ok) waiter.resolve(reply.value);
-	else waiter.reject(reply.expired ? new SessionExpiredError() : reply.unreachable ? new NavidromeUnreachableError() : new Error(reply.error));
+	else
+		waiter.reject(reply.expired ? new SessionExpiredError() : reply.unreachable ? new NavidromeUnreachableError() : new Error(reply.error));
 }
 
 async function refreshCoverStamps() {
 	const [albums, artists] = await Promise.all([
-		query<{ id: string; image_hash: string; dominant_color: string; thumb_hash: string }>("select id, image_hash, dominant_color, thumb_hash from album where image_hash != '' or dominant_color != '' or thumb_hash != ''"),
-		query<{ artist_id: string; dominant_color: string; thumb_hash: string }>("select artist_id, dominant_color, thumb_hash from artist_art where thumb_hash != '' or dominant_color != ''")
+		query<{ id: string; image_hash: string; dominant_color: string; thumb_hash: string }>(
+			"select id, image_hash, dominant_color, thumb_hash from album where image_hash != '' or dominant_color != '' or thumb_hash != ''"
+		),
+		query<{ artist_id: string; dominant_color: string; thumb_hash: string }>(
+			"select artist_id, dominant_color, thumb_hash from artist_art where thumb_hash != '' or dominant_color != ''"
+		)
 	]);
 	for (const { id, image_hash: hash, dominant_color: color, thumb_hash: thumb } of albums) {
 		const known = albumArt.get(id);
@@ -143,7 +161,12 @@ async function requestEnrichment(force = false) {
 }
 
 function queueEnrichment(enrichment: Enrichment) {
-	if ([enrichment.releaseGroups, enrichment.mbArtists, enrichment.deezer, enrichment.artistMatches ?? {}, enrichment.apple ?? {}].every((part) => !Object.keys(part).length)) return;
+	if (
+		[enrichment.releaseGroups, enrichment.mbArtists, enrichment.deezer, enrichment.artistMatches ?? {}, enrichment.apple ?? {}].every(
+			(part) => !Object.keys(part).length
+		)
+	)
+		return;
 	pendingEnrichment = pendingEnrichment
 		? {
 				at: Math.max(pendingEnrichment.at, enrichment.at),
@@ -155,7 +178,10 @@ function queueEnrichment(enrichment: Enrichment) {
 			}
 		: enrichment;
 	if (enrichmentTimer) return;
-	enrichmentTimer = setTimeout(applyEnrichment, Math.max(ENRICHMENT.applyDelayMs, lastEnrichmentAt + ENRICHMENT.applyIntervalMs - Date.now()));
+	enrichmentTimer = setTimeout(
+		applyEnrichment,
+		Math.max(ENRICHMENT.applyDelayMs, lastEnrichmentAt + ENRICHMENT.applyIntervalMs - Date.now())
+	);
 }
 
 async function applyEnrichment() {

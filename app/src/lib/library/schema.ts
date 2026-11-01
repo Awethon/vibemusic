@@ -91,4 +91,12 @@ create index search_key_prefix on search_key (kind, text);
 
 export const normalizeForSearch = (text: string) => text.toLowerCase().replaceAll('ё', 'е').normalize('NFKC');
 
-export const KEPT_TABLES = ['palette', 'mb_release_group', 'mb_artist', 'deezer_artist', 'artist_match', 'apple_artist', 'enrichment_state'] as const;
+export const KEPT_TABLES = [
+	'palette',
+	'mb_release_group',
+	'mb_artist',
+	'deezer_artist',
+	'artist_match',
+	'apple_artist',
+	'enrichment_state'
+] as const;

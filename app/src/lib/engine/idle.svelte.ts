@@ -24,7 +24,8 @@ export function wakeFromIdle() {
 	}
 }
 
-const somethingKeepsUiAwake = () => ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
+const somethingKeepsUiAwake = () =>
+	ui.searchOpen || ui.panelOpen || ui.queuePressed || anyMenuOpen() || document.activeElement?.matches('input, textarea');
 
 function enterIdleOrRest() {
 	if (bodyHasClass('now-open')) {

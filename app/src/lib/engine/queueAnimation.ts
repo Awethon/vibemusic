@@ -13,7 +13,8 @@ const isQueueVisible = () => bodyHasClass('panel-open') && !bodyHasClass('now-op
 function snapshotQueueRows() {
 	const rowsByKey = new Map<string, RowSnapshot>();
 	const visible = isQueueVisible();
-	for (const row of document.querySelectorAll<HTMLElement>(QUEUE_ROW_SELECTOR)) rowsByKey.set(row.dataset.entry ?? '', { row, rect: row.getBoundingClientRect(), visible });
+	for (const row of document.querySelectorAll<HTMLElement>(QUEUE_ROW_SELECTOR))
+		rowsByKey.set(row.dataset.entry ?? '', { row, rect: row.getBoundingClientRect(), visible });
 	return rowsByKey;
 }
 
@@ -26,14 +27,28 @@ export function placeOverlayCopy(original: HTMLElement, rect: DOMRect) {
 	stripIds(copy);
 	copy.classList.add('row-lift');
 	copy.classList.remove('dragging');
-	Object.assign(copy.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, transform: '', opacity: '', visibility: '' });
+	Object.assign(copy.style, {
+		left: `${rect.left}px`,
+		top: `${rect.top}px`,
+		width: `${rect.width}px`,
+		height: `${rect.height}px`,
+		transform: '',
+		opacity: '',
+		visibility: ''
+	});
 	document.body.append(copy);
 	return copy;
 }
 
 function animateRowLeaving(original: HTMLElement, rect: DOMRect, exitTransform: string) {
 	const copy = placeOverlayCopy(original, rect);
-	const animation = copy.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: exitTransform }], { duration: QUEUE_MOTION.exitMs, easing: EASING.easeOutCubic, fill: 'forwards' });
+	const animation = copy.animate(
+		[
+			{ opacity: 1, transform: 'none' },
+			{ opacity: 0, transform: exitTransform }
+		],
+		{ duration: QUEUE_MOTION.exitMs, easing: EASING.easeOutCubic, fill: 'forwards' }
+	);
 	animation.onfinish = () => copy.remove();
 }
 
@@ -58,13 +73,22 @@ function crossfadeNowPlaying(captured: ReturnType<typeof captureNowPlayingBlocks
 			pointerEvents: 'none'
 		});
 		document.body.append(copy);
-		const fadeOut = copy.animate([{ opacity: 1 }, { opacity: 0 }], { duration: QUEUE_MOTION.nowCrossfadeMs, easing: EASING.easeOutCubic, fill: 'forwards' });
+		const fadeOut = copy.animate([{ opacity: 1 }, { opacity: 0 }], {
+			duration: QUEUE_MOTION.nowCrossfadeMs,
+			easing: EASING.easeOutCubic,
+			fill: 'forwards'
+		});
 		fadeOut.onfinish = () => copy.remove();
 		block.animate([{ opacity: 0 }, { opacity: 1 }], { duration: QUEUE_MOTION.nowCrossfadeMs, easing: EASING.easeOutCubic });
 	}
 }
 
-function animateLeavingRows(before: Map<string, RowSnapshot>, after: Map<string, RowSnapshot>, playedEntryId: string | null, skippedRow?: HTMLElement) {
+function animateLeavingRows(
+	before: Map<string, RowSnapshot>,
+	after: Map<string, RowSnapshot>,
+	playedEntryId: string | null,
+	skippedRow?: HTMLElement
+) {
 	for (const [key, previous] of before) {
 		if (after.has(key) || previous.row === skippedRow || !previous.visible) continue;
 		if (previous.rect.bottom < 0 || previous.rect.top > innerHeight) continue;
@@ -74,11 +98,20 @@ function animateLeavingRows(before: Map<string, RowSnapshot>, after: Map<string,
 }
 
 function animateEnteringRow(row: HTMLElement) {
-	row.animate([{ opacity: 0, transform: `translateX(${QUEUE_MOTION.enterSlidePx}px)` }, { opacity: 1, transform: 'none' }], { duration: QUEUE_MOTION.enterMs, easing: EASING.easeOutCubic });
+	row.animate(
+		[
+			{ opacity: 0, transform: `translateX(${QUEUE_MOTION.enterSlidePx}px)` },
+			{ opacity: 1, transform: 'none' }
+		],
+		{ duration: QUEUE_MOTION.enterMs, easing: EASING.easeOutCubic }
+	);
 }
 
 function animateGlide(row: HTMLElement, offsetY: number) {
-	row.animate([{ transform: `translateY(${offsetY}px)` }, { transform: 'none' }], { duration: QUEUE_MOTION.glideMs, easing: EASING.easeOutCubic });
+	row.animate([{ transform: `translateY(${offsetY}px)` }, { transform: 'none' }], {
+		duration: QUEUE_MOTION.glideMs,
+		easing: EASING.easeOutCubic
+	});
 }
 
 function animateTravel(row: HTMLElement, offsetY: number) {
@@ -86,7 +119,11 @@ function animateTravel(row: HTMLElement, offsetY: number) {
 	const travel = row.animate(
 		[
 			{ transform: `translateY(${offsetY}px)`, boxShadow: QUEUE_MOTION.restingShadow },
-			{ transform: `translateY(${offsetY * QUEUE_MOTION.travelMidpoint}px)`, boxShadow: QUEUE_MOTION.travelShadow, offset: QUEUE_MOTION.travelMidpoint },
+			{
+				transform: `translateY(${offsetY * QUEUE_MOTION.travelMidpoint}px)`,
+				boxShadow: QUEUE_MOTION.travelShadow,
+				offset: QUEUE_MOTION.travelMidpoint
+			},
 			{ transform: 'none', boxShadow: QUEUE_MOTION.restingShadow }
 		],
 		{ duration: QUEUE_MOTION.travelMs, easing: EASING.easeOutCubic }

@@ -29,7 +29,12 @@ export function updateMediaSession(track: Track | null, playing: boolean, positi
 			title: track.title,
 			artist: track.artist,
 			album: track.album,
-			artwork: [{ src: coverUrl(session.credentials, track.albumId, COVER_PX.mediaSession), sizes: `${COVER_PX.mediaSession}x${COVER_PX.mediaSession}` }]
+			artwork: [
+				{
+					src: coverUrl(session.credentials, track.albumId, COVER_PX.mediaSession),
+					sizes: `${COVER_PX.mediaSession}x${COVER_PX.mediaSession}`
+				}
+			]
 		});
 	}
 	if (track && duration > 0 && position <= duration) media.setPositionState({ duration, position, playbackRate: 1 });

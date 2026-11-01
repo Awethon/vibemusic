@@ -3,7 +3,16 @@ import { setBodyClass } from '../engine/dom.ts';
 import { playUpNextRow, reorderUpNextRows } from './queueActions.ts';
 import { ui } from './state.svelte.ts';
 
-type Drag = { list: HTMLElement; row: HTMLElement; startY: number; dragging: boolean; rows: HTMLElement[]; fromIndex: number; toIndex: number; rowPitch: number };
+type Drag = {
+	list: HTMLElement;
+	row: HTMLElement;
+	startY: number;
+	dragging: boolean;
+	rows: HTMLElement[];
+	fromIndex: number;
+	toIndex: number;
+	rowPitch: number;
+};
 
 let drag: Drag | null = null;
 

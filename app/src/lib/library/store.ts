@@ -39,13 +39,21 @@ const chunksOf = (name: string, from = 0) => IDBKeyRange.bound([name, from], [na
 
 export async function readFile(name: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; saved: Saved } | null> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readonly');
-	const [manifest, parts] = await Promise.all([settle<Manifest | undefined>(transaction.objectStore(MANIFESTS).get(name)), settle<Blob[]>(transaction.objectStore(CHUNKS).getAll(chunksOf(name)))]);
+	const [manifest, parts] = await Promise.all([
+		settle<Manifest | undefined>(transaction.objectStore(MANIFESTS).get(name)),
+		settle<Blob[]>(transaction.objectStore(CHUNKS).getAll(chunksOf(name)))
+	]);
 	if (!manifest || parts.length !== manifest.hashes.length) return null;
 	const bytes = joinChunks(await Promise.all(parts.map(async (part) => new Uint8Array(await part.arrayBuffer()))), manifest.size);
 	return { bytes, saved: { chunkSize: manifest.chunkSize, hashes: manifest.hashes } };
 }
 
-export async function writeFile(name: string, snapshot: () => Uint8Array, chunkSize: number, previous: Saved | null): Promise<{ saved: Saved; size: number; written: number }> {
+export async function writeFile(
+	name: string,
+	snapshot: () => Uint8Array,
+	chunkSize: number,
+	previous: Saved | null
+): Promise<{ saved: Saved; size: number; written: number }> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readwrite');
 	const done = finish(transaction);
 	const bytes = snapshot();

@@ -16,7 +16,11 @@ fn rgb_to_hls(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     if (max - min).abs() < f32::EPSILON {
         return (0.0, l, 0.0);
     }
-    let s = if l <= 0.5 { (max - min) / (max + min) } else { (max - min) / (2.0 - max - min) };
+    let s = if l <= 0.5 {
+        (max - min) / (max + min)
+    } else {
+        (max - min) / (2.0 - max - min)
+    };
     let rc = (max - r) / (max - min);
     let gc = (max - g) / (max - min);
     let bc = (max - b) / (max - min);
@@ -53,11 +57,25 @@ fn hls_to_rgb(h: f32, l: f32, s: f32) -> [u8; 3] {
 }
 
 fn median_cut(pixels: Vec<[f32; 3]>, count: usize) -> Vec<[f32; 3]> {
-    let spread = |b: &[[f32; 3]], c: usize| b.iter().map(|p| p[c]).fold(f32::MIN, f32::max) - b.iter().map(|p| p[c]).fold(f32::MAX, f32::min);
-    let widest = |b: &[[f32; 3]]| (0..3).max_by(|&x, &y| spread(b, x).total_cmp(&spread(b, y)).then(y.cmp(&x))).unwrap_or(0);
+    let spread = |b: &[[f32; 3]], c: usize| {
+        b.iter().map(|p| p[c]).fold(f32::MIN, f32::max) - b.iter().map(|p| p[c]).fold(f32::MAX, f32::min)
+    };
+    let widest = |b: &[[f32; 3]]| {
+        (0..3)
+            .max_by(|&x, &y| spread(b, x).total_cmp(&spread(b, y)).then(y.cmp(&x)))
+            .unwrap_or(0)
+    };
     let mut boxes = vec![pixels];
     while boxes.len() < count {
-        let Some(index) = boxes.iter().enumerate().filter(|(_, b)| b.len() > 1 && spread(b, widest(b)) > 0.0).max_by(|a, b| a.1.len().cmp(&b.1.len()).then(b.0.cmp(&a.0))).map(|(i, _)| i) else { break };
+        let Some(index) = boxes
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| b.len() > 1 && spread(b, widest(b)) > 0.0)
+            .max_by(|a, b| a.1.len().cmp(&b.1.len()).then(b.0.cmp(&a.0)))
+            .map(|(i, _)| i)
+        else {
+            break;
+        };
         let mut b = boxes.remove(index);
         let c = widest(&b);
         b.sort_by(|x, y| x[c].total_cmp(&y[c]));
@@ -66,7 +84,10 @@ fn median_cut(pixels: Vec<[f32; 3]>, count: usize) -> Vec<[f32; 3]> {
         boxes.push(upper);
     }
     boxes.sort_by_key(|b| std::cmp::Reverse(b.len()));
-    boxes.iter().map(|b| [0, 1, 2].map(|c| b.iter().map(|p| p[c]).sum::<f32>() / b.len() as f32)).collect()
+    boxes
+        .iter()
+        .map(|b| [0, 1, 2].map(|c| b.iter().map(|p| p[c]).sum::<f32>() / b.len() as f32))
+        .collect()
 }
 
 struct Theme {
@@ -78,7 +99,13 @@ struct Theme {
 
 fn theme_of(image: &RgbImage) -> Theme {
     let sample = imageops::resize(image, 48, 48, imageops::FilterType::CatmullRom);
-    let colors = median_cut(sample.pixels().map(|p| [p[0] as f32, p[1] as f32, p[2] as f32]).collect(), 6);
+    let colors = median_cut(
+        sample
+            .pixels()
+            .map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
+            .collect(),
+        6,
+    );
     let colourfulness = |c: &[f32; 3]| {
         let (_, l, s) = rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
         s * (1.0 - (l - 0.5).abs() * 1.6)
@@ -91,7 +118,12 @@ fn theme_of(image: &RgbImage) -> Theme {
     let c = &c;
     let (h, _, s) = rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
     let vivid = s.clamp(0.45, 0.9);
-    Theme { accent: hls_to_rgb(h, 0.68, vivid), accent_soft: hls_to_rgb(h, 0.45, vivid), dark: hls_to_rgb(h, 0.16, vivid.min(0.55)), deep: hls_to_rgb(h, 0.08, vivid.min(0.5)) }
+    Theme {
+        accent: hls_to_rgb(h, 0.68, vivid),
+        accent_soft: hls_to_rgb(h, 0.45, vivid),
+        dark: hls_to_rgb(h, 0.16, vivid.min(0.55)),
+        deep: hls_to_rgb(h, 0.08, vivid.min(0.5)),
+    }
 }
 
 fn mix(a: [u8; 3], b: [u8; 3], t: f32) -> [f32; 3] {
@@ -135,7 +167,12 @@ fn rounded(image: &RgbImage, radius: f32) -> RgbaImage {
     let (w, h) = (image.width() as f32, image.height() as f32);
     RgbaImage::from_fn(image.width(), image.height(), |x, y| {
         let p = image.get_pixel(x, y);
-        Rgba([p[0], p[1], p[2], (corner_coverage(x as f32 + 0.5, y as f32 + 0.5, w, h, radius) * 255.0).round() as u8])
+        Rgba([
+            p[0],
+            p[1],
+            p[2],
+            (corner_coverage(x as f32 + 0.5, y as f32 + 0.5, w, h, radius) * 255.0).round() as u8,
+        ])
     })
 }
 
@@ -148,7 +185,12 @@ fn rotate_expand(image: &RgbaImage, degrees: f32) -> RgbaImage {
         let (x0, y0) = (sx.floor(), sy.floor());
         let (fx, fy) = (sx - x0, sy - y0);
         let mut acc = [0f32; 4];
-        for (ox, oy, weight) in [(0.0, 0.0, (1.0 - fx) * (1.0 - fy)), (1.0, 0.0, fx * (1.0 - fy)), (0.0, 1.0, (1.0 - fx) * fy), (1.0, 1.0, fx * fy)] {
+        for (ox, oy, weight) in [
+            (0.0, 0.0, (1.0 - fx) * (1.0 - fy)),
+            (1.0, 0.0, fx * (1.0 - fy)),
+            (0.0, 1.0, (1.0 - fx) * fy),
+            (1.0, 1.0, fx * fy),
+        ] {
             let (px, py) = (x0 + ox, y0 + oy);
             if px < 0.0 || py < 0.0 || px >= w || py >= h || weight == 0.0 {
                 continue;
@@ -170,14 +212,23 @@ fn rotate_expand(image: &RgbaImage, degrees: f32) -> RgbaImage {
         if a <= 0.0 {
             return Rgba([0, 0, 0, 0]);
         }
-        Rgba([(r / a).round() as u8, (g / a).round() as u8, (b / a).round() as u8, (a * 255.0).round() as u8])
+        Rgba([
+            (r / a).round() as u8,
+            (g / a).round() as u8,
+            (b / a).round() as u8,
+            (a * 255.0).round() as u8,
+        ])
     })
 }
 
 fn rotate_gray(image: &GrayImage, degrees: f32) -> GrayImage {
-    let as_rgba = RgbaImage::from_fn(image.width(), image.height(), |x, y| Rgba([0, 0, 0, image.get_pixel(x, y)[0]]));
+    let as_rgba = RgbaImage::from_fn(image.width(), image.height(), |x, y| {
+        Rgba([0, 0, 0, image.get_pixel(x, y)[0]])
+    });
     let rotated = rotate_expand(&as_rgba, degrees);
-    GrayImage::from_fn(rotated.width(), rotated.height(), |x, y| Luma([rotated.get_pixel(x, y)[3]]))
+    GrayImage::from_fn(rotated.width(), rotated.height(), |x, y| {
+        Luma([rotated.get_pixel(x, y)[3]])
+    })
 }
 
 fn blend(canvas: &mut RgbaImage, x: i64, y: i64, color: [f32; 3], alpha: f32) {
@@ -186,7 +237,9 @@ fn blend(canvas: &mut RgbaImage, x: i64, y: i64, color: [f32; 3], alpha: f32) {
     }
     let p = canvas.get_pixel_mut(x as u32, y as u32);
     for i in 0..3 {
-        p[i] = (p[i] as f32 * (1.0 - alpha) + color[i] * alpha).round().clamp(0.0, 255.0) as u8;
+        p[i] = (p[i] as f32 * (1.0 - alpha) + color[i] * alpha)
+            .round()
+            .clamp(0.0, 255.0) as u8;
     }
 }
 
@@ -198,7 +251,15 @@ fn place(canvas: &mut RgbaImage, tile: &RgbaImage, left: f32, top: f32, angle: f
     let pad = (60.0 * SCALE).round();
     let (sw, sh) = (tile.width() as f32 + pad * 2.0, tile.height() as f32 + pad * 2.0);
     let shadow = GrayImage::from_fn(sw as u32, sh as u32, |x, y| {
-        let inside = inside_rounded(x as f32, y as f32, pad + spread, pad + spread, pad + tile.width() as f32 - spread, pad + tile.height() as f32 - spread, (10.0 * SCALE).round());
+        let inside = inside_rounded(
+            x as f32,
+            y as f32,
+            pad + spread,
+            pad + spread,
+            pad + tile.width() as f32 - spread,
+            pad + tile.height() as f32 - spread,
+            (10.0 * SCALE).round(),
+        );
         Luma([if inside { 190 } else { 0 }])
     });
     let shadow = imageproc::filter::gaussian_blur_f32(&rotate_gray(&shadow, angle), 22.0 * SCALE);
@@ -210,7 +271,13 @@ fn place(canvas: &mut RgbaImage, tile: &RgbaImage, left: f32, top: f32, angle: f
     let rx = (center_x - rotated.width() as f32 / 2.0).round() as i64;
     let ry = (center_y - rotated.height() as f32 / 2.0).round() as i64;
     for (x, y, p) in rotated.enumerate_pixels() {
-        blend(canvas, rx + x as i64, ry + y as i64, [p[0] as f32, p[1] as f32, p[2] as f32], p[3] as f32 / 255.0);
+        blend(
+            canvas,
+            rx + x as i64,
+            ry + y as i64,
+            [p[0] as f32, p[1] as f32, p[2] as f32],
+            p[3] as f32 / 255.0,
+        );
     }
 }
 
@@ -226,7 +293,11 @@ impl Face {
         font.set_variation(b"wght", weight);
         let size = size.round();
         let px = size * font.height_unscaled() / font.units_per_em().expect("bundled font has units per em");
-        Face { font, scale: PxScale::from(px), size }
+        Face {
+            font,
+            scale: PxScale::from(px),
+            size,
+        }
     }
 
     fn advance(&self, character: char) -> f32 {
@@ -254,21 +325,44 @@ impl Face {
     }
 
     fn ink_top(&self, sample: char) -> f32 {
-        let glyph = self.font.glyph_id(sample).with_scale_and_position(self.scale, point(0.0, self.ascent()));
-        self.font.outline_glyph(glyph).map(|outline| outline.px_bounds().min.y).unwrap_or(0.0)
+        let glyph = self
+            .font
+            .glyph_id(sample)
+            .with_scale_and_position(self.scale, point(0.0, self.ascent()));
+        self.font
+            .outline_glyph(glyph)
+            .map(|outline| outline.px_bounds().min.y)
+            .unwrap_or(0.0)
     }
 
     fn ink_bottom(&self, sample: char) -> f32 {
-        let glyph = self.font.glyph_id(sample).with_scale_and_position(self.scale, point(0.0, self.ascent()));
-        self.font.outline_glyph(glyph).map(|outline| outline.px_bounds().max.y).unwrap_or(0.0)
+        let glyph = self
+            .font
+            .glyph_id(sample)
+            .with_scale_and_position(self.scale, point(0.0, self.ascent()));
+        self.font
+            .outline_glyph(glyph)
+            .map(|outline| outline.px_bounds().max.y)
+            .unwrap_or(0.0)
     }
 
     fn draw(&self, canvas: &mut RgbaImage, character: char, x: f32, y: f32, color: [u8; 3]) {
-        let glyph = self.font.glyph_id(character).with_scale_and_position(self.scale, point(x, y + self.ascent()));
+        let glyph = self
+            .font
+            .glyph_id(character)
+            .with_scale_and_position(self.scale, point(x, y + self.ascent()));
         if let Some(outline) = self.font.outline_glyph(glyph) {
             let bounds = outline.px_bounds();
             let color = color.map(|c| c as f32);
-            outline.draw(|gx, gy, coverage| blend(canvas, bounds.min.x as i64 + gx as i64, bounds.min.y as i64 + gy as i64, color, coverage.min(1.0)));
+            outline.draw(|gx, gy, coverage| {
+                blend(
+                    canvas,
+                    bounds.min.x as i64 + gx as i64,
+                    bounds.min.y as i64 + gy as i64,
+                    color,
+                    coverage.min(1.0),
+                )
+            });
         }
     }
 
@@ -298,7 +392,16 @@ fn fan_layout(count: usize) -> Vec<(f32, f32, f32, f32)> {
         _ => {
             let step_x = (248.0 / (count as f32 - 1.0)).min(110.0);
             let step_y = (120.0 / (count as f32 - 1.0)).min(60.0);
-            (0..count).map(|i| (300.0 - i as f32 * step_x, 296.0 - i as f32 * step_y, 270.0, i as f32 * 3.0)).collect()
+            (0..count)
+                .map(|i| {
+                    (
+                        300.0 - i as f32 * step_x,
+                        296.0 - i as f32 * step_y,
+                        270.0,
+                        i as f32 * 3.0,
+                    )
+                })
+                .collect()
         }
     }
 }
@@ -311,20 +414,48 @@ pub fn render(name: &str, newest: &RgbImage, covers: &[RgbImage]) -> Vec<u8> {
         let Some(cover) = covers.get(index) else { continue };
         let tile_size = (size * SCALE).round() as u32;
         let art = imageops::resize(cover, tile_size, tile_size, imageops::FilterType::Lanczos3);
-        place(&mut canvas, &rounded(&art, (10.0 * SCALE).round()), left * SCALE, top * SCALE, angle);
+        place(
+            &mut canvas,
+            &rounded(&art, (10.0 * SCALE).round()),
+            left * SCALE,
+            top * SCALE,
+            angle,
+        );
     }
     let eyebrow = Face::new(ONEST, 22.0 * SCALE, 600.0);
-    eyebrow.draw_tracked(&mut canvas, "THIS IS", 44.0 * SCALE, 44.0 * SCALE - eyebrow.ink_top('T'), theme.accent, 22.0 * SCALE * 0.24);
+    eyebrow.draw_tracked(
+        &mut canvas,
+        "THIS IS",
+        44.0 * SCALE,
+        44.0 * SCALE - eyebrow.ink_top('T'),
+        theme.accent,
+        22.0 * SCALE * 0.24,
+    );
     let title = fit_name(name, (600.0 - 88.0) * SCALE);
-    title.draw_tracked(&mut canvas, name, 44.0 * SCALE, 82.0 * SCALE - title.ink_top('H') + 6.0 * SCALE, INK, -title.size * 0.03);
+    title.draw_tracked(
+        &mut canvas,
+        name,
+        44.0 * SCALE,
+        82.0 * SCALE - title.ink_top('H') + 6.0 * SCALE,
+        INK,
+        -title.size * 0.03,
+    );
     let mark_v = Face::new(UNBOUNDED, 26.0 * SCALE, 500.0);
     let mark_m = Face::new(UNBOUNDED, 26.0 * SCALE, 300.0);
     let mark_y = SIZE as f32 - 34.0 * SCALE - mark_v.ink_bottom('v');
     mark_v.draw(&mut canvas, 'v', 44.0 * SCALE, mark_y, INK);
-    mark_m.draw(&mut canvas, 'm', 44.0 * SCALE + mark_v.advance('v') - 26.0 * SCALE * 0.04, mark_y, theme.accent);
+    mark_m.draw(
+        &mut canvas,
+        'm',
+        44.0 * SCALE + mark_v.advance('v') - 26.0 * SCALE * 0.04,
+        mark_y,
+        theme.accent,
+    );
     let rgb = image::DynamicImage::ImageRgba8(canvas).to_rgb8();
     let mut jpeg = Vec::new();
-    JpegEncoder::new_with_quality(&mut jpeg, 90).encode_image(&rgb).expect("jpeg in memory");
+    JpegEncoder::new_with_quality(&mut jpeg, 90)
+        .encode_image(&rgb)
+        .expect("jpeg in memory");
     jpeg
 }
 
@@ -335,7 +466,11 @@ mod tests {
     #[test]
     fn draws_a_square_jpeg_with_a_theme_from_the_newest_album() {
         let red = RgbImage::from_pixel(64, 64, image::Rgb([200, 30, 40]));
-        let jpeg = render("Glass Harbor", &red, &[red.clone(), RgbImage::from_pixel(64, 64, image::Rgb([20, 20, 200]))]);
+        let jpeg = render(
+            "Glass Harbor",
+            &red,
+            &[red.clone(), RgbImage::from_pixel(64, 64, image::Rgb([20, 20, 200]))],
+        );
         let decoded = image::load_from_memory(&jpeg).unwrap();
         assert_eq!((decoded.width(), decoded.height()), (SIZE, SIZE));
         let theme = theme_of(&red);
@@ -354,7 +489,10 @@ mod tests {
         let tile = rounded(&RgbImage::from_pixel(40, 40, image::Rgb([255, 255, 255])), 10.0);
         assert_eq!(tile.get_pixel(0, 0)[3], 0);
         assert_eq!(tile.get_pixel(20, 20)[3], 255);
-        let blended = (0..10).flat_map(|x| (0..10).map(move |y| (x, y))).filter(|&(x, y)| (1..255).contains(&tile.get_pixel(x, y)[3])).count();
+        let blended = (0..10)
+            .flat_map(|x| (0..10).map(move |y| (x, y)))
+            .filter(|&(x, y)| (1..255).contains(&tile.get_pixel(x, y)[3]))
+            .count();
         assert!(blended >= 8, "only {blended} blended corner pixels");
     }
 }

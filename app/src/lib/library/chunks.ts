@@ -19,7 +19,8 @@ function hashRange(bytes: Uint8Array, start: number, end: number): string {
 
 export function chunkHashes(bytes: Uint8Array, chunkSize: number): string[] {
 	const hashes: string[] = [];
-	for (let start = 0; start < bytes.length; start += chunkSize) hashes.push(hashRange(bytes, start, Math.min(bytes.length, start + chunkSize)));
+	for (let start = 0; start < bytes.length; start += chunkSize)
+		hashes.push(hashRange(bytes, start, Math.min(bytes.length, start + chunkSize)));
 	return hashes;
 }
 

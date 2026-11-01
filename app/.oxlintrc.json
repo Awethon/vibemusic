@@ -7,9 +7,5 @@
 		"unicorn/require-post-message-target-origin": "off",
 		"unicorn/consistent-function-scoping": "off"
 	},
-	"ignorePatterns": [
-		".svelte-kit",
-		"build",
-		"node_modules"
-	]
+	"ignorePatterns": [".svelte-kit", "build", "node_modules"]
 }

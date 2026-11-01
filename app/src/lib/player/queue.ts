@@ -156,10 +156,20 @@ export function applyEdit(state: QueueState, edit: QueueEdit) {
 	else reorderUpNext(state, edit.fromUserQueue, edit.from, edit.to);
 }
 
-export const copyQueue = (state: QueueState): QueueState => ({ ...state, sourceQueue: state.sourceQueue.map((entry) => ({ ...entry })), userQueue: state.userQueue.map((entry) => ({ ...entry })) });
+export const copyQueue = (state: QueueState): QueueState => ({
+	...state,
+	sourceQueue: state.sourceQueue.map((entry) => ({ ...entry })),
+	userQueue: state.userQueue.map((entry) => ({ ...entry }))
+});
 
 export function replaceQueue(state: QueueState, next: QueueState) {
 	Object.assign(state, copyQueue(next));
 }
 
-export const queuedTrackIds = (state: QueueState) => [...new Set([state.currentTrackId, ...state.sourceQueue.map((entry) => entry.trackId), ...state.userQueue.map((entry) => entry.trackId)].filter(Boolean))];
+export const queuedTrackIds = (state: QueueState) => [
+	...new Set(
+		[state.currentTrackId, ...state.sourceQueue.map((entry) => entry.trackId), ...state.userQueue.map((entry) => entry.trackId)].filter(
+			Boolean
+		)
+	)
+];

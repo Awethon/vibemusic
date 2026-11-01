@@ -12,7 +12,8 @@ const channelRange = (box: Box, channel: number) => {
 	return high - low;
 };
 
-const widestChannel = (box: Box) => [0, 1, 2].reduce((best, channel) => (channelRange(box, channel) > channelRange(box, best) ? channel : best), 0);
+const widestChannel = (box: Box) =>
+	[0, 1, 2].reduce((best, channel) => (channelRange(box, channel) > channelRange(box, best) ? channel : best), 0);
 
 const hex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
 

@@ -5,7 +5,17 @@
 	import { alphabetEntriesFor } from '#lib/engine/layout.svelte.ts';
 	import { history } from '#lib/history.svelte.ts';
 	import { library } from '#lib/library/library.svelte.ts';
-	import { albumsByIds, albumWall, allPlaylists, artistById, artistStrip, playlistById, type AlbumSort, type AlbumSummary, type Playlist } from '#lib/library/queries.ts';
+	import {
+		albumsByIds,
+		albumWall,
+		allPlaylists,
+		artistById,
+		artistStrip,
+		playlistById,
+		type AlbumSort,
+		type AlbumSummary,
+		type Playlist
+	} from '#lib/library/queries.ts';
 	import { HOME, SHELVES } from '#lib/tuning.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import Filters from '#lib/ui/Filters.svelte';
@@ -46,7 +56,9 @@
 				return { key: `playlist:${item.id}`, playlist: await playlistById(item.id) };
 			})
 		);
-		return entries.filter((entry) => ('album' in entry && entry.album) || ('artist' in entry && entry.artist) || ('playlist' in entry && entry.playlist));
+		return entries.filter(
+			(entry) => ('album' in entry && entry.album) || ('artist' in entry && entry.artist) || ('playlist' in entry && entry.playlist)
+		);
 	}, []);
 
 	const homePlaylists = $derived.by(() => {
@@ -66,7 +78,11 @@
 
 	const alphabetEntries = $derived(alphabetEntriesFor(wall.value, bucketBySort[ui.albumSort] ?? null));
 	const countLine = $derived(
-		library.meta ? (filtering() ? `${formatCount(wall.value.length)} of ${plural(library.meta.albums, 'album')}${filterSuffix()}` : plural(library.meta.albums, 'album')) : ''
+		library.meta
+			? filtering()
+				? `${formatCount(wall.value.length)} of ${plural(library.meta.albums, 'album')}${filterSuffix()}`
+				: plural(library.meta.albums, 'album')
+			: ''
 	);
 
 	let firstRender = true;
@@ -82,12 +98,16 @@
 	<div class="vhead">
 		<div>
 			<h1 class="display">Your Music</h1>
-			{#if library.meta}<p class="sub">{plural(library.meta.albums, 'album')} · {plural(library.meta.artists, 'artist')} · {plural(library.meta.tracks, 'track')}</p>{/if}
+			{#if library.meta}<p class="sub">
+					{plural(library.meta.albums, 'album')} · {plural(library.meta.artists, 'artist')} · {plural(library.meta.tracks, 'track')}
+				</p>{/if}
 		</div>
 	</div>
 	<div class="artist-strip" {@attach formFactor.phone && fitRows(HOME.phoneArtistRows)}>
 		{#each strip.value as artist (artist.id)}
-			<a href={resolve('/artist/[id]', { id: artist.id })} data-preview-album={artist.newestAlbumId}>{artist.name}<sup>{artist.albumCount}</sup></a>
+			<a href={resolve('/artist/[id]', { id: artist.id })} data-preview-album={artist.newestAlbumId}
+				>{artist.name}<sup>{artist.albumCount}</sup></a
+			>
 		{/each}
 		<a class="more" href={resolve('/artists')}>All artists →</a>
 	</div>
@@ -98,7 +118,10 @@
 		</Shelf>
 	{/if}
 	{#if homePlaylists.length}
-		<div class="sec-head"><h2 class="section-title">Playlists</h2><a class="see-all" href={resolve('/playlists')}>See all</a></div>
+		<div class="sec-head">
+			<h2 class="section-title">Playlists</h2>
+			<a class="see-all" href={resolve('/playlists')}>See all</a>
+		</div>
 		<Shelf id="plShelf" items={homePlaylists} {...SHELVES.homePlaylists}>
 			{#snippet item(playlist)}<PlaylistTile {playlist} />{/snippet}
 		</Shelf>

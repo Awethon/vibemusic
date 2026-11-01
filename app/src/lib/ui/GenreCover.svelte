@@ -13,10 +13,19 @@
 
 	let colors = $state<string[]>([]);
 	const albumIds = $derived(playlist.mosaicAlbumIds);
-	const tiles = $derived(albumIds.length ? Array.from({ length: GENRE_COVER.wallTiles }, (_, index) => albumIds[(index + Math.floor(index / GENRE_COVER.wallRowLength)) % albumIds.length]) : []);
+	const tiles = $derived(
+		albumIds.length
+			? Array.from(
+					{ length: GENRE_COVER.wallTiles },
+					(_, index) => albumIds[(index + Math.floor(index / GENRE_COVER.wallRowLength)) % albumIds.length]
+				)
+			: []
+	);
 	const theme = $derived(genreTheme(colors));
 	const tileSize = $derived(mini ? GENRE_COVER.miniTilePx : Math.round(size * GENRE_COVER.tileToCoverRatio));
-	const nameSize = $derived(Math.min(GENRE_COVER.maxNamePx, GENRE_COVER.nameWidthPx / (Math.max(1, playlist.name.length) * GENRE_COVER.letterWidthRatio)));
+	const nameSize = $derived(
+		Math.min(GENRE_COVER.maxNamePx, GENRE_COVER.nameWidthPx / (Math.max(1, playlist.name.length) * GENRE_COVER.letterWidthRatio))
+	);
 
 	$effect(() => {
 		const id = albumIds[0];
@@ -39,7 +48,15 @@
 		<span class="gc-fade">
 			<span class="gc-wall">
 				{#if session.credentials}
-					{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} style={placeholderStyle(albumArt.get(albumId))} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
+					{#each tiles as albumId, index (index)}<img
+							src={coverUrl(session.credentials, albumId, tileSize)}
+							style={placeholderStyle(albumArt.get(albumId))}
+							{@attach retryCover}
+							alt=""
+							loading="lazy"
+							decoding="async"
+							draggable="false"
+						/>{/each}
 				{/if}
 			</span>
 		</span>

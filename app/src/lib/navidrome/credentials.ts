@@ -62,10 +62,13 @@ export function appendParams(target: URLSearchParams, params: SubsonicParams) {
 	return target;
 }
 
-export const subsonicUrl = (credentials: Credentials, method: string, params: SubsonicParams = {}) => `/rest/${method}?${appendParams(subsonicAuthParams(credentials), params)}`;
+export const subsonicUrl = (credentials: Credentials, method: string, params: SubsonicParams = {}) =>
+	`/rest/${method}?${appendParams(subsonicAuthParams(credentials), params)}`;
 
 export const streamUrl = (credentials: Credentials, trackId: string) =>
-	trackId.startsWith('radio:') ? `/radio/${encodeURIComponent(trackId.slice('radio:'.length))}?${subsonicAuthParams(credentials)}` : subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
+	trackId.startsWith('radio:')
+		? `/radio/${encodeURIComponent(trackId.slice('radio:'.length))}?${subsonicAuthParams(credentials)}`
+		: subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
 
 const coverTier = (size: number) => COVER_TIERS.find((tier) => tier >= size) ?? COVER_TIERS[COVER_TIERS.length - 1];
 
@@ -85,7 +88,8 @@ const albumCoverId = (albumId: string) => {
 export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>
 	subsonicUrl(credentials, 'getCoverArt', { id: albumCoverId(albumId), size: coverTier(size) });
 
-export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size: coverTier(size) });
+export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) =>
+	subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size: coverTier(size) });
 
 export const playlistCoverUrl = (credentials: Credentials, playlistId: string, image: string, size: number) =>
 	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}`, size: coverTier(size), v: image });

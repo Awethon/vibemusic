@@ -27,7 +27,10 @@ export function historyItemFromListKey(listKey: string): HistoryItem | null {
 export function rememberPlayedList(listKey: string) {
 	const item = historyItemFromListKey(listKey);
 	if (!item) return;
-	history.items = [item, ...history.items.filter((existing) => existing.kind !== item.kind || existing.id !== item.id)].slice(0, HISTORY.maxLength);
+	history.items = [item, ...history.items.filter((existing) => existing.kind !== item.kind || existing.id !== item.id)].slice(
+		0,
+		HISTORY.maxLength
+	);
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(history.items));
 	} catch {

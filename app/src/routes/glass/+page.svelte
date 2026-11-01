@@ -53,7 +53,10 @@
 			<div>
 				<p class="eyebrow">Settings</p>
 				<h1 class="display">Liquid glass</h1>
-				<p class="sub">Real refracting glass for the player bar, side panels, pop-ups and menus. Changes apply as you move the sliders and are kept in this browser.</p>
+				<p class="sub">
+					Real refracting glass for the player bar, side panels, pop-ups and menus. Changes apply as you move the sliders and are kept in
+					this browser.
+				</p>
 			</div>
 		</div>
 		<button type="button" class="set-row gt-switch" class:on={glass.enabled} onclick={() => setGlassEnabled(!glass.enabled)}>
@@ -63,7 +66,9 @@
 		<p class="pop-title">Looks</p>
 		<div class="chips gt-presets">
 			{#each LOOKS as preset (preset.id)}
-				<button type="button" class="chip" class:on={glass.preset === preset.id} onclick={() => applyGlassPreset(preset.id)}>{preset.name}</button>
+				<button type="button" class="chip" class:on={glass.preset === preset.id} onclick={() => applyGlassPreset(preset.id)}
+					>{preset.name}</button
+				>
 			{/each}
 		</div>
 
@@ -72,7 +77,12 @@
 			<div class="gt-group">
 				{#each group.controls as control (control.key)}
 					{#if 'toggle' in control}
-						<button type="button" class="set-row" class:on={glass.params[control.key] < 0} onclick={() => setGlassParam(control.key, glass.params[control.key] < 0 ? 1 : -1)}>
+						<button
+							type="button"
+							class="set-row"
+							class:on={glass.params[control.key] < 0}
+							onclick={() => setGlassParam(control.key, glass.params[control.key] < 0 ? 1 : -1)}
+						>
 							<span>{control.label}</span><span class="switch"></span>
 						</button>
 					{:else}
@@ -97,7 +107,10 @@
 			<input bind:value={link} placeholder="Paste a liquid glass lab link" spellcheck="false" />
 			<button class="ghost" type="submit" disabled={!link.trim()}>Import</button>
 		</form>
-		<p class="gt-note">{linkNote || 'Tune a look in the lab, copy its link, and paste it here.'} <a href={LAB_URL} target="_blank" rel="noreferrer">Open the lab</a></p>
+		<p class="gt-note">
+			{linkNote || 'Tune a look in the lab, copy its link, and paste it here.'}
+			<a href={LAB_URL} target="_blank" rel="noreferrer">Open the lab</a>
+		</p>
 		<button type="button" class="ghost gt-menu" onclick={sampleMenu}>Open a sample menu</button>
 	</div>
 	<div class="gt-wall" aria-hidden="true">

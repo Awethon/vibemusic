@@ -11,7 +11,10 @@ import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, Librar
 
 const albumCreditsOf = (album: NativeAlbum) => {
 	const credited = album.participants.filter((artist) => artist.id && artist.name);
-	if (!credited.length) return album.albumArtistId ? [{ id: album.albumArtistId, name: album.albumArtist, order: album.orderAlbumArtistName || album.albumArtist.toLowerCase() }] : [];
+	if (!credited.length)
+		return album.albumArtistId
+			? [{ id: album.albumArtistId, name: album.albumArtist, order: album.orderAlbumArtistName || album.albumArtist.toLowerCase() }]
+			: [];
 	return credited.map((artist) => ({
 		id: artist.id,
 		name: artist.name,
@@ -28,7 +31,8 @@ const ARTIST_PLAYLIST_PREFIX = 'This is ';
 
 export const genrePlaylistId = (genre: string) => 'genre-' + genre.toLowerCase().replace(/[^a-z0-9а-яё]+/g, '-');
 
-export const newest = (values: string[]) => values.reduce((latest, value) => (value && (!latest || Date.parse(value) > Date.parse(latest)) ? value : latest), '');
+export const newest = (values: string[]) =>
+	values.reduce((latest, value) => (value && (!latest || Date.parse(value) > Date.parse(latest)) ? value : latest), '');
 
 export function playlistSignature(playlist: NativePlaylist) {
 	return playlist.rules ? `smart:${playlist.uploadedImage}` : `${playlist.updatedAt}:${playlist.songCount}:${playlist.uploadedImage}`;
@@ -42,13 +46,50 @@ function eachBound(db: Database, sql: string, rows: (string | number | null)[][]
 }
 
 function deleteWhereIn(db: Database, sql: string, ids: string[]) {
-	eachBound(db, sql, ids.map((id) => [id]));
+	eachBound(
+		db,
+		sql,
+		ids.map((id) => [id])
+	);
 }
 
 function insertAlbums(db: Database, albums: NativeAlbum[]) {
-	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId, album.imageHash, album.dominantColor, album.thumbHash]));
-	eachBound(db, 'insert or ignore into album_credit values (?,?,?,?,?)', albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order])));
-	eachBound(db, 'insert into search values (?,?,?)', albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]));
+	eachBound(
+		db,
+		'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+		albums.map((album) => [
+			album.id,
+			album.name,
+			album.orderAlbumName || album.name.toLowerCase(),
+			album.albumArtistId,
+			album.albumArtist,
+			album.orderAlbumArtistName || album.albumArtist.toLowerCase(),
+			album.maxYear,
+			JSON.stringify(albumGenresOf(album)),
+			album.songCount,
+			album.duration,
+			album.createdAt,
+			album.updatedAt,
+			album.playCount,
+			album.playDate,
+			album.starred ? 1 : 0,
+			JSON.stringify(albumGenresOf(album)),
+			album.mbzReleaseGroupId,
+			album.imageHash,
+			album.dominantColor,
+			album.thumbHash
+		])
+	);
+	eachBound(
+		db,
+		'insert or ignore into album_credit values (?,?,?,?,?)',
+		albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order]))
+	);
+	eachBound(
+		db,
+		'insert into search values (?,?,?)',
+		albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)])
+	);
 }
 
 function removeAlbums(db: Database, ids: string[]) {
@@ -65,15 +106,43 @@ const songGenresOf = (song: NativeSong) => {
 };
 
 function insertTracks(db: Database, songs: NativeSong[]) {
-	eachBound(db, 'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', songs.map((song) => [song.id, song.albumId, song.title, song.artist, song.artistId, song.trackNumber, song.discNumber, song.duration, song.suffix, song.bitRate, song.playCount, song.playDate, song.starred ? 1 : 0, JSON.stringify(songGenresOf(song)), song.rating]));
-	eachBound(db, 'insert into search values (?,?,?)', songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)]));
+	eachBound(
+		db,
+		'insert or ignore into track values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+		songs.map((song) => [
+			song.id,
+			song.albumId,
+			song.title,
+			song.artist,
+			song.artistId,
+			song.trackNumber,
+			song.discNumber,
+			song.duration,
+			song.suffix,
+			song.bitRate,
+			song.playCount,
+			song.playDate,
+			song.starred ? 1 : 0,
+			JSON.stringify(songGenresOf(song)),
+			song.rating
+		])
+	);
+	eachBound(
+		db,
+		'insert into search values (?,?,?)',
+		songs.map((song) => ['track', song.id, normalizeForSearch(`${song.title} ${song.artist}`)])
+	);
 }
 
 function replaceRadioStations(db: Database, stations: RadioStation[] | null): boolean {
 	if (!stations) return false;
 	const before = JSON.stringify(db.selectArrays('select id, name, stream_url, home_page_url from radio_station order by id'));
 	db.exec('delete from radio_station');
-	eachBound(db, 'insert or replace into radio_station values (?,?,?,?)', stations.map((station) => [station.id, station.name, station.streamUrl, station.homePageUrl]));
+	eachBound(
+		db,
+		'insert or replace into radio_station values (?,?,?,?)',
+		stations.map((station) => [station.id, station.name, station.streamUrl, station.homePageUrl])
+	);
 	return JSON.stringify(db.selectArrays('select id, name, stream_url, home_page_url from radio_station order by id')) !== before;
 }
 
@@ -84,18 +153,25 @@ function removeTracks(db: Database, ids: string[]) {
 }
 
 function updateRatings(db: Database, ratings: Map<string, number>): number {
-	const current = new Map(db.selectObjects('select id, rating from track where rating != 0').map((row) => [row.id as string, row.rating as number]));
+	const current = new Map(
+		db.selectObjects('select id, rating from track where rating != 0').map((row) => [row.id as string, row.rating as number])
+	);
 	const changed: [number, string][] = [...current.keys()].filter((id) => !ratings.has(id)).map((id) => [0, id]);
-	for (const [id, rating] of ratings) if (current.get(id) !== rating && db.selectValue('select 1 from track where id = ?', [id])) changed.push([rating, id]);
+	for (const [id, rating] of ratings)
+		if (current.get(id) !== rating && db.selectValue('select 1 from track where id = ?', [id])) changed.push([rating, id]);
 	eachBound(db, 'update track set rating = ? where id = ?', changed);
 	return changed.length;
 }
 
 function updateArtwork(db: Database, albums: NativeAlbum[]): number {
-	const update = db.prepare('update album set image_hash = ?, dominant_color = ?, thumb_hash = ? where id = ? and (image_hash != ? or dominant_color != ? or thumb_hash != ?)');
+	const update = db.prepare(
+		'update album set image_hash = ?, dominant_color = ?, thumb_hash = ? where id = ? and (image_hash != ? or dominant_color != ? or thumb_hash != ?)'
+	);
 	let changed = 0;
 	for (const album of albums) {
-		update.bind([album.imageHash, album.dominantColor, album.thumbHash, album.id, album.imageHash, album.dominantColor, album.thumbHash]).stepReset();
+		update
+			.bind([album.imageHash, album.dominantColor, album.thumbHash, album.id, album.imageHash, album.dominantColor, album.thumbHash])
+			.stepReset();
 		changed += db.changes();
 	}
 	update.finalize();
@@ -103,7 +179,8 @@ function updateArtwork(db: Database, albums: NativeAlbum[]): number {
 }
 
 function upsertArtistArt(db: Database, artists: NativeArtist[]): number {
-	const upsert = db.prepare(`insert into artist_art values (?, ?, ?, ?) on conflict (artist_id) do update set image_hash = excluded.image_hash, thumb_hash = excluded.thumb_hash, dominant_color = excluded.dominant_color
+	const upsert =
+		db.prepare(`insert into artist_art values (?, ?, ?, ?) on conflict (artist_id) do update set image_hash = excluded.image_hash, thumb_hash = excluded.thumb_hash, dominant_color = excluded.dominant_color
 		where image_hash != excluded.image_hash or thumb_hash != excluded.thumb_hash or dominant_color != excluded.dominant_color`);
 	let changed = 0;
 	for (const artist of artists) {
@@ -114,7 +191,11 @@ function upsertArtistArt(db: Database, artists: NativeArtist[]): number {
 	return changed;
 }
 
-function updateStats(db: Database, table: 'album' | 'track', rows: { id: string; playCount: number; playDate: string; starred: boolean }[]): number {
+function updateStats(
+	db: Database,
+	table: 'album' | 'track',
+	rows: { id: string; playCount: number; playDate: string; starred: boolean }[]
+): number {
 	if (!rows.length) return 0;
 	const counted = db.prepare(`update ${table} set play_count = ?, starred = ? where id = ? and (play_count != ? or starred != ?)`);
 	const dated = db.prepare(`update ${table} set play_date = ? where id = ?`);
@@ -131,12 +212,37 @@ function updateStats(db: Database, table: 'album' | 'track', rows: { id: string;
 }
 
 function insertPlaylists(db: Database, playlists: NativePlaylist[], userId: string) {
-	eachBound(db, 'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)', playlists.map((playlist) => [playlist.id, playlist.name, playlist.rules ? 'smart' : 'own', playlist.ownerId, '', 0, 0, playlist.duration, playlist.evaluatedAt || playlist.updatedAt, playlist.uploadedImage, playlist.sync || playlist.ownerId !== userId ? 1 : 0, '']));
-	eachBound(db, 'insert into search values (?,?,?)', playlists.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.name)]));
+	eachBound(
+		db,
+		'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)',
+		playlists.map((playlist) => [
+			playlist.id,
+			playlist.name,
+			playlist.rules ? 'smart' : 'own',
+			playlist.ownerId,
+			'',
+			0,
+			0,
+			playlist.duration,
+			playlist.evaluatedAt || playlist.updatedAt,
+			playlist.uploadedImage,
+			playlist.sync || playlist.ownerId !== userId ? 1 : 0,
+			''
+		])
+	);
+	eachBound(
+		db,
+		'insert into search values (?,?,?)',
+		playlists.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.name)])
+	);
 }
 
 function insertPlaylistTracks(db: Database, playlistTracks: Map<string, NativePlaylistTrack[]>) {
-	eachBound(db, 'insert into playlist_track values (?,?,?)', [...playlistTracks].flatMap(([playlistId, tracks]) => tracks.map((track, position) => [playlistId, position, track.mediaFileId])));
+	eachBound(
+		db,
+		'insert into playlist_track values (?,?,?)',
+		[...playlistTracks].flatMap(([playlistId, tracks]) => tracks.map((track, position) => [playlistId, position, track.mediaFileId]))
+	);
 }
 
 function rebuildArtists(db: Database) {
@@ -151,7 +257,11 @@ function rebuildArtists(db: Database) {
 		from album_credit credit join album on album.id = credit.album_id group by credit.artist_id;
 	`);
 	const artists = db.selectArrays('select id, name from artist') as [string, string][];
-	eachBound(db, 'insert into search values (?,?,?)', artists.map(([id, name]) => ['artist', id, normalizeForSearch(name)]));
+	eachBound(
+		db,
+		'insert into search values (?,?,?)',
+		artists.map(([id, name]) => ['artist', id, normalizeForSearch(name)])
+	);
 	classifyArtistPlaylists(db);
 }
 
@@ -170,14 +280,24 @@ function classifyArtistPlaylists(db: Database) {
 
 function syncPlaylistSearchKeys(db: Database, ids: string[]) {
 	deleteWhereIn(db, "delete from search_key where kind = 'playlist' and ref = ?", ids);
-	eachBound(db, "insert into search_key select kind, text, ref from search where kind = 'playlist' and ref = ?", ids.map((id) => [id]));
+	eachBound(
+		db,
+		"insert into search_key select kind, text, ref from search where kind = 'playlist' and ref = ?",
+		ids.map((id) => [id])
+	);
 }
 
 function updateSongCounts(db: Database, ids: string[]) {
-	eachBound(db, 'update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where id = ?', ids.map((id) => [id]));
+	eachBound(
+		db,
+		'update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where id = ?',
+		ids.map((id) => [id])
+	);
 }
 
-const storedTrackIds = (db: Database, playlistId: string) => (db.selectValue("select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = ?", [playlistId]) as string | undefined) ?? '';
+const storedTrackIds = (db: Database, playlistId: string) =>
+	(db.selectValue("select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = ?", [playlistId]) as
+		string | undefined) ?? '';
 
 const parsedTags = (value: unknown): Tag[] | null => (typeof value === 'string' ? (JSON.parse(value) as Tag[]) : null);
 
@@ -185,11 +305,26 @@ type MbArtistRow = { tags: Tag[] | null; countries: string[] };
 
 function musicBrainzArtists(db: Database) {
 	const artists = new Map(
-		db.selectObjects('select id, tags, countries from mb_artist').map((row) => [row.id as string, { tags: parsedTags(row.tags), countries: typeof row.countries === 'string' ? (JSON.parse(row.countries) as string[]) : [] } satisfies MbArtistRow])
+		db
+			.selectObjects('select id, tags, countries from mb_artist')
+			.map((row) => [
+				row.id as string,
+				{
+					tags: parsedTags(row.tags),
+					countries: typeof row.countries === 'string' ? (JSON.parse(row.countries) as string[]) : []
+				} satisfies MbArtistRow
+			])
 	);
-	const byAlbumArtist = new Map<string, string>(db.selectArrays('select artist_id, mbid from artist_match where mbid is not null') as [string, string][]);
-	const counted = db.selectArrays(`select album.artist_id, json_extract(mb_release_group.artists, '$[0]') as mbid, count(*) as albums from album
-		join mb_release_group on mb_release_group.id = album.release_group where mb_release_group.artists is not null group by album.artist_id, mbid order by albums desc`) as [string, string, number][];
+	const byAlbumArtist = new Map<string, string>(
+		db.selectArrays('select artist_id, mbid from artist_match where mbid is not null') as [string, string][]
+	);
+	const counted =
+		db.selectArrays(`select album.artist_id, json_extract(mb_release_group.artists, '$[0]') as mbid, count(*) as albums from album
+		join mb_release_group on mb_release_group.id = album.release_group where mb_release_group.artists is not null group by album.artist_id, mbid order by albums desc`) as [
+			string,
+			string,
+			number
+		][];
 	for (const [artistId, mbid] of counted) if (!byAlbumArtist.has(artistId) && mbid) byAlbumArtist.set(artistId, mbid);
 	return { artists, byAlbumArtist };
 }
@@ -200,7 +335,8 @@ function rebuildTrackGenres(db: Database) {
 	const albumTags = new Map<string, Tag[] | null>();
 	const storeGenres = new Map<string, string | null>();
 	const { artists, byAlbumArtist } = musicBrainzArtists(db);
-	const rows = db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.name as albumName, album.raw_genres as albumGenres, album.artist_id as albumArtistId,
+	const rows =
+		db.selectObjects(`select track.id, track.raw_genres as songGenres, album.id as albumId, album.name as albumName, album.raw_genres as albumGenres, album.artist_id as albumArtistId,
 		mb_release_group.tags as albumTags, json_extract(mb_release_group.artists, '$[0]') as groupArtist, deezer_artist.albums as deezerAlbums
 		from track join album on album.id = track.album_id
 		left join mb_release_group on mb_release_group.id = album.release_group
@@ -210,8 +346,13 @@ function rebuildTrackGenres(db: Database) {
 		const songGenres = JSON.parse(row.songGenres as string) as string[];
 		const albumId = row.albumId as string;
 		if (!albumTags.has(albumId)) albumTags.set(albumId, parsedTags(row.albumTags));
-		if (!storeGenres.has(albumId)) storeGenres.set(albumId, deezerAlbumGenre(typeof row.deezerAlbums === 'string' ? JSON.parse(row.deezerAlbums) : null, row.albumName as string));
-		const artist = artists.get(byAlbumArtist.get(row.albumArtistId as string) ?? '') ?? artists.get((row.groupArtist as string | null) ?? '');
+		if (!storeGenres.has(albumId))
+			storeGenres.set(
+				albumId,
+				deezerAlbumGenre(typeof row.deezerAlbums === 'string' ? JSON.parse(row.deezerAlbums) : null, row.albumName as string)
+			);
+		const artist =
+			artists.get(byAlbumArtist.get(row.albumArtistId as string) ?? '') ?? artists.get((row.groupArtist as string | null) ?? '');
 		const direct = genresFromEvidence(resolver, {
 			fileGenres: songGenres.length ? songGenres : (JSON.parse(row.albumGenres as string) as string[]),
 			albumTags: albumTags.get(albumId) ?? null,
@@ -221,7 +362,8 @@ function rebuildTrackGenres(db: Database) {
 		const regional = regionalGenres(direct.flatMap(withAncestors), artist?.countries ?? []);
 		const all = [...new Set([...direct, ...regional])];
 		for (const genre of all) insert.bind([genre, row.id as string, 1]).stepReset();
-		for (const genre of new Set(all.flatMap(withAncestors))) if (!all.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
+		for (const genre of new Set(all.flatMap(withAncestors)))
+			if (!all.includes(genre)) insert.bind([genre, row.id as string, 0]).stepReset();
 	}
 	insert.finalize();
 }
@@ -238,14 +380,19 @@ function rebuildAlbumGenres(db: Database) {
 function refreshGenrePlaylists(db: Database): string[] {
 	const stored = new Map(
 		db
-			.selectArrays("select id, json_array(name, album_count, song_count, duration), (select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = playlist.id) from playlist where kind = 'genre'")
+			.selectArrays(
+				"select id, json_array(name, album_count, song_count, duration), (select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = playlist.id) from playlist where kind = 'genre'"
+			)
 			.map(([id, shape, tracks]) => [id as string, `${shape as string}|${(tracks as string | null) ?? ''}`])
 	);
-	const rows = db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, album.year, track.play_count as plays,
+	const rows =
+		db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, album.year, track.play_count as plays,
 		track.starred, track.duration, (select json_group_array(genre) from track_genre where track_genre.track_id = track.id) as genres
 		from track join album on album.id = track.album_id where exists (select 1 from track_genre where track_genre.track_id = track.id)`);
 	const deezer = new Map(
-		db.selectObjects('select artist_id, fans, top from deezer_artist where deezer_id is not null').map((row) => [row.artist_id as string, { fans: row.fans as number, rankOf: songRanks(JSON.parse(row.top as string)) }])
+		db
+			.selectObjects('select artist_id, fans, top from deezer_artist where deezer_id is not null')
+			.map((row) => [row.artist_id as string, { fans: row.fans as number, rankOf: songRanks(JSON.parse(row.top as string)) }])
 	);
 	const apple = new Map(
 		db.selectObjects('select artist_id, top from apple_artist where top is not null').map((row) => {
@@ -275,7 +422,14 @@ function refreshGenrePlaylists(db: Database): string[] {
 	const wanted = chooseGenres(songs).map(({ genre, songs: picked }) => {
 		const albumCount = new Set(picked.map((song) => song.albumId)).size;
 		const duration = picked.reduce((total, song) => total + (durations.get(song.id) ?? 0), 0);
-		return { id: genrePlaylistId(genre), genre, albumCount, duration, picked, shape: `${JSON.stringify([genre, albumCount, picked.length, duration])}|${picked.map((song) => song.id).join(',')}` };
+		return {
+			id: genrePlaylistId(genre),
+			genre,
+			albumCount,
+			duration,
+			picked,
+			shape: `${JSON.stringify([genre, albumCount, picked.length, duration])}|${picked.map((song) => song.id).join(',')}`
+		};
 	});
 	const changed = wanted.filter((playlist) => stored.get(playlist.id) !== playlist.shape);
 	const kept = new Set(wanted.map((playlist) => playlist.id));
@@ -283,9 +437,34 @@ function refreshGenrePlaylists(db: Database): string[] {
 	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', touched);
 	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", touched);
 	deleteWhereIn(db, 'delete from playlist where id = ?', touched);
-	eachBound(db, 'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)', changed.map((playlist) => [playlist.id, playlist.genre, 'genre', '', playlist.genre, playlist.albumCount, playlist.picked.length, playlist.duration, '', '', 1, '']));
-	eachBound(db, 'insert into search values (?,?,?)', changed.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.genre)]));
-	eachBound(db, 'insert into playlist_track values (?,?,?)', changed.flatMap((playlist) => playlist.picked.map((song, position) => [playlist.id, position, song.id])));
+	eachBound(
+		db,
+		'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)',
+		changed.map((playlist) => [
+			playlist.id,
+			playlist.genre,
+			'genre',
+			'',
+			playlist.genre,
+			playlist.albumCount,
+			playlist.picked.length,
+			playlist.duration,
+			'',
+			'',
+			1,
+			''
+		])
+	);
+	eachBound(
+		db,
+		'insert into search values (?,?,?)',
+		changed.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.genre)])
+	);
+	eachBound(
+		db,
+		'insert into playlist_track values (?,?,?)',
+		changed.flatMap((playlist) => playlist.picked.map((song, position) => [playlist.id, position, song.id]))
+	);
 	return touched;
 }
 
@@ -298,12 +477,26 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
-const DERIVED_RULES = JSON.stringify({ algorithm: 10, evidence: GENRE_EVIDENCE, playlists: GENRE_PLAYLISTS, hidden: HIDDEN_GENRE_PLAYLISTS });
+const DERIVED_RULES = JSON.stringify({
+	algorithm: 10,
+	evidence: GENRE_EVIDENCE,
+	playlists: GENRE_PLAYLISTS,
+	hidden: HIDDEN_GENRE_PLAYLISTS
+});
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
-	const full: LibraryMeta = { ...meta, albums: count('album'), artists: count('artist'), tracks: count('track'), playlists: count('playlist') };
-	db.exec({ sql: 'insert or replace into meta values (?, ?), (?, ?), (?, ?), (?, ?)', bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync), 'derived', DERIVED_RULES] });
+	const full: LibraryMeta = {
+		...meta,
+		albums: count('album'),
+		artists: count('artist'),
+		tracks: count('track'),
+		playlists: count('playlist')
+	};
+	db.exec({
+		sql: 'insert or replace into meta values (?, ?), (?, ?), (?, ?), (?, ?)',
+		bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync), 'derived', DERIVED_RULES]
+	});
 	return full;
 }
 
@@ -311,7 +504,9 @@ function carryKept(from: Database | null, to: Database) {
 	if (!from) return;
 	for (const table of KEPT_TABLES) {
 		const previous = new Set(from.selectValues(`select name from pragma_table_info('${table}')`) as string[]);
-		const columns = (to.selectValues(`select name from pragma_table_info('${table}')`) as string[]).filter((column) => previous.has(column));
+		const columns = (to.selectValues(`select name from pragma_table_info('${table}')`) as string[]).filter((column) =>
+			previous.has(column)
+		);
 		if (!columns.length) continue;
 		const rows = from.selectArrays(`select ${columns.join(',')} from ${table}`);
 		if (!rows.length) continue;
@@ -321,7 +516,13 @@ function carryKept(from: Database | null, to: Database) {
 	}
 }
 
-export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: string, syncedAt: string, previous: Database | null = null): LibraryMeta {
+export function buildLibrary(
+	db: Database,
+	snapshot: LibrarySnapshot,
+	userId: string,
+	syncedAt: string,
+	previous: Database | null = null
+): LibraryMeta {
 	db.exec(SCHEMA);
 	carryKept(previous, db);
 	db.transaction(() => {
@@ -347,12 +548,22 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 	return writeMeta(db, { version: syncedAt, syncedAt, userId }, sync);
 }
 
-export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, changes: LibraryChanges, syncedAt: string): { meta: LibraryMeta; changed: boolean } {
+export function applyChanges(
+	db: Database,
+	meta: LibraryMeta,
+	sync: SyncState,
+	changes: LibraryChanges,
+	syncedAt: string
+): { meta: LibraryMeta; changed: boolean } {
 	const contentChanged = changes.albums.length > 0;
 	const current = new Set(changes.playlists.map((playlist) => playlist.id));
 	const removed = (db.selectValues("select id from playlist where kind != 'genre'") as string[]).filter((id) => !current.has(id));
-	const changedTracks = new Map([...changes.playlistTracks].filter(([id, tracks]) => storedTrackIds(db, id) !== tracks.map((track) => track.mediaFileId).join(',')));
-	const replaced = changes.playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || changedTracks.has(playlist.id));
+	const changedTracks = new Map(
+		[...changes.playlistTracks].filter(([id, tracks]) => storedTrackIds(db, id) !== tracks.map((track) => track.mediaFileId).join(','))
+	);
+	const replaced = changes.playlists.filter(
+		(playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || changedTracks.has(playlist.id)
+	);
 	const touched = [...removed, ...replaced.map((playlist) => playlist.id)];
 	const playlistsChanged = touched.length > 0;
 	let statsChanged = 0;
@@ -362,11 +573,18 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 		if (contentChanged) {
 			const ids = changes.albums.map((album) => album.id);
 			removeAlbums(db, ids);
-			insertAlbums(db, changes.albums.filter((album) => !album.missing));
-			removeTracks(db, changes.albumSongs.map((song) => song.id));
+			insertAlbums(
+				db,
+				changes.albums.filter((album) => !album.missing)
+			);
+			removeTracks(
+				db,
+				changes.albumSongs.map((song) => song.id)
+			);
 			insertTracks(db, changes.albumSongs);
 		}
-		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats) + updateRatings(db, changes.ratings);
+		statsChanged =
+			updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats) + updateRatings(db, changes.ratings);
 		artworkChanged = updateArtwork(db, changes.artwork) + upsertArtistArt(db, changes.artistArt);
 		if (playlistsChanged) {
 			deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", touched);
@@ -381,7 +599,10 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			return;
 		}
 		if (playlistsChanged) {
-			updateSongCounts(db, replaced.map((playlist) => playlist.id));
+			updateSongCounts(
+				db,
+				replaced.map((playlist) => playlist.id)
+			);
 			classifyArtistPlaylists(db);
 			syncPlaylistSearchKeys(db, touched);
 		}
@@ -423,7 +644,8 @@ export function enrichmentRequest(db: Database): EnrichmentRequest {
 	const since = Number(db.selectValue("select value from enrichment_state where key = 'since'") ?? 0);
 	const releaseGroups = db.selectValues("select distinct release_group from album where release_group != ''") as string[];
 	const titles = new Map<string, { name: string; songs: string[] }>();
-	const rows = db.selectObjects(`select album.artist_id as id, album.artist as name, track.title from track join album on album.id = track.album_id
+	const rows =
+		db.selectObjects(`select album.artist_id as id, album.artist as name, track.title from track join album on album.id = track.album_id
 		where album.artist_id != '' order by album.artist_id, track.play_count desc, album.play_count desc, track.disc_no, track.track_no`);
 	for (const row of rows) {
 		if (VARIOUS_ARTISTS.has((row.name as string).toLowerCase())) continue;
@@ -432,7 +654,9 @@ export function enrichmentRequest(db: Database): EnrichmentRequest {
 		titles.set(row.id as string, artist);
 	}
 	const albumsByArtist = new Map<string, { name: string; albums: string[]; tagged: boolean }>();
-	for (const row of db.selectObjects("select artist_id as id, artist as name, name as album, release_group from album where artist_id != ''")) {
+	for (const row of db.selectObjects(
+		"select artist_id as id, artist as name, name as album, release_group from album where artist_id != ''"
+	)) {
 		if (VARIOUS_ARTISTS.has((row.name as string).toLowerCase())) continue;
 		const artist = albumsByArtist.get(row.id as string) ?? { name: row.name as string, albums: [], tagged: false };
 		artist.albums.push(row.album as string);
@@ -440,17 +664,60 @@ export function enrichmentRequest(db: Database): EnrichmentRequest {
 		albumsByArtist.set(row.id as string, artist);
 	}
 	const mbSearch = [...albumsByArtist].filter(([, artist]) => !artist.tagged).map(([id, { name, albums }]) => ({ id, name, albums }));
-	return { since, releaseGroups, artists: [...titles].map(([id, artist]) => ({ id, ...artist, albums: albumsByArtist.get(id)?.albums ?? [] })), mbSearch };
+	return {
+		since,
+		releaseGroups,
+		artists: [...titles].map(([id, artist]) => ({ id, ...artist, albums: albumsByArtist.get(id)?.albums ?? [] })),
+		mbSearch
+	};
 }
 
 export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState, enrichment: Enrichment): LibraryMeta {
 	db.transaction(() => {
-		eachBound(db, 'insert or replace into mb_release_group values (?,?,?)', Object.entries(enrichment.releaseGroups).map(([id, group]) => [id, group && JSON.stringify(group.artists), group && JSON.stringify(group.tags)]));
-		eachBound(db, 'insert or replace into mb_artist values (?,?,?)', Object.entries(enrichment.mbArtists).map(([id, artist]) => [id, artist && JSON.stringify(artist.tags), artist?.countries ? JSON.stringify(artist.countries) : null]));
-		eachBound(db, 'insert or replace into artist_match values (?,?)', Object.entries(enrichment.artistMatches ?? {}).map(([id, mbid]) => [id, mbid]));
-		eachBound(db, 'insert or replace into apple_artist values (?,?)', Object.entries(enrichment.apple ?? {}).map(([id, top]) => [id, top && JSON.stringify(top)]));
-		eachBound(db, 'insert or replace into deezer_artist values (?,?,?,?,?,?)', Object.entries(enrichment.deezer).map(([id, artist]) => [id, artist && artist.id, artist && artist.name, artist && artist.fans, artist && JSON.stringify(artist.top), artist?.albums ? JSON.stringify(artist.albums) : null]));
-		db.exec({ sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))", bind: [enrichment.at] });
+		eachBound(
+			db,
+			'insert or replace into mb_release_group values (?,?,?)',
+			Object.entries(enrichment.releaseGroups).map(([id, group]) => [
+				id,
+				group && JSON.stringify(group.artists),
+				group && JSON.stringify(group.tags)
+			])
+		);
+		eachBound(
+			db,
+			'insert or replace into mb_artist values (?,?,?)',
+			Object.entries(enrichment.mbArtists).map(([id, artist]) => [
+				id,
+				artist && JSON.stringify(artist.tags),
+				artist?.countries ? JSON.stringify(artist.countries) : null
+			])
+		);
+		eachBound(
+			db,
+			'insert or replace into artist_match values (?,?)',
+			Object.entries(enrichment.artistMatches ?? {}).map(([id, mbid]) => [id, mbid])
+		);
+		eachBound(
+			db,
+			'insert or replace into apple_artist values (?,?)',
+			Object.entries(enrichment.apple ?? {}).map(([id, top]) => [id, top && JSON.stringify(top)])
+		);
+		eachBound(
+			db,
+			'insert or replace into deezer_artist values (?,?,?,?,?,?)',
+			Object.entries(enrichment.deezer).map(([id, artist]) => [
+				id,
+				artist && artist.id,
+				artist && artist.name,
+				artist && artist.fans,
+				artist && JSON.stringify(artist.top),
+				artist?.albums ? JSON.stringify(artist.albums) : null
+			])
+		);
+		db.exec({
+			sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))",
+			bind: [enrichment.at]
+		});
 		rebuildDerived(db);
 	});
 	return writeMeta(db, { version: new Date().toISOString(), syncedAt: meta.syncedAt, userId: meta.userId }, sync);

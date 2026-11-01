@@ -12,9 +12,12 @@ export const retryCover: Attachment<HTMLImageElement> = (image) => {
 		failed = image.src;
 		image.src = TRANSPARENT_PIXEL;
 		if (attempts >= COVER_RETRY.attempts) return;
-		timer = setTimeout(() => {
-			if (image.src === TRANSPARENT_PIXEL) image.src = failed;
-		}, COVER_RETRY.baseDelayMs * 2 ** attempts + Math.random() * COVER_RETRY.jitterMs);
+		timer = setTimeout(
+			() => {
+				if (image.src === TRANSPARENT_PIXEL) image.src = failed;
+			},
+			COVER_RETRY.baseDelayMs * 2 ** attempts + Math.random() * COVER_RETRY.jitterMs
+		);
 		attempts += 1;
 	};
 	const loaded = () => {

@@ -20,7 +20,8 @@ function parseColor(value: string): number {
 	return parts.length > 3 ? Number(parts[3]) : 1;
 }
 
-const radiusOf = (style: CSSStyleDeclaration, box: DOMRect) => Math.min(parseFloat(style.borderTopLeftRadius) || 0, box.width / 2, box.height / 2);
+const radiusOf = (style: CSSStyleDeclaration, box: DOMRect) =>
+	Math.min(parseFloat(style.borderTopLeftRadius) || 0, box.width / 2, box.height / 2);
 
 function roundRect(context: CanvasRenderingContext2D, box: DOMRect, radius: number) {
 	context.beginPath();
@@ -28,10 +29,20 @@ function roundRect(context: CanvasRenderingContext2D, box: DOMRect, radius: numb
 	else context.rect(box.left, box.top, box.width, box.height);
 }
 
-function drawImage(context: CanvasRenderingContext2D, image: CanvasImageSource, naturalWidth: number, naturalHeight: number, box: DOMRect, fit: string) {
+function drawImage(
+	context: CanvasRenderingContext2D,
+	image: CanvasImageSource,
+	naturalWidth: number,
+	naturalHeight: number,
+	box: DOMRect,
+	fit: string
+) {
 	if (!naturalWidth || !naturalHeight) return;
 	if (fit === 'cover' || fit === 'contain') {
-		const scale = fit === 'cover' ? Math.max(box.width / naturalWidth, box.height / naturalHeight) : Math.min(box.width / naturalWidth, box.height / naturalHeight);
+		const scale =
+			fit === 'cover'
+				? Math.max(box.width / naturalWidth, box.height / naturalHeight)
+				: Math.min(box.width / naturalWidth, box.height / naturalHeight);
 		const w = naturalWidth * scale;
 		const h = naturalHeight * scale;
 		context.drawImage(image, box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);

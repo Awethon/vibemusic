@@ -1,5 +1,14 @@
 import { randomId } from '../randomId.ts';
-import { appendParams, NavidromeError, NavidromeUnreachableError, reachNavidrome, SessionExpiredError, subsonicUrl, type Credentials, type SubsonicParams } from './credentials.ts';
+import {
+	appendParams,
+	NavidromeError,
+	NavidromeUnreachableError,
+	reachNavidrome,
+	SessionExpiredError,
+	subsonicUrl,
+	type Credentials,
+	type SubsonicParams
+} from './credentials.ts';
 
 export type NativePage<T> = { items: T[]; total: number };
 
