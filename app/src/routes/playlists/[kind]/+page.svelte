@@ -10,7 +10,7 @@
 	const kinds: Record<string, { title: string; note: string }> = {
 		own: { title: 'Your playlists', note: '' },
 		smart: { title: 'Smart playlists', note: 'update automatically' },
-		genre: { title: 'Genre playlists', note: 'your top songs in each genre' }
+		genre: { title: 'Genre playlists', note: 'your top tracks in each genre' }
 	};
 	const kind = $derived(page.params.kind ?? 'own');
 	const playlists = live(allPlaylists, []);

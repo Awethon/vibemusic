@@ -150,7 +150,7 @@ export async function trackMenu(
 		...(await addToPlaylistEntries(async () => [track])),
 		SEPARATOR,
 		{
-			label: track.disliked ? 'Undo “I don’t like this song”' : 'I don’t like this song',
+			label: track.disliked ? 'Undo “I don’t like this track”' : 'I don’t like this track',
 			hint: track.disliked ? undefined : 'skipped in mixes',
 			run: () => dislike(track)
 		}

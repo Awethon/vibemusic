@@ -115,7 +115,7 @@
 				class="set-row"
 				class:on={ui.showTimeline}
 				onclick={() => setNavItem('timeline', !ui.showTimeline)}
-				><span>Timeline<small>Your albums by release or added date</small></span><span class="switch"></span></button
+				><span>Timeline<small>Your albums by release year</small></span><span class="switch"></span></button
 			>{/if}
 		<button type="button" class="set-row" class:on={ui.showRadio} onclick={() => setNavItem('radio', !ui.showRadio)}
 			><span>Radio<small>Stations configured in Navidrome</small></span><span class="switch"></span></button
