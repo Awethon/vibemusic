@@ -20,9 +20,9 @@ it('gives artists with enough albums their own lane, ordered by debut, and pools
 			album('c1', 'once', 2001)
 		],
 		2,
-		'Elsewhere'
+		'Everyone else'
 	);
-	expect(lanes.map((lane) => lane.label)).toEqual(['EARLY', 'LATE', 'Elsewhere']);
+	expect(lanes.map((lane) => lane.label)).toEqual(['EARLY', 'LATE', 'Everyone else']);
 	expect(lanes[2].albums.map((entry) => entry.id)).toEqual(['c1']);
 });
 
@@ -30,7 +30,7 @@ it('makes a year as wide as its busiest lane and keeps empty years thin', () => 
 	const lanes = timelineLanes(
 		[album('a1', 'a', 2000), album('a2', 'a', 2000), album('b1', 'b', 2000), album('b2', 'b', 2002)],
 		1,
-		'Elsewhere'
+		'Everyone else'
 	);
 	const layout = layoutTimeline(lanes, metrics);
 	expect(layout.buckets.map((bucket) => [bucket.key, bucket.width, bucket.count])).toEqual([
@@ -46,7 +46,7 @@ it('makes a year as wide as its busiest lane and keeps empty years thin', () => 
 });
 
 it('leaves albums without a year off the timeline', () => {
-	const lanes = timelineLanes([album('a1', 'a', 0), album('a2', 'a', 2001)], 1, 'Elsewhere');
+	const lanes = timelineLanes([album('a1', 'a', 0), album('a2', 'a', 2001)], 1, 'Everyone else');
 	expect([...layoutTimeline(lanes, metrics).positions.keys()]).toEqual(['a2']);
 });
 
@@ -65,7 +65,7 @@ it('folds lanes whose last album is behind the view, and brings them back in pla
 	const lanes = timelineLanes(
 		[album('a1', 'early', 1990), album('a2', 'early', 1992), album('b1', 'late', 1991), album('b2', 'late', 2000)],
 		2,
-		'Elsewhere'
+		'Everyone else'
 	);
 	const layout = layoutTimeline(lanes, metrics);
 	const lastEarly = layout.positions.get('a2')!.x;

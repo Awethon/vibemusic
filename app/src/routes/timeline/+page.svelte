@@ -21,7 +21,7 @@
 	let hoveredLane = $state(-1);
 	let tip = $state<{ name: string; detail: string; x: number; y: number } | null>(null);
 
-	const lanes = $derived(timelineLanes(albums.value, TIMELINE.minAlbumsForLane, 'Elsewhere'));
+	const lanes = $derived(timelineLanes(albums.value, TIMELINE.minAlbumsForLane, 'Everyone else'));
 	const layout = $derived(
 		layoutTimeline(lanes, {
 			cover: TIMELINE.coverPx,
@@ -206,7 +206,7 @@
 							</div>
 						{/each}
 					</div>
-					{#each lanes as lane, index (lane.artistId ?? 'elsewhere')}
+					{#each lanes as lane, index (lane.artistId ?? 'everyone-else')}
 						{@const span = laneSpan(lane, layout, TIMELINE.coverPx)}
 						<div
 							class="tl-lane"

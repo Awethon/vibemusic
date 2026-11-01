@@ -6,7 +6,7 @@ export type Bucket = { key: number; label: string; era: string; x: number; width
 export type TimelineLayout = { buckets: Bucket[]; positions: Map<string, { x: number; lane: number }>; width: number };
 export type TimelineMetrics = { cover: number; gap: number; pad: number; empty: number; start: number; tail: number };
 
-export function timelineLanes(albums: TimelineAlbum[], minAlbums: number, elsewhere: string): Lane[] {
+export function timelineLanes(albums: TimelineAlbum[], minAlbums: number, everyoneElse: string): Lane[] {
 	const byArtist = Map.groupBy(albums, (album) => album.artistId);
 	const main: Lane[] = [];
 	const rest: TimelineAlbum[] = [];
@@ -16,7 +16,7 @@ export function timelineLanes(albums: TimelineAlbum[], minAlbums: number, elsewh
 	}
 	const firstYear = (lane: Lane) => Math.min(...lane.albums.map((album) => album.year || Number.MAX_SAFE_INTEGER));
 	main.sort((a, b) => firstYear(a) - firstYear(b) || b.albums.length - a.albums.length || a.label.localeCompare(b.label));
-	return rest.length ? [...main, { artistId: null, label: elsewhere, albums: rest }] : main;
+	return rest.length ? [...main, { artistId: null, label: everyoneElse, albums: rest }] : main;
 }
 
 function describe(year: number): { label: string; era: string; minor: boolean } {
