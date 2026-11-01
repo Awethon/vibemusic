@@ -5,7 +5,7 @@ import { TREE_VERSION } from '../genres/genres.ts';
 
 // Bump on any change to SCHEMA or to how rows are built: a new version makes every tab rebuild
 // from a full sync. The genre tree version is included because stored genres depend on it.
-export const SCHEMA_VERSION = `16.${TREE_VERSION}`;
+export const SCHEMA_VERSION = `17.${TREE_VERSION}`;
 
 // `search` is an FTS5 trigram index for substring search. `search_key` holds the same texts in a
 // plain indexed table for prefix lookups and for needles under 3 characters, which trigrams can't match.
@@ -76,7 +76,7 @@ create table playlist (
 	song_count integer not null,
 	duration real not null,
 	updated text not null,
-	image text not null,
+	image_hash text not null,
 	readonly integer not null,
 	artist_id text not null
 );

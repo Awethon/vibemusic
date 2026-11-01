@@ -1,6 +1,7 @@
 //! Apple top songs for enrichment and "This is" playlists, from the public iTunes Search API
 //! (no key). `APPLE_PAUSE_MS` sets the gap between requests (default 3200 ms) and
-//! `APPLE_STOREFRONTS` the country catalogs to search, in order (default `us,ru`).
+//! `APPLE_STOREFRONTS` the country catalogs to search, in order (default `us`). Local artists can be
+//! missing from the US catalog or ranked differently there, so add your own countries, e.g. `us,de`.
 
 use std::collections::HashSet;
 use std::time::Duration;
@@ -41,7 +42,7 @@ impl Apple {
             .and_then(|value| value.parse().ok())
             .unwrap_or(3200);
         let storefronts = std::env::var("APPLE_STOREFRONTS")
-            .unwrap_or_else(|_| "us,ru".into())
+            .unwrap_or_else(|_| "us".into())
             .split(',')
             .map(|code| code.trim().to_lowercase())
             .filter(|code| !code.is_empty())

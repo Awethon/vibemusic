@@ -42,10 +42,15 @@ export const genrePlaylistId = (genre: string) => 'genre-' + genre.toLowerCase()
 export const newest = (values: string[]) =>
 	values.reduce((latest, value) => (value && (!latest || Date.parse(value) > Date.parse(latest)) ? value : latest), '');
 
-// Changes when a playlist's tracks may have changed, so its tracks are refetched. Smart playlists
-// only track the image here; fetch.ts decides separately when to refetch their tracks.
+// Only an uploaded image is shown, so only its hash matters. Navidrome also hashes the mosaic it
+// generates for other playlists, which changes with their tracks.
+const uploadedImageHash = (playlist: NativePlaylist) => (playlist.uploadedImage ? playlist.imageHash : '');
+
+// Changes when a playlist's tracks or uploaded image may have changed, so it is refetched. Smart
+// playlists only track the image here; fetch.ts decides separately when to refetch their tracks.
 export function playlistSignature(playlist: NativePlaylist) {
-	return playlist.rules ? `smart:${playlist.uploadedImage}` : `${playlist.updatedAt}:${playlist.songCount}:${playlist.uploadedImage}`;
+	const image = uploadedImageHash(playlist);
+	return playlist.rules ? `smart:${image}` : `${playlist.updatedAt}:${playlist.songCount}:${image}`;
 }
 
 function eachBound(db: Database, sql: string, rows: (string | number | null)[][]) {
@@ -238,7 +243,7 @@ function insertPlaylists(db: Database, playlists: NativePlaylist[], userId: stri
 			0,
 			playlist.duration,
 			playlist.evaluatedAt || playlist.updatedAt,
-			playlist.uploadedImage,
+			uploadedImageHash(playlist),
 			// Read-only: synced from a playlist file on disk, or owned by someone else.
 			playlist.sync || playlist.ownerId !== userId ? 1 : 0,
 			''

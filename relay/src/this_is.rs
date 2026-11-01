@@ -1,7 +1,9 @@
 //! "This is <artist>" playlists: public Navidrome playlists of each artist's most popular songs
 //! in the library, with a generated cover. On only when `VIBEMUSIC_RELAY_NAVIDROME_USER` and
-//! `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` name a dedicated Navidrome admin account, which owns the
-//! playlists. Popularity comes from Apple and Deezer (see `enrich.rs`).
+//! `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` name a dedicated Navidrome account, which owns the
+//! playlists. A regular user is enough; it needs admin rights only when it lacks access to some
+//! libraries, or when Navidrome's `EnableArtworkUpload` is off (covers are uploaded images).
+//! Popularity comes from Apple and Deezer (see `enrich.rs`).
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;

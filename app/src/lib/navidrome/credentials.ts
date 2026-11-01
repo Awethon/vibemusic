@@ -101,7 +101,6 @@ export const coverUrl = (credentials: Credentials, albumId: string, size: number
 export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) =>
 	subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size: coverTier(size) });
 
-// `v` here overrides the Subsonic API version param (Navidrome only checks that it is present).
-// Using the uploaded image name changes the URL whenever the playlist image is replaced.
-export const playlistCoverUrl = (credentials: Credentials, playlistId: string, image: string, size: number) =>
-	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}`, size: coverTier(size), v: image });
+// Same "pl-<id>_<imageHash>" scheme as album covers: cached forever, new URL when the image changes.
+export const playlistCoverUrl = (credentials: Credentials, playlistId: string, imageHash: string, size: number) =>
+	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}_${imageHash}`, size: coverTier(size) });

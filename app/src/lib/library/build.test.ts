@@ -10,7 +10,7 @@ import {
 	type NativePlaylistTrack,
 	type NativeSong
 } from '../navidrome/schemas.ts';
-import { applyChanges, buildLibrary, readMeta, readSyncState } from './build.ts';
+import { applyChanges, buildLibrary, playlistSignature, readMeta, readSyncState } from './build.ts';
 import { followsListening } from './fetch.ts';
 import type { LibraryChanges, LibrarySnapshot } from './snapshot.ts';
 
@@ -243,6 +243,18 @@ describe('applyChanges', () => {
 		const result = applied(base, base, ['pl-smart']);
 		expect(result.changed).toBe(false);
 		expectSameLibrary(result.db, built(base));
+	});
+});
+
+describe('playlistSignature', () => {
+	it('changes when an uploaded image is replaced under the same file name', () => {
+		const before = nativePlaylist.parse({ id: 'p', name: 'This is X', uploadedImage: 'p_this_is_x.jpeg', imageHash: '0123456789abcdef' });
+		expect(playlistSignature({ ...before, imageHash: 'fedcba9876543210' })).not.toBe(playlistSignature(before));
+	});
+
+	it('ignores the hash of a generated mosaic', () => {
+		const before = nativePlaylist.parse({ id: 'p', name: 'Mix', rules: { all: [] }, imageHash: '0123456789abcdef' });
+		expect(playlistSignature({ ...before, imageHash: 'fedcba9876543210' })).toBe(playlistSignature(before));
 	});
 });
 

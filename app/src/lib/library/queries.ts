@@ -61,7 +61,8 @@ export type Playlist = {
 	songCount: number;
 	duration: number;
 	updated: string;
-	image: string;
+	// Hash of the uploaded playlist image; empty when there is none (the app draws a mosaic).
+	imageHash: string;
 	readonly: boolean;
 	artistId: string;
 	mosaicAlbumIds: string[];
@@ -94,7 +95,7 @@ const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount
 	(select json_group_array(id) from (select id from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) order by year desc, created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
-	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image, playlist.readonly, playlist.artist_id as artistId,
+	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image_hash as imageHash, playlist.readonly, playlist.artist_id as artistId,
 	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
 		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 8)) as mosaicAlbumIds`;
 

@@ -103,6 +103,7 @@ export const nativePlaylist = z.object({
 		.nullish()
 		.transform((value) => value ?? null),
 	uploadedImage: optionalString,
+	imageHash: optionalString,
 	sync: z
 		.boolean()
 		.nullish()
