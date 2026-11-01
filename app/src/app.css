@@ -285,7 +285,7 @@ body.panel-open { --panel-w: 376px; }
 
 .tile:hover .art { transform: translateY(-4px) scale(1.02); box-shadow: 0 22px 40px -16px rgba(0, 0, 0, 0.75); }
 
-.grid:hover .tile:not(:hover), .vgrid:hover .tile:not(:hover) { opacity: 0.5; }
+.grid:has(.tile:hover) .tile:not(:hover), .vgrid:has(.tile:hover) .tile:not(:hover) { opacity: 0.5; }
 
 .tile .t {
 	display: block;
@@ -435,7 +435,7 @@ body.is-playing .trk.playing .n::after { animation-play-state: running; }
 
 .pl-card { text-align: left; transition: opacity 0.35s var(--ease); }
 
-.pl-grid:hover .pl-card:not(:hover) { opacity: 0.5; }
+.pl-grid:has(.pl-card:hover) .pl-card:not(:hover) { opacity: 0.5; }
 
 .mosaic { display: grid; width: 100%; grid-template-columns: 1fr 1fr; aspect-ratio: 1; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 44px -20px rgba(0, 0, 0, 0.8); transition: transform 0.4s var(--ease); }
 
@@ -1051,7 +1051,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .pl-tile { display: block; min-width: 0; text-align: left; transition: opacity 0.35s var(--ease); }
 
-.shelf:hover .pl-tile:not(:hover) { opacity: 0.5; }
+.shelf:has(.pl-tile:hover) .pl-tile:not(:hover) { opacity: 0.5; }
 
 .pl-tile .mosaic { border-radius: 12px; box-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.8); }
 
@@ -1117,7 +1117,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .g-tile:hover .mosaic { transform: translateY(-3px); }
 
-.bb-body.tiles:hover .g-tile:not(:hover) { opacity: 0.5; }
+.bb-body.tiles:has(.g-tile:hover) .g-tile:not(:hover) { opacity: 0.5; }
 
 .album-main { min-width: 0; }
 
