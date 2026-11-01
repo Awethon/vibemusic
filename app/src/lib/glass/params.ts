@@ -184,7 +184,7 @@ export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 		controls: [
 			slider('ior', 'Index of refraction', 1, 2.4, 0.01),
 			slider('disp', 'Dispersion', 0, 0.35, 0.005, '', 'rainbow fringes at the rim'),
-			slider('frost', 'Frost', 0, 40, 0.5, 'px'),
+			slider('frost', 'Frost', 0, 40, 0.1, 'px'),
 			{ key: 'flip', label: 'Rim pulls outside content in', toggle: true }
 		]
 	},
@@ -251,7 +251,12 @@ const LAB_ORDER: GlassKey[] = [
 	'settle',
 	'flip'
 ];
-const LAB_FIELDS = LAB_ORDER.map((key) => SLIDERS.get(key) ?? LAB_ONLY[key]!);
+// Sliders that are finer here than in the lab; links still count these fields in the lab's steps.
+const LAB_STEPS: Partial<Record<GlassKey, number>> = { frost: 0.5 };
+const LAB_FIELDS = LAB_ORDER.map((key) => {
+	const field = SLIDERS.get(key) ?? LAB_ONLY[key]!;
+	return { ...field, step: LAB_STEPS[key] ?? field.step };
+});
 const LAB_LINK_VERSION = 1;
 const LAB_SHAPE_GROUP = 3;
 
