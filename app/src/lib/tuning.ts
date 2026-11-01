@@ -110,6 +110,7 @@ export const BENTO = Object.freeze({
 	genreMaxRows: 2,
 	listMaxColumns: 2,
 	listMaxRows: 6,
+	alignWithinPx: 72,
 	rowMinWidthPx: 200,
 	rowColumnGapPx: 12,
 	rowHeightPx: 64,

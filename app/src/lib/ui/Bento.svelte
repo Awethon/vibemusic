@@ -12,11 +12,13 @@
 	type Block = { kind: PlaylistKind; title: string; playlists: Playlist[] };
 	type Plan = { columns: number; rows: number; tileSize: number; itemCount: number; bodyHeight: number };
 	type Geometry = { kind: PlaylistKind; width: number; chrome: number; count: number };
+	type Layout = { plans: Record<string, Plan>; aligned: boolean };
 
 	let { blocks }: { blocks: Block[] } = $props();
 
 	let bento = $state<HTMLElement | null>(null);
 	let plans = $state<Record<string, Plan>>({});
+	let aligned = $state(false);
 
 	const columnCount = $derived(Math.min(blocks.length, 2));
 
@@ -57,14 +59,47 @@
 		return wanted.map((need) => (need <= share ? need : share + spare / Math.max(1, short)));
 	}
 
-	function fittedPlans(): Record<string, Plan> {
+	function planSide(side: Geometry[], height: number, gap: number): [PlaylistKind, Plan][] {
+		const rooms = stackedRoom(side, height, gap);
+		const planned = side.map((item, index): [PlaylistKind, Plan] => [item.kind, planFor(item, rooms[index])]);
+		for (;;) {
+			const leftover = height - sideHeight(side, planned, gap);
+			const grown = side
+				.map((item, index) => ({ index, plan: planFor(item, planned[index][1].bodyHeight + rowStep(item, planned[index][1])) }))
+				.filter(({ index, plan }) => plan.rows > planned[index][1].rows && plan.bodyHeight - planned[index][1].bodyHeight <= leftover)
+				.toSorted((a, b) => a.plan.bodyHeight - planned[a.index][1].bodyHeight - (b.plan.bodyHeight - planned[b.index][1].bodyHeight))[0];
+			if (!grown) return planned;
+			planned[grown.index] = [side[grown.index].kind, grown.plan];
+		}
+	}
+
+	const rowStep = (item: Geometry, plan: Plan) => (item.kind === 'genre' ? plan.tileSize + BENTO.genreTileGapPx : BENTO.rowHeightPx + BENTO.rowGapPx);
+
+	const sideHeight = (side: Geometry[], planned: [PlaylistKind, Plan][], gap: number) => side.reduce((sum, item, index) => sum + item.chrome + planned[index][1].bodyHeight, 0) + gap * (side.length - 1);
+
+	const showsEverything = (side: Geometry[], planned: [PlaylistKind, Plan][]) => side.every((item, index) => planned[index][1].itemCount >= item.count);
+
+	function fittedLayout(): Layout {
 		const height = fillHeight();
 		const gap = bento ? parseFloat(getComputedStyle(bento).rowGap) || 0 : 0;
 		const [lead, ...rest] = measureGeometry();
-		if (!lead) return {};
-		const leadPlan = planFor(lead, height - lead.chrome);
-		const restRooms = stackedRoom(rest, height, gap);
-		return Object.fromEntries([[lead.kind, leadPlan], ...rest.map((item, index) => [item.kind, planFor(item, restRooms[index])])]);
+		if (!lead) return { plans: {}, aligned: false };
+		let left = planSide([lead], height, gap);
+		let right = planSide(rest, height, gap);
+		let aligned = false;
+		if (rest.length) {
+			const leftHeight = sideHeight([lead], left, gap);
+			const rightHeight = sideHeight(rest, right, gap);
+			const leftShorter = leftHeight < rightHeight;
+			const close = Math.abs(leftHeight - rightHeight) <= BENTO.alignWithinPx;
+			const shorterHasMore = !(leftShorter ? showsEverything([lead], left) : showsEverything(rest, right));
+			aligned = close || shorterHasMore;
+			if (aligned && !close) {
+				if (leftShorter) right = planSide(rest, leftHeight, gap);
+				else left = planSide([lead], rightHeight, gap);
+			}
+		}
+		return { plans: Object.fromEntries([...left, ...right]), aligned };
 	}
 
 	const signature = (all: Record<string, Plan>) => Object.entries(all).map(([kind, plan]) => `${kind}:${plan.itemCount}|${plan.columns}|${plan.tileSize}|${plan.bodyHeight}`).join(',');
@@ -80,11 +115,12 @@
 		);
 	}
 
-	const currentPlans = () => (formFactor.phone ? stackedPlans() : fittedPlans());
+	const currentLayout = (): Layout => (formFactor.phone ? { plans: stackedPlans(), aligned: false } : fittedLayout());
 
 	function refit() {
-		const next = currentPlans();
-		if (signature(next) !== signature(plans)) plans = next;
+		const next = currentLayout();
+		if (signature(next.plans) !== signature(plans)) plans = next.plans;
+		aligned = next.aligned;
 	}
 
 	$effect(() => {
@@ -94,7 +130,10 @@
 		untrack(refit);
 		const frame = requestAnimationFrame(refit);
 		const unregister = registerLayout({
-			needsRefill: () => signature(currentPlans()) !== signature(plans),
+			needsRefill: () => {
+				const next = currentLayout();
+				return next.aligned !== aligned || signature(next.plans) !== signature(plans);
+			},
 			refill: refit,
 			reflow: refit
 		});
@@ -105,7 +144,7 @@
 	});
 </script>
 
-<div class="bento" class:stacked={formFactor.phone} id="bento" bind:this={bento} style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`} style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined}>
+<div class="bento" class:stacked={formFactor.phone} id="bento" bind:this={bento} style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`} style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined} style:align-items={aligned ? 'stretch' : 'start'}>
 	{#each blocks as block, index (block.kind)}
 		{@const plan = plans[block.kind]}
 		<section class="bento-block" data-kind={block.kind} style:grid-row={!formFactor.phone && blocks.length > 2 && index === 0 ? 'span 2' : undefined}>
