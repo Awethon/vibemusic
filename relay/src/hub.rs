@@ -172,6 +172,7 @@ impl Hub {
     pub fn receive(&mut self, user: &str, device_id: &str, message: ClientMessage) {
         let Some(room) = self.rooms.get_mut(user) else { return };
         let is_active = room.active.as_deref() == Some(device_id);
+        log_message(room, device_id, is_active, &message);
         match message {
             ClientMessage::Queue { queue } if is_active => {
                 room.queue = Some(queue.clone());
@@ -223,6 +224,31 @@ impl Hub {
             _ => {}
         }
     }
+}
+
+/// Logs each device message at debug level (no tokens; ids shortened) to trace handovers.
+fn log_message(room: &Room, device_id: &str, is_active: bool, message: &ClientMessage) {
+    if matches!(message, ClientMessage::Ping) {
+        return;
+    }
+    let short = |id: &str| id[..id.len().min(8)].to_owned();
+    let (playback, command) = match message {
+        ClientMessage::Playback { playback } | ClientMessage::Handoff { playback, .. } => (playback, &Value::Null),
+        ClientMessage::Command { command } => (&Value::Null, command),
+        _ => (&Value::Null, &Value::Null),
+    };
+    tracing::debug!(
+        device = short(device_id),
+        kind = message.kind(),
+        is_active,
+        active = room.active.as_deref().map(short).unwrap_or_default(),
+        track = playback["trackId"].as_str().unwrap_or(""),
+        playing = playback["playing"].as_bool(),
+        waiting = playback["waiting"].as_bool(),
+        position = playback["position"].as_f64().map(|position| position.round()),
+        command = command["kind"].as_str().unwrap_or(""),
+        "message"
+    );
 }
 
 #[cfg(test)]

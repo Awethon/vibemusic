@@ -62,6 +62,22 @@ pub enum ClientMessage {
     Enrich(EnrichRequest),
 }
 
+impl ClientMessage {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ClientMessage::Hello { .. } => "hello",
+            ClientMessage::Ping => "ping",
+            ClientMessage::Claim => "claim",
+            ClientMessage::Queue { .. } => "queue",
+            ClientMessage::Playback { .. } => "playback",
+            ClientMessage::Command { .. } => "command",
+            ClientMessage::Transfer { .. } => "transfer",
+            ClientMessage::Handoff { .. } => "handoff",
+            ClientMessage::Enrich(_) => "enrich",
+        }
+    }
+}
+
 /// A device as shown in the devices list. An offline device stays listed while it is still
 /// the active one, so "Play here" can take over its queue.
 #[derive(Serialize, Debug)]
