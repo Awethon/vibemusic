@@ -12,7 +12,7 @@ export const ui = $state({
 	panelTab: 'queue' as PanelTab,
 	fullScreen: false,
 	fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'minimal'),
-	ripples: readPreference('ripples', ['on', 'off'] as const, 'on') === 'on',
+	ripples: readPreference('ripples', ['on', 'off'] as const, 'off') === 'on',
 	railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
 	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
 	showTimeline: readPreference('nav.timeline', ['on', 'off'] as const, 'on') === 'on',
