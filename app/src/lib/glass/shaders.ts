@@ -183,21 +183,10 @@ float heightAt(vec2 q) {
   return profile(t) * mix(1.0, oval, uBody);
 }
 
-void main() {
-  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
-  if (uN == 0 || any(lessThan(p, uBounds.xy)) || any(greaterThan(p, uBounds.zw))) {
-    o = vec4(0.0);
-    return;
-  }
-  float alpha = alphaAt(p);
-  float d = sdf(p);
-  float shadow = shadowAt(p) * alpha;
-  if (d > 2.0) {
-    o = vec4(0.0, 0.0, 0.0, shadow);
-    return;
-  }
-
-  float t = max(-d, 0.0);
+// Height of the glass at p and its gradient (from 18 samples around p). This is most of the
+// shader's cost and depends only on the shapes and the glass settings, so the renderer bakes it
+// into a texture (SURFACE) and the glass pass reads it back while only the backdrop changes.
+vec3 surfaceLive(vec2 p, float t) {
   float h = heightAt(p);
   float sigma = max(0.75 * uDpr, 0.45 * t);
   vec2 gh = vec2(0.0);
@@ -214,7 +203,34 @@ void main() {
     gh += w * acc;
     norm += w * 3.0 * r;
   }
-  gh /= norm;
+  return vec3(gh / norm, h);
+}
+
+#ifdef BAKED
+uniform sampler2D uSurface;
+vec3 surfaceAt(vec2 p, float t) { return texelFetch(uSurface, ivec2(gl_FragCoord.xy), 0).xyz; }
+#else
+vec3 surfaceAt(vec2 p, float t) { return surfaceLive(p, t); }
+#endif
+
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  if (uN == 0 || any(lessThan(p, uBounds.xy)) || any(greaterThan(p, uBounds.zw))) {
+    o = vec4(0.0);
+    return;
+  }
+  float alpha = alphaAt(p);
+  float d = sdf(p);
+  float shadow = shadowAt(p) * alpha;
+  if (d > 2.0) {
+    o = vec4(0.0, 0.0, 0.0, shadow);
+    return;
+  }
+
+  float t = max(-d, 0.0);
+  vec3 surf = surfaceAt(p, t);
+  float h = surf.z;
+  vec2 gh = surf.xy;
   float slope = length(gh);
   vec3 n = normalize(vec3(-gh, 1.0));
   float ge = 1.5 * uDpr;
@@ -278,4 +294,19 @@ void main() {
   float dist = d / max(length(vec2(ex, ey)) / (2.0 * de), 0.2);
   float cover = smoothstep(0.75, -0.75, dist) * alpha;
   o = vec4(clamp(col, 0.0, 1.0) * cover, cover + shadow * (1.0 - cover));
+}`;
+
+// The glass pass reading the baked surface instead of computing it.
+export const GLASS_BAKED = GLASS.replace('#version 300 es\n', '#version 300 es\n#define BAKED\n');
+
+// Bakes surfaceLive() into an RGBA16F target the size of the canvas: xy = gradient, z = height.
+// Same pixel grid as the glass pass, which reads it back with texelFetch, so the result is the same.
+export const SURFACE = `${GLASS.slice(0, GLASS.indexOf('void main() {'))}void main() {
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  float d = sdf(p);
+  if (uN == 0 || d > 2.0) {
+    o = vec4(0.0);
+    return;
+  }
+  o = vec4(surfaceLive(p, max(-d, 0.0)), 1.0);
 }`;

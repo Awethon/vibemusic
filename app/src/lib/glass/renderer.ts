@@ -1,7 +1,7 @@
 // WebGL2 side of the glass: uploads each shape's painted backdrop as a texture ("slot"), keeps a
 // blurred copy for frost, and draws the glass shader with a scissor per draw area.
 import { lightVector, RENDER, type GlassParams } from './params.ts';
-import { BLUR, GLASS, MAX_SHAPES, VERT } from './shaders.ts';
+import { BLUR, GLASS, GLASS_BAKED, MAX_SHAPES, SURFACE, VERT } from './shaders.ts';
 
 export type GlassShape = { x: number; y: number; width: number; height: number; radius: number; alpha: number };
 export type Region = { x: number; y: number; width: number; height: number };
@@ -48,7 +48,9 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		return { program, u };
 	}
 
-	const programs = { blur: compile(BLUR), glass: compile(GLASS) };
+	// Baking the glass surface needs a float render target; without one the glass pass computes it live.
+	const baked = !!context.getExtension('EXT_color_buffer_float');
+	const programs = { blur: compile(BLUR), glass: compile(baked ? GLASS_BAKED : GLASS), ...(baked ? { surface: compile(SURFACE) } : {}) };
 	context.bindVertexArray(context.createVertexArray());
 
 	function texture(mips: boolean): WebGLTexture {
@@ -83,17 +85,36 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		version: number;
 		blur: { scale: number; h: Target; v: Target } | null;
 		blurKey: string;
+		// What the slot's areas of the surface texture were last baked from.
+		surfaceKey: string;
 	};
 	const slots: Slot[] = [];
-	const slotAt = (index: number) => (slots[index] ??= { scene: texture(true), size: [1, 1], version: 0, blur: null, blurKey: '' });
+	const slotAt = (index: number) =>
+		(slots[index] ??= { scene: texture(true), size: [1, 1], version: 0, blur: null, blurKey: '', surfaceKey: '' });
 	let width = 0;
 	let height = 0;
+	let surface: Target | null = null;
+
+	function surfaceTarget(): Target {
+		const tex = context.createTexture();
+		context.bindTexture(context.TEXTURE_2D, tex);
+		for (const name of [context.TEXTURE_MIN_FILTER, context.TEXTURE_MAG_FILTER])
+			context.texParameteri(context.TEXTURE_2D, name, context.NEAREST);
+		context.texImage2D(context.TEXTURE_2D, 0, context.RGBA16F, width, height, 0, context.RGBA, context.HALF_FLOAT, null);
+		const fbo = context.createFramebuffer();
+		context.bindFramebuffer(context.FRAMEBUFFER, fbo);
+		context.framebufferTexture2D(context.FRAMEBUFFER, context.COLOR_ATTACHMENT0, context.TEXTURE_2D, tex, 0);
+		return { tex, fbo, width, height };
+	}
 
 	function resize(cssWidth: number, cssHeight: number, dpr: number) {
 		width = Math.round(cssWidth * dpr);
 		height = Math.round(cssHeight * dpr);
 		canvas.width = width;
 		canvas.height = height;
+		release(surface);
+		surface = null;
+		for (const slot of slots) slot.surfaceKey = '';
 	}
 
 	function releaseSlot(slot: Slot) {
@@ -165,20 +186,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.clear(context.COLOR_BUFFER_BIT);
 	}
 
-	function render(params: GlassParams, shapes: GlassShape[], areas: Region[], region: Region, dpr: number, index = 0) {
-		const slot = slotAt(index);
-		// Blur radii are in pixels of the page copy, which can be lower resolution than the glass.
-		const blurTex = blurred(slot, params.frost, slot.size[0] / region.width);
-		const { program, u } = programs.glass;
-		context.bindFramebuffer(context.FRAMEBUFFER, null);
-		context.viewport(0, 0, width, height);
-		context.useProgram(program);
-		context.activeTexture(context.TEXTURE0);
-		context.bindTexture(context.TEXTURE_2D, slot.scene);
-		context.uniform1i(u.uScene, 0);
-		context.activeTexture(context.TEXTURE1);
-		context.bindTexture(context.TEXTURE_2D, blurTex);
-		context.uniform1i(u.uBlur, 1);
+	function setUniforms(u: Program['u'], params: GlassParams, shapes: GlassShape[], region: Region, dpr: number) {
 		context.uniform2f(u.uRes, width, height);
 		context.uniform4f(u.uRegion, region.x * dpr, region.y * dpr, region.width * dpr, region.height * dpr);
 		context.uniform1f(u.uDpr, dpr);
@@ -227,6 +235,9 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.uniform1f(u.uCaustic, params.caustic);
 		context.uniform4f(u.uTint, TINT[0], TINT[1], TINT[2], params.tintA);
 		context.uniform1f(u.uSat, params.sat);
+	}
+
+	function drawAreas(areas: Region[], dpr: number) {
 		context.enable(context.SCISSOR_TEST);
 		for (const area of areas) {
 			const left = Math.round(area.x * dpr);
@@ -239,11 +250,53 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 			context.drawArrays(context.TRIANGLES, 0, 3);
 		}
 		context.disable(context.SCISSOR_TEST);
+	}
+
+	// Rebakes the surface for this slot's areas when the shapes, the areas, the size or a setting
+	// that shapes the surface changed. Scrolling only changes the backdrop, so it never rebakes.
+	function bakeSurface(slot: Slot, params: GlassParams, shapes: GlassShape[], areas: Region[], region: Region, dpr: number) {
+		const program = programs.surface;
+		if (!program) return;
+		const { thick, bevel, lens, curve, body, cut } = params;
+		const key = JSON.stringify([width, height, dpr, shapes.slice(0, MAX_SHAPES), areas, thick, bevel, lens, curve, body, cut]);
+		if (surface && key === slot.surfaceKey) return;
+		surface ??= surfaceTarget();
+		slot.surfaceKey = key;
+		context.bindFramebuffer(context.FRAMEBUFFER, surface.fbo);
+		context.viewport(0, 0, width, height);
+		context.useProgram(program.program);
+		setUniforms(program.u, params, shapes, region, dpr);
+		drawAreas(areas, dpr);
+	}
+
+	function render(params: GlassParams, shapes: GlassShape[], areas: Region[], region: Region, dpr: number, index = 0) {
+		const slot = slotAt(index);
+		// Blur radii are in pixels of the page copy, which can be lower resolution than the glass.
+		const blurTex = blurred(slot, params.frost, slot.size[0] / region.width);
+		bakeSurface(slot, params, shapes, areas, region, dpr);
+		const { program, u } = programs.glass;
+		context.bindFramebuffer(context.FRAMEBUFFER, null);
+		context.viewport(0, 0, width, height);
+		context.useProgram(program);
+		context.activeTexture(context.TEXTURE0);
+		context.bindTexture(context.TEXTURE_2D, slot.scene);
+		context.uniform1i(u.uScene, 0);
+		context.activeTexture(context.TEXTURE1);
+		context.bindTexture(context.TEXTURE_2D, blurTex);
+		context.uniform1i(u.uBlur, 1);
+		if (surface) {
+			context.activeTexture(context.TEXTURE2);
+			context.bindTexture(context.TEXTURE_2D, surface.tex);
+			context.uniform1i(u.uSurface, 2);
+		}
+		setUniforms(u, params, shapes, region, dpr);
+		drawAreas(areas, dpr);
 		context.activeTexture(context.TEXTURE0);
 	}
 
 	function dispose(loseContext: boolean) {
 		keepSlots(0);
+		release(surface);
 		for (const { program } of Object.values(programs)) context.deleteProgram(program);
 		if (loseContext) context.getExtension('WEBGL_lose_context')?.loseContext();
 	}
