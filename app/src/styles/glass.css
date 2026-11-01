@@ -1,0 +1,123 @@
+/* Liquid glass layers and the glass tuner page. */
+
+.glass-layer {
+	position: fixed;
+	inset: 0;
+	z-index: 5;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+#glass-rail {
+	z-index: 2;
+}
+#glass-popups {
+	z-index: 7;
+}
+body.glass-on #capsule,
+body.glass-on #panel,
+body.glass-on .pop,
+body.glass-on #rail::before {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	backdrop-filter: none;
+}
+
+.glass-tuner {
+	display: grid;
+	grid-template-columns: minmax(380px, 520px) minmax(0, 1fr);
+	gap: 48px;
+	align-items: start;
+}
+.gt-controls {
+	padding-bottom: 140px;
+}
+.gt-controls .vhead {
+	margin-bottom: 18px;
+}
+.gt-controls .pop-title {
+	margin: 26px 0 10px;
+}
+.gt-switch {
+	max-width: 360px;
+	border: 1px solid var(--line);
+}
+.gt-presets {
+	flex-wrap: wrap;
+	width: fit-content;
+	border-radius: 18px;
+}
+.gt-group {
+	display: grid;
+	gap: 14px;
+}
+.gt-slider {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.gt-slider .gt-label {
+	display: flex;
+	justify-content: space-between;
+	font-size: 13px;
+	color: var(--ink-2);
+}
+.gt-slider .gt-label b {
+	font-weight: 500;
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+}
+.gt-slider small {
+	font-size: 11.5px;
+	color: var(--ink-4);
+}
+.gt-link {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+.gt-link input {
+	flex: 1;
+	height: 38px;
+	padding: 0 12px;
+	border-radius: 12px;
+	border: 1px solid var(--line-2);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--ink);
+	font: 500 13px var(--ui);
+	outline: none;
+}
+.gt-link input:focus {
+	border-color: var(--accent);
+}
+.gt-note {
+	margin: 8px 0 0;
+	font-size: 12.5px;
+	color: var(--ink-3);
+}
+.gt-note a {
+	color: var(--ink-2);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+.gt-menu {
+	margin-top: 18px;
+}
+.gt-wall {
+	position: sticky;
+	top: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 14px;
+	height: calc(100vh - 40px);
+	overflow: hidden;
+	align-content: end;
+	padding-bottom: 20px;
+}
+.gt-wall img {
+	width: 100%;
+	aspect-ratio: 1;
+	object-fit: cover;
+	border-radius: 10px;
+}

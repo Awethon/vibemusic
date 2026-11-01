@@ -1,0 +1,141 @@
+/* The full-screen "Classic" now-playing view. */
+
+#classic {
+	position: fixed;
+	inset: 0;
+	z-index: 3;
+	display: flex;
+	flex-direction: column;
+	padding: 22px 40px 110px;
+	opacity: 0;
+	pointer-events: none;
+	transform: scale(1.015);
+	background: radial-gradient(120% 80% at 30% 40%, rgba(6, 5, 9, 0.05), rgba(6, 5, 9, 0.4));
+}
+
+body.now-open.fs-classic #classic {
+	opacity: 1;
+	pointer-events: auto;
+	transform: none;
+}
+
+body.now-open.fs-classic.idle #classic {
+	opacity: 0;
+}
+
+.cl-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.cl-head .eyebrow {
+	margin: 0;
+	color: var(--ink-2);
+	text-shadow: var(--shadow-text);
+}
+
+.cl-stage {
+	--cl-cover: min(56vh, 36vw);
+	flex: 1;
+	min-height: 0;
+	display: grid;
+	grid-template-columns: var(--cl-cover) minmax(0, min(72vh, 46vw));
+	justify-content: center;
+	gap: min(9vh, 5vw);
+	align-items: center;
+}
+
+.cl-stage.solo {
+	--cl-cover: min(64vh, 60vw);
+	grid-template-columns: var(--cl-cover);
+	text-align: center;
+}
+
+.cl-stage.solo .cl-lyrics {
+	display: none;
+}
+
+.cl-left img,
+.cl-left .cover-icon {
+	width: var(--cl-cover);
+	height: auto;
+	aspect-ratio: 1;
+	object-fit: cover;
+	border-radius: 14px;
+	box-shadow:
+		0 40px 100px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.cl-left h1 {
+	margin: 3vh 0 1vh;
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: clamp(26px, 4vh, 96px);
+	line-height: 1.1;
+	letter-spacing: -0.025em;
+	text-shadow: var(--shadow-text);
+}
+
+.cl-left p {
+	margin: 0;
+	color: var(--ink-2);
+	font-size: clamp(15px, 1.7vh, 36px);
+}
+
+.cl-left p a {
+	cursor: pointer;
+}
+
+.cl-left p a:hover {
+	color: var(--ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.cl-lyrics {
+	position: relative;
+	height: 70vh;
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 70%, transparent 100%);
+	mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 70%, transparent 100%);
+}
+
+.cl-lines {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	transition: transform 0.7s var(--ease);
+	will-change: transform;
+}
+
+.cl-lines p {
+	margin: 0;
+	padding: 1.2vh 0;
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: clamp(22px, 3.4vh, 80px);
+	line-height: 1.3;
+	letter-spacing: -0.02em;
+	opacity: 0.2;
+	transform-origin: left center;
+	cursor: pointer;
+	text-shadow: var(--shadow-text);
+	transition:
+		opacity 0.5s var(--ease),
+		transform 0.5s var(--ease);
+}
+
+.cl-lines p:hover {
+	opacity: 0.55;
+}
+
+.cl-lines p.near {
+	opacity: 0.34;
+}
+
+.cl-lines p.on {
+	opacity: 1;
+}

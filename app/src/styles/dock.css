@@ -1,0 +1,219 @@
+/* The player capsule docked at the bottom. */
+
+#dock {
+	position: fixed;
+	left: calc(var(--rail-w) + 16px + max(12px, var(--edge-l)));
+	right: calc(var(--panel-w) + var(--edge-r));
+	bottom: calc(16px + var(--safe-b));
+	z-index: 6;
+	display: flex;
+	justify-content: center;
+	padding: 0 28px;
+	pointer-events: none;
+	container: dock / inline-size;
+}
+
+body.now-open #dock {
+	left: 0;
+	right: 0;
+	padding: 0 28px;
+}
+
+#capsule {
+	position: relative;
+	pointer-events: auto;
+	width: 100%;
+	max-width: 1000px;
+	height: 64px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(250px, 1.3fr) minmax(0, 1fr);
+	align-items: center;
+	gap: 14px;
+	padding: 0 12px 0 8px;
+	border-radius: 32px;
+	background: var(--glass-strong);
+	border: 1px solid var(--line-2);
+	backdrop-filter: blur(26px) saturate(1.3);
+	box-shadow:
+		0 18px 50px rgba(0, 0, 0, 0.45),
+		inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.cap-left {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.cap-cover {
+	width: 48px;
+	height: 48px;
+	flex: none;
+	border-radius: 50%;
+	overflow: hidden;
+}
+
+.cap-cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transform: scale(1) rotate(0deg);
+	transition: transform 0.3s var(--ease);
+}
+
+.cap-cover:hover img {
+	transform: scale(1.06) rotate(0.02deg);
+}
+
+.cap-meta {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.cap-title {
+	display: block;
+	max-width: 100%;
+	text-align: left;
+	font-weight: 600;
+	font-size: 13.5px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.cap-title:hover {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-color: var(--ink-4);
+}
+
+.cap-sub {
+	margin: 2px 0 0;
+	font-size: 12.5px;
+	color: var(--ink-3);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.cap-sub a {
+	cursor: pointer;
+}
+
+.cap-sub a:hover {
+	color: var(--ink);
+}
+
+.cap-like {
+	position: static;
+	flex: none;
+	width: 30px;
+	height: 30px;
+	margin-left: -4px;
+}
+
+.cap-like svg {
+	width: 17px;
+	height: 17px;
+}
+
+.cap-center {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+	transform: translateX(-10px);
+}
+
+.cap-ctrl {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+}
+
+.cap-ctrl .play {
+	width: 40px;
+	height: 40px;
+}
+
+.cap-seek {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.cap-seek.live {
+	justify-content: center;
+}
+
+.live-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--ink-2);
+}
+
+.live-badge i {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--accent);
+	animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.live-badge i {
+		animation: none;
+	}
+}
+
+.cap-right {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 2px;
+	min-width: 0;
+}
+
+.cap-right .slider.vol {
+	flex: 0 1 80px;
+	min-width: 44px;
+	margin-right: 6px;
+}
+
+#bPanel.on {
+	color: var(--accent);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+@container dock (max-width: 900px) {
+	.cap-right .slider.vol {
+		display: none;
+	}
+}
+
+@container dock (max-width: 760px) {
+	.cap-like {
+		display: none;
+	}
+	.cap-seek .time {
+		display: none;
+	}
+	#capsule {
+		gap: 10px;
+	}
+}

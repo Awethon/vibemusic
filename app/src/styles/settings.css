@@ -1,0 +1,134 @@
+/* The settings popover and its full-screen style picker. */
+
+#settings {
+	width: 340px;
+	padding: 10px;
+	overflow-y: auto;
+	scrollbar-width: none;
+	transform-origin: bottom left;
+}
+
+@media (max-height: 860px) and (min-width: 641px) {
+	#settings {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-content: start;
+		column-gap: 14px;
+		width: min(640px, calc(100vw - 32px));
+	}
+	#settings .set-group.wide {
+		grid-column: 1 / -1;
+	}
+	#settings .fs-thumb {
+		height: 40px;
+	}
+	#settings .fs-opt small {
+		display: none;
+	}
+}
+
+@media (max-height: 480px) and (min-width: 641px) {
+	#settings .fs-thumb {
+		display: none;
+	}
+	#settings .fs-opt b {
+		margin-top: 0;
+	}
+}
+
+#settings .pop-title {
+	margin-top: 8px;
+}
+
+.fs-opts {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.fs-opt {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 8px 8px 10px;
+	border-radius: 12px;
+	border: 1px solid var(--line);
+	text-align: left;
+	transition:
+		border-color 0.15s,
+		background 0.15s;
+}
+
+.fs-opt:hover {
+	background: var(--hover);
+}
+
+.fs-opt.on {
+	border-color: var(--accent);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.fs-opt b {
+	font-size: 13px;
+	font-weight: 600;
+	margin-top: 4px;
+}
+
+.fs-opt small {
+	font-size: 11.5px;
+	color: var(--ink-3);
+	line-height: 1.3;
+}
+
+.fs-thumb {
+	position: relative;
+	display: block;
+	height: 58px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.05);
+	overflow: hidden;
+}
+
+.fs-thumb i {
+	position: absolute;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, 0.22);
+}
+
+.fs-thumb.classic i:nth-child(1) {
+	left: 10%;
+	top: 16%;
+	width: 32%;
+	height: 56%;
+}
+
+.fs-thumb.classic i:nth-child(2) {
+	left: 52%;
+	top: 30%;
+	width: 38%;
+	height: 5px;
+	box-shadow:
+		0 9px 0 rgba(255, 255, 255, 0.4),
+		0 18px 0 rgba(255, 255, 255, 0.14);
+}
+
+.fs-thumb.classic i:nth-child(3) {
+	left: 10%;
+	bottom: 12%;
+	width: 22%;
+	height: 3px;
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.fs-opt.on .fs-thumb i:nth-child(1) {
+	background: var(--accent);
+	opacity: 0.7;
+}
+
+.set-foot {
+	margin: 12px 10px 4px;
+	font-size: 11px;
+	color: var(--ink-4);
+	letter-spacing: 0.04em;
+}

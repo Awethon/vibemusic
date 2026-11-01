@@ -1,0 +1,110 @@
+/* Behaviour shared across many components: the common icon-button look, rows lifted while dragged, and which text can be selected. */
+
+.icon-btn,
+.nav,
+.like,
+.pal-ico,
+.fbtn,
+.seg-toggle button {
+	--ic: var(--ink);
+	--ia: 1;
+}
+
+.icon-btn svg,
+.nav .ni svg,
+.like svg,
+.pal-ico svg,
+.fbtn svg,
+.seg-toggle button svg {
+	color: var(--ic);
+	opacity: var(--ia);
+	transition: opacity 0.15s;
+}
+
+.icon-btn {
+	--ia: 0.72;
+}
+
+.nav,
+.like,
+.pal-ico,
+.fbtn,
+.seg-toggle button {
+	--ia: 0.5;
+}
+
+.nav.nav-search {
+	--ia: 0.72;
+}
+
+.icon-btn:hover,
+.nav:hover,
+.like:hover,
+.seg-toggle button:hover,
+.seg-toggle button.on {
+	--ia: 1;
+}
+
+.fbtn:hover,
+.fbtn.on {
+	--ia: 0.72;
+}
+
+.icon-btn.on,
+.nav.active,
+.like.on {
+	--ic: var(--accent);
+	--ia: 1;
+}
+
+.row-lift {
+	position: fixed;
+	z-index: 30;
+	margin: 0;
+	list-style: none;
+	pointer-events: none;
+	cursor: default;
+	will-change: transform, opacity;
+}
+
+.qlist li.row-travel {
+	position: relative;
+	z-index: 3;
+	border-radius: 10px;
+}
+
+body {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+input,
+textarea,
+.trk .tt b,
+.trk .tt small,
+.trk .al,
+.album-side .display,
+.album-side .sub,
+.album-side .genres,
+.vhead .eyebrow + .display,
+.vhead .eyebrow + .display + .sub,
+.pl-head .display,
+.pn-title,
+.pn-sub,
+.cl-left h1,
+.cl-left p,
+.cl-lines p,
+.amb-artist,
+#ambient h2,
+.amb-line,
+.pal-item b,
+.pal-item small {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+body.no-select,
+body.no-select * {
+	-webkit-user-select: none !important;
+	user-select: none !important;
+}

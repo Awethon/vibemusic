@@ -1,0 +1,248 @@
+/* Browsing tools: toolbar, genre and decade filters, virtual grids, the A–Z rail, smart-playlist icons. */
+
+.toolbar {
+	position: sticky;
+	top: -33px;
+	z-index: 3;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px 16px;
+	margin: 0 -14px 26px;
+	padding: 10px 14px;
+	border-radius: 18px;
+	background: rgba(12, 11, 16, 0.55);
+	border: 1px solid var(--line);
+	backdrop-filter: blur(22px) saturate(1.25);
+}
+
+.toolbar .chips {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	backdrop-filter: none;
+}
+
+.filters {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.fbtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 10px 0 14px;
+	border-radius: 999px;
+	border: 1px solid var(--line-2);
+	color: var(--ink-2);
+	font-size: 13px;
+	font-weight: 500;
+	transition:
+		border-color 0.15s,
+		color 0.15s,
+		background 0.15s;
+}
+
+.fbtn svg {
+	width: 14px;
+	height: 14px;
+	opacity: 0.7;
+}
+
+.fbtn:hover {
+	color: var(--ink);
+	border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fbtn.on {
+	color: var(--ink);
+	background: rgba(255, 255, 255, 0.12);
+	border-color: transparent;
+}
+
+.fclear {
+	color: var(--ink-3);
+	font-size: 13px;
+	padding: 6px 8px;
+}
+
+.fclear:hover {
+	color: var(--ink);
+}
+
+#filterPop {
+	width: 300px;
+	padding: 10px;
+	transform-origin: top left;
+}
+#filterPop.above {
+	transform-origin: bottom left;
+}
+
+.fopts {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 2px;
+	max-height: 360px;
+	overflow-y: auto;
+}
+
+.fopt {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-radius: 9px;
+	font-size: 13.5px;
+	color: var(--ink-2);
+	text-align: left;
+}
+
+.fopt span {
+	color: var(--ink-4);
+	font-size: 11.5px;
+	font-variant-numeric: tabular-nums;
+}
+
+.fopt:hover {
+	background: var(--hover);
+	color: var(--ink);
+}
+
+.fopt.on {
+	background: rgba(255, 255, 255, 0.12);
+	color: var(--ink);
+}
+
+.fopt:first-child {
+	grid-column: 1 / -1;
+}
+
+.empty {
+	color: var(--ink-3);
+	padding: 40px 0;
+}
+
+.vgrid {
+	position: relative;
+	contain: layout;
+}
+
+.vgrid > * {
+	position: absolute;
+	left: 0;
+	top: 0;
+}
+
+.vgrid.tracks .trk {
+	height: 48px;
+	min-height: 0;
+}
+
+.artist-list.vgrid {
+	display: block;
+}
+
+#az {
+	position: absolute;
+	top: 44px;
+	right: calc(var(--panel-w) + 10px + var(--edge-r));
+	bottom: calc(118px + var(--safe-b));
+	width: 30px;
+	z-index: 3;
+	display: none;
+	flex-direction: column;
+	justify-content: center;
+	padding: 6px 0;
+	border-radius: 999px;
+	background: rgba(12, 11, 16, 0.35);
+	border: 1px solid var(--line);
+	backdrop-filter: blur(16px);
+}
+
+body.has-az #az {
+	display: flex;
+}
+
+#az button {
+	flex: 0 1 18px;
+	min-height: 0;
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--ink-3);
+	line-height: 1;
+	border-radius: 6px;
+	overflow: hidden;
+	transform: scale(1) rotate(0deg);
+	transition:
+		color 0.15s,
+		transform 0.15s var(--ease);
+}
+
+#az button:hover {
+	color: var(--ink);
+	transform: scale(1.35) rotate(0.02deg);
+}
+
+#az button.cur {
+	color: var(--accent);
+}
+
+.smart-ico {
+	display: inline-grid;
+	vertical-align: -2px;
+	margin-right: 8px;
+	color: var(--accent);
+}
+
+.smart-ico svg {
+	width: 17px;
+	height: 17px;
+}
+
+.smart-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--ink-2);
+}
+
+.smart-line svg {
+	width: 16px;
+	height: 16px;
+	color: var(--accent);
+}
+
+.genres a {
+	cursor: pointer;
+}
+
+.genres a:hover {
+	color: var(--ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.time {
+	font-size: 11.5px;
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+	width: 36px;
+	flex: none;
+	text-align: center;
+}
+
+.icon-btn.sm {
+	width: 32px;
+	height: 32px;
+}
+
+.icon-btn.sm svg {
+	width: 17px;
+	height: 17px;
+}

@@ -1,0 +1,110 @@
+/* Connection problems, first-run errors and the first-sync progress screen. */
+
+#connection-note {
+	position: fixed;
+	top: calc(18px + var(--safe-t));
+	left: 50%;
+	z-index: 12;
+	display: flex;
+	white-space: nowrap;
+	max-width: calc(100vw - 32px);
+	align-items: center;
+	gap: 10px;
+	padding: 8px 8px 8px 14px;
+	border-radius: 999px;
+	background: rgba(20, 18, 24, 0.94);
+	box-shadow:
+		0 0 0 1px rgba(246, 243, 238, 0.08),
+		0 14px 34px -16px rgba(0, 0, 0, 0.9);
+	color: var(--ink-2);
+	font-size: 13px;
+	transform: translateX(-50%);
+	animation: connection-note-in 0.3s var(--ease);
+}
+#connection-note .cn-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #f0a35e;
+}
+#connection-note button {
+	padding: 5px 12px;
+	border-radius: 999px;
+	background: rgba(246, 243, 238, 0.1);
+	color: var(--ink);
+	font-weight: 600;
+	font-size: 12.5px;
+}
+#connection-note button:hover {
+	background: rgba(246, 243, 238, 0.18);
+}
+#connection-note button:disabled {
+	opacity: 0.6;
+}
+@keyframes connection-note-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, -8px);
+	}
+}
+.first-run-problem {
+	max-width: 520px;
+	padding: 120px 0;
+}
+.first-run-problem p {
+	margin: 14px 0 24px;
+	color: var(--ink-3);
+	font-size: 15px;
+	line-height: 1.5;
+}
+img.img-broken {
+	visibility: hidden;
+}
+
+.first-sync {
+	max-width: 520px;
+	padding: 120px 0;
+}
+.first-sync > p {
+	margin: 14px 0 28px;
+	color: var(--ink-3);
+	font-size: 15px;
+	line-height: 1.5;
+}
+.first-sync .fs-bar {
+	height: 4px;
+	border-radius: 999px;
+	background: rgba(246, 243, 238, 0.08);
+	overflow: hidden;
+}
+.first-sync .fs-bar i {
+	display: block;
+	height: 100%;
+	background: var(--accent);
+	transform-origin: left;
+	transition: transform 0.5s var(--ease);
+}
+.first-sync ul {
+	display: flex;
+	gap: 32px;
+	margin: 22px 0 0;
+	padding: 0;
+	list-style: none;
+	font-size: 15px;
+	font-variant-numeric: tabular-nums;
+	color: var(--ink);
+}
+.first-sync li span {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+.first-sync .fs-stage {
+	margin: 26px 0 0;
+	color: var(--ink-3);
+	font-size: 13px;
+}

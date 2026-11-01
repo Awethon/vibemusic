@@ -1,3 +1,5 @@
+/* Phone layout: applied on top of everything else when body has the phone class. */
+
 body.phone {
 	--tabs-h: 58px;
 	--dock-h: 60px;

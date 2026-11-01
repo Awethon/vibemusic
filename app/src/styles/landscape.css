@@ -1,0 +1,25 @@
+/* Phones in landscape: keep clear of the camera island and screen edges. */
+
+body.island-left {
+	--edge-r: min(var(--safe-r), 12px);
+}
+body.island-right {
+	--edge-l: min(var(--safe-l), 12px);
+}
+
+@media (pointer: coarse) and (max-height: 520px) {
+	#main {
+		padding: 20px 24px 104px 16px;
+	}
+	#rail {
+		top: max(8px, var(--safe-t));
+		bottom: max(8px, var(--safe-b));
+	}
+	#panel {
+		top: max(8px, var(--safe-t));
+		bottom: max(8px, var(--safe-b));
+	}
+	#dock {
+		bottom: max(8px, var(--safe-b));
+	}
+}

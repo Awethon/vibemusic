@@ -1,0 +1,278 @@
+/* The release timeline page. */
+
+.tl-view {
+	max-width: none;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.tl-title {
+	margin-bottom: 18px;
+	font-size: clamp(32px, 3vw, 44px);
+}
+
+body.timeline-view #dock {
+	display: none;
+}
+
+body.timeline-view #main {
+	padding-bottom: 28px;
+}
+
+.tl {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.tl-scroll {
+	position: relative;
+	flex: 1;
+	min-height: 320px;
+	overflow: auto;
+	border-radius: 18px;
+	background: var(--glass);
+	border: 1px solid var(--line);
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+	cursor: grab;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.tl-scroll:active {
+	cursor: grabbing;
+}
+
+.tl-canvas {
+	position: relative;
+}
+
+.tl-grid {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.tl-grid i {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: rgba(255, 255, 255, 0.035);
+}
+
+.tl-grid i.major {
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.tl-head {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	height: var(--hh);
+	background: linear-gradient(to bottom, rgba(10, 10, 14, 0.5), rgba(10, 10, 14, 0));
+}
+
+.tl-corner {
+	position: sticky;
+	left: 0;
+	width: var(--lw);
+	height: 100%;
+	background: rgba(16, 13, 19, 0.5);
+	backdrop-filter: blur(18px) saturate(1.2);
+	border-right: 1px solid var(--line);
+}
+
+.tl-mark {
+	position: absolute;
+	top: 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-left: 8px;
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+.tl-mark b {
+	font-family: var(--display);
+	font-weight: 300;
+	font-size: 15px;
+	color: var(--ink-3);
+	letter-spacing: -0.01em;
+}
+
+.tl-mark.major b {
+	font-size: 21px;
+	color: var(--ink);
+}
+
+.tl-mark span {
+	font-size: 11px;
+	color: var(--ink-3);
+}
+
+.tl-lane {
+	position: relative;
+	height: var(--lh);
+	transition: opacity 0.2s;
+}
+
+.tl-lane + .tl-lane {
+	border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tl-lane.dim .tl-item,
+.tl-lane.dim .tl-line {
+	opacity: 0.25;
+}
+
+.tl-line {
+	position: absolute;
+	top: 50%;
+	height: 1px;
+	background: rgba(255, 255, 255, 0.14);
+	transition: background 0.2s;
+}
+
+.tl-lane.hi .tl-line {
+	background: var(--accent);
+}
+
+.tl-label {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 3px;
+	width: var(--lw);
+	height: 100%;
+	padding: 0 18px 0 20px;
+	background: rgba(16, 13, 19, 0.4);
+	backdrop-filter: blur(18px) saturate(1.2);
+	border-right: 1px solid var(--line);
+}
+
+.tl-label b {
+	font-weight: 500;
+	font-size: 14.5px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.tl-label span {
+	font-size: 12px;
+	color: var(--ink-3);
+	white-space: nowrap;
+}
+
+a.tl-label:hover b {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.tl-label.plain b {
+	font-style: italic;
+	color: var(--ink-2);
+}
+
+.tl-item {
+	position: absolute;
+	top: calc((var(--lh) - var(--cv)) / 2);
+	width: var(--cv);
+	height: var(--cv);
+	padding: 0;
+	border-radius: 7px;
+	overflow: hidden;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	transform: scale(1) rotate(0deg);
+	transition:
+		transform 0.18s,
+		opacity 0.2s;
+}
+
+.tl-item img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.tl-item:hover {
+	transform: scale(1.08) rotate(0.02deg);
+	z-index: 1;
+}
+
+.tl-era {
+	position: absolute;
+	right: 28px;
+	bottom: 52px;
+	font-family: var(--display);
+	font-weight: 200;
+	font-size: clamp(56px, 9vw, 128px);
+	line-height: 1;
+	letter-spacing: -0.04em;
+	color: rgba(255, 255, 255, 0.05);
+	pointer-events: none;
+}
+
+.tl-mini {
+	position: relative;
+	height: 34px;
+	margin-top: 10px;
+	border-radius: 10px;
+	background: var(--glass);
+	border: 1px solid var(--line);
+	cursor: pointer;
+	overflow: hidden;
+	touch-action: none;
+}
+
+.tl-mini canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.tl-window {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	border-radius: 9px;
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.06);
+	pointer-events: none;
+}
+
+.tl-tip {
+	position: fixed;
+	z-index: 20;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-width: 280px;
+	padding: 8px 12px;
+	border-radius: 10px;
+	background: rgba(16, 16, 22, 0.92);
+	border: 1px solid var(--line);
+	backdrop-filter: blur(16px);
+	pointer-events: none;
+	font-size: 12.5px;
+}
+
+.tl-tip b {
+	font-weight: 500;
+	font-size: 13.5px;
+}
+
+.tl-tip span {
+	color: var(--ink-3);
+}

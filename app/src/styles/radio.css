@@ -1,0 +1,160 @@
+/* The radio stations page. */
+
+.radio-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+}
+
+.radio-card {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 14px;
+	border-radius: 20px;
+	text-align: left;
+	background: rgba(12, 11, 16, 0.26);
+	border: 1px solid var(--line);
+	transition:
+		background 0.2s,
+		border-color 0.2s;
+}
+
+.radio-card:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.radio-card.on {
+	border-color: var(--line-2);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.radio-art {
+	position: relative;
+	flex: none;
+	width: 88px;
+	height: 88px;
+	border-radius: 14px;
+	overflow: hidden;
+}
+
+.radio-play {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.35);
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.radio-play svg {
+	width: 28px;
+	height: 28px;
+}
+
+.radio-card:hover .radio-play,
+.radio-card.on .radio-play {
+	opacity: 1;
+}
+
+.radio-text {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+
+.radio-text b {
+	font-weight: 600;
+	font-size: 16px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.radio-text small {
+	font-size: 13px;
+	color: var(--ink-3);
+}
+
+.radio-song {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 6px;
+	font-size: 13px;
+	color: var(--ink-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.radio-add {
+	border-style: dashed;
+}
+
+.radio-add .cover-icon {
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.radio-form {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 12px;
+	grid-column: span 2;
+	max-width: 620px;
+}
+
+.radio-form > b {
+	font-weight: 600;
+	font-size: 16px;
+}
+
+.radio-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 12.5px;
+	color: var(--ink-3);
+}
+
+.radio-form label small {
+	display: inline;
+	font-size: 11.5px;
+	color: var(--ink-4);
+}
+
+.radio-form input {
+	height: 40px;
+	padding: 0 12px;
+	border-radius: 12px;
+	border: 1px solid var(--line-2);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--ink);
+	font: 500 14px var(--ui);
+	outline: none;
+}
+
+.radio-form input:focus {
+	border-color: var(--accent);
+}
+
+.radio-problem {
+	margin: 0;
+	color: #ff9a9a;
+	font-size: 13px;
+}
+
+.radio-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 8px;
+}
+
+@media (max-width: 760px) {
+	.radio-form {
+		grid-column: auto;
+	}
+}

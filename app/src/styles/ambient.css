@@ -1,0 +1,91 @@
+/* The idle screen that fades in over the app after a while without input. */
+
+#ambient {
+	position: fixed;
+	left: calc(clamp(48px, 6vw, 110px) + var(--edge-l));
+	bottom: calc(clamp(48px, 9vh, 110px) + var(--safe-b));
+	right: calc(48px + var(--edge-r));
+	z-index: 4;
+	display: flex;
+	align-items: flex-end;
+	gap: 36px;
+	opacity: 0;
+	transform: translateY(16px);
+	transition:
+		opacity 1.4s var(--ease),
+		transform 1.4s var(--ease);
+	pointer-events: none;
+}
+
+body.idle #ambient,
+body.now-open.fs-minimal #ambient {
+	opacity: 1;
+	transform: none;
+	transition-delay: 0.35s;
+}
+
+body.now-open.fs-minimal:not(.rest) #ambient {
+	transition-delay: 0s;
+	transform: translateY(-72px);
+}
+
+body.rest #capsule {
+	opacity: 0;
+	transform: translateY(12px);
+	pointer-events: none;
+}
+
+#ambient > img,
+#ambient > .cover-icon {
+	flex: none;
+	width: clamp(180px, 18vw, 260px);
+	height: auto;
+	aspect-ratio: 1;
+	object-fit: cover;
+	border-radius: 14px;
+	box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8);
+}
+
+.amb-text {
+	min-width: 0;
+	max-width: 900px;
+	padding-bottom: 6px;
+}
+
+.amb-artist {
+	margin: 0 0 8px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ink-2);
+	letter-spacing: 0.02em;
+	text-shadow: var(--shadow-text);
+}
+
+#ambient h2 {
+	margin: 0;
+	overflow-wrap: anywhere;
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: clamp(34px, 3.6vw, 56px);
+	line-height: 1.04;
+	letter-spacing: -0.03em;
+	text-shadow: var(--shadow-text);
+}
+
+.amb-line {
+	margin: 22px 0 0;
+	font-family: var(--display);
+	font-weight: 300;
+	font-size: clamp(18px, 1.6vw, 24px);
+	color: var(--ink-2);
+	min-height: 1.3em;
+	text-shadow: var(--shadow-text);
+	transition:
+		opacity 0.5s var(--ease),
+		transform 0.5s var(--ease);
+}
+
+.amb-line.swap {
+	opacity: 0;
+	transform: translateY(6px);
+}

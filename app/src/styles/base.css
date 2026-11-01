@@ -1,0 +1,81 @@
+/* Colour and spacing tokens, resets, and the base look of buttons, links and images. */
+
+:root {
+	--safe-t: env(safe-area-inset-top, 0px);
+	--safe-r: env(safe-area-inset-right, 0px);
+	--safe-b: env(safe-area-inset-bottom, 0px);
+	--safe-l: env(safe-area-inset-left, 0px);
+	--edge-l: var(--safe-l);
+	--edge-r: var(--safe-r);
+	--rail-w: 196px;
+	--panel-w: 0px;
+	--rail-p: 1;
+	--rail-l: 1;
+	--ink: #f6f3ee;
+	--ink-2: rgba(246, 243, 238, 0.72);
+	--ink-3: rgba(246, 243, 238, 0.5);
+	--ink-4: rgba(246, 243, 238, 0.28);
+	--glass: rgba(12, 11, 16, 0.42);
+	--glass-strong: rgba(12, 11, 16, 0.7);
+	--line: rgba(255, 255, 255, 0.08);
+	--line-2: rgba(255, 255, 255, 0.14);
+	--hover: rgba(255, 255, 255, 0.07);
+	--accent: #d9c8ff;
+	--ui: 'Onest', system-ui, sans-serif;
+	--display: 'Unbounded', 'Onest', system-ui, sans-serif;
+	--ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+	--focus-fade: 0.45s;
+	--focus-return: 0.25s;
+	--focus-leave: 0.2s;
+	--shadow-text: 0 1px 18px rgba(0, 0, 0, 0.35);
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+	background: #0a090d;
+	color: var(--ink);
+	font-family: var(--ui);
+	font-size: 14px;
+	-webkit-font-smoothing: antialiased;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+#dock,
+#phoneDock,
+#tabs {
+	touch-action: none;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+img {
+	display: block;
+}
+
+:focus-visible {
+	outline: 1.5px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 8px;
+}
