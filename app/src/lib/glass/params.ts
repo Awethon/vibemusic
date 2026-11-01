@@ -46,12 +46,12 @@ export const RENDER = Object.freeze({
 	minBlurPx: 6,
 	blurStepPerPx: 3 / 16,
 	shininess: 60,
-	// Resolution of the glass and of the page copy behind it, as a cap on devicePixelRatio. The
-	// cost is per pixel and every glass repaints while the page under it moves, so 2x on a Retina
-	// screen dropped to about 45 fps with a popup open; 1.5x glass with a 1x copy held 60 fps.
-	// The copy only shows through refraction and tint, so its lower resolution is hard to see.
-	maxPixelRatio: 1.5,
-	backdropPixelRatio: 1
+	// Resolution of the glass and of the page copy behind it, as a cap on devicePixelRatio: 2 is
+	// native on Retina screens, so the glass matches the page pixel for pixel. Higher-density
+	// screens are capped because the cost is per pixel. With the surface baked (renderer.ts), a
+	// large glass layer at 2x takes about 3.6 ms of GPU time instead of 10.
+	maxPixelRatio: 2,
+	backdropPixelRatio: 2
 });
 
 export const BASE: GlassParams = {
