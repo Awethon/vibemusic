@@ -22,6 +22,8 @@
 	--ui: 'Onest', system-ui, sans-serif;
 	--display: 'Unbounded', 'Onest', system-ui, sans-serif;
 	--ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+	--focus-fade: 0.45s;
+	--focus-return: 0.25s;
 	--shadow-text: 0 1px 18px rgba(0, 0, 0, 0.35);
 	color-scheme: dark;
 }
@@ -268,7 +270,7 @@ body.panel-open { --panel-w: 376px; }
 	gap: 30px 22px;
 }
 
-.tile { display: block; width: 100%; min-width: 0; text-align: left; transition: opacity 0.35s var(--ease); }
+.tile { display: block; width: 100%; min-width: 0; text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
 
 .tile .art {
 	display: block;
@@ -285,7 +287,9 @@ body.panel-open { --panel-w: 376px; }
 
 .tile:hover .art { transform: translateY(-4px) scale(1.02); box-shadow: 0 22px 40px -16px rgba(0, 0, 0, 0.75); }
 
-.grid:has(.tile:hover) .tile:not(:hover), .vgrid:has(.tile:hover) .tile:not(:hover) { opacity: 0.5; }
+.grid:has(.tile:hover) .tile:not(:hover), .vgrid:has(.tile:hover) .tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
+
+.tile:hover, .pl-card:hover, .pl-tile:hover, .g-tile:hover { transition-delay: 0s; }
 
 .tile .t {
 	display: block;
@@ -433,9 +437,9 @@ body.is-playing .trk.playing .n::after { animation-play-state: running; }
 
 .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 28px; }
 
-.pl-card { text-align: left; transition: opacity 0.35s var(--ease); }
+.pl-card { text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
 
-.pl-grid:has(.pl-card:hover) .pl-card:not(:hover) { opacity: 0.5; }
+.pl-grid:has(.pl-card:hover) .pl-card:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
 .mosaic { display: grid; width: 100%; grid-template-columns: 1fr 1fr; aspect-ratio: 1; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 44px -20px rgba(0, 0, 0, 0.8); transition: transform 0.4s var(--ease); }
 
@@ -1049,9 +1053,9 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 
 
-.pl-tile { display: block; min-width: 0; text-align: left; transition: opacity 0.35s var(--ease); }
+.pl-tile { display: block; min-width: 0; text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
 
-.shelf:has(.pl-tile:hover) .pl-tile:not(:hover) { opacity: 0.5; }
+.shelf:has(.pl-tile:hover) .pl-tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
 .pl-tile .mosaic { border-radius: 12px; box-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.8); }
 
@@ -1113,13 +1117,13 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .bb-body .pl-row .mini-mosaic { width: calc(var(--row-h, 64px) - 8px); height: calc(var(--row-h, 64px) - 8px); }
 
-.g-tile { display: block; width: 100%; height: 100%; transition: opacity 0.35s var(--ease); }
+.g-tile { display: block; width: 100%; height: 100%; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
 
 .g-tile .mosaic { border-radius: 12px; box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.8); }
 
 .g-tile:hover .mosaic { transform: translateY(-3px); }
 
-.bb-body.tiles:has(.g-tile:hover) .g-tile:not(:hover) { opacity: 0.5; }
+.bb-body.tiles:has(.g-tile:hover) .g-tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
 .album-main { min-width: 0; }
 
