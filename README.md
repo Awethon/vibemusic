@@ -70,6 +70,16 @@ All of them use Docker Compose, and most of the work is done by `./setup.sh`.
 - [The relay](docs/relay.md): what it does, and which outside services it asks about your music.
 - [Development](docs/development.md): running the app and relay from source.
 
+## Built with AI
+
+vibemusic was implemented entirely by AI. Claude, Anthropic's model, working in Claude Code, wrote
+all of the code, the tests and these docs. The person behind the project decided what to build
+and how it should look and feel, made the design calls, reviewed the results and uses it every
+day on their own server, but didn't write the code by hand.
+
+So read it as you would any young project: the tests and checks in [Development](docs/development.md)
+cover a lot, not everything, and bug reports are welcome.
+
 ## License
 
 vibemusic is free software under the [GNU Affero General Public License v3.0 or later](LICENSE).
