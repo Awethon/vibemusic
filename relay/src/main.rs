@@ -6,6 +6,7 @@ mod deezer;
 mod enrich;
 mod hub;
 mod musicbrainz;
+mod protocol;
 mod radio;
 mod radio_meta;
 mod share;
@@ -22,13 +23,12 @@ use axum::extract::{Path, Query, State};
 use axum::response::Response;
 use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
-use serde_json::{Value, json};
 use tokio::sync::mpsc::unbounded_channel;
 
 use auth::Navidrome;
-use enrich::{EnrichRequest, Enricher};
+use enrich::Enricher;
 use hub::Hub;
+use protocol::{ClientMessage, ServerMessage};
 
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
 const PING_EVERY: Duration = Duration::from_secs(25);
@@ -44,8 +44,6 @@ struct App {
     shares: Arc<share::Shares>,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct Hello {
     token: String,
     device_id: String,
@@ -133,11 +131,10 @@ async fn upgrade(State(app): State<App>, upgrade: WebSocketUpgrade) -> Response 
 async fn read_hello(socket: &mut WebSocket) -> Option<Hello> {
     let message = tokio::time::timeout(HELLO_TIMEOUT, socket.recv()).await.ok()??.ok()?;
     let Message::Text(text) = message else { return None };
-    let value: Value = serde_json::from_str(&text).ok()?;
-    if value["type"] != "hello" {
+    let Ok(ClientMessage::Hello { token, device_id, name }) = serde_json::from_str(&text) else {
         return None;
-    }
-    let hello: Hello = serde_json::from_value(value).ok()?;
+    };
+    let hello = Hello { token, device_id, name };
     let valid = !hello.device_id.is_empty() && hello.device_id.chars().count() <= MAX_DEVICE_ID_CHARS;
     valid.then_some(hello)
 }
@@ -148,7 +145,7 @@ async fn serve(app: App, mut socket: WebSocket) {
     };
     let Some(user) = app.navidrome.user_of(&hello.token).await else {
         let _ = socket
-            .send(Message::Text(json!({ "type": "unauthorized" }).to_string().into()))
+            .send(Message::Text(ServerMessage::Unauthorized.to_text().into()))
             .await;
         return;
     };
@@ -178,16 +175,13 @@ async fn serve(app: App, mut socket: WebSocket) {
     });
     while let Some(Ok(message)) = stream.next().await {
         let Message::Text(text) = message else { continue };
-        let Ok(value) = serde_json::from_str::<Value>(&text) else {
-            continue;
-        };
-        if value["type"] == "enrich" {
-            if let Ok(request) = serde_json::from_value::<EnrichRequest>(value) {
+        match serde_json::from_str::<ClientMessage>(&text) {
+            Ok(ClientMessage::Enrich(request)) => {
                 let _ = replies.send(app.enricher.request(request));
             }
-            continue;
+            Ok(message) => app.hub.lock().unwrap().receive(&user, &hello.device_id, message),
+            Err(error) => tracing::debug!(%error, "ignored a message the relay does not understand"),
         }
-        app.hub.lock().unwrap().receive(&user, &hello.device_id, &value);
     }
     app.hub.lock().unwrap().leave(&user, &hello.device_id, connection);
     writer.abort();

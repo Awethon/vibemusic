@@ -1,9 +1,24 @@
 import { session } from '../session.svelte.ts';
-import type { Enrichment } from '../library/snapshot.ts';
+import type { Enrichment, EnrichmentRequest } from '../library/snapshot.ts';
 import { randomId } from '../randomId.ts';
 import { REMOTE } from '../tuning.ts';
 
 export type Device = { id: string; name: string; online: boolean };
+
+// The relay's WebSocket protocol. relay/src/protocol.rs defines the same messages on the
+// server side and explains the flow; change both together. Queue, playback and command bodies
+// are this app's own types; the relay stores and forwards them without reading them.
+
+export type RelayRequest =
+	| { type: 'hello'; token: string; deviceId: string; name: string }
+	| { type: 'ping' }
+	| { type: 'claim' }
+	| { type: 'queue'; queue: unknown }
+	| { type: 'playback'; playback: unknown }
+	| { type: 'command'; command: unknown }
+	| { type: 'transfer'; to: string }
+	| { type: 'handoff'; to: string | null; queue: unknown; playback: unknown }
+	| ({ type: 'enrich' } & EnrichmentRequest);
 
 export type RelayMessage =
 	| { type: 'welcome'; devices: Device[]; active: string | null; queue: unknown; playback: unknown; ageMs: number }
@@ -106,7 +121,7 @@ function connect() {
 	const current = new WebSocket(url);
 	socket = current;
 	current.addEventListener('open', () => {
-		current.send(JSON.stringify({ type: 'hello', token, deviceId: relay.deviceId, name: deviceName() }));
+		current.send(JSON.stringify({ type: 'hello', token, deviceId: relay.deviceId, name: deviceName() } satisfies RelayRequest));
 	});
 	current.addEventListener('message', (event) => {
 		const message = JSON.parse(event.data as string) as RelayMessage;
@@ -138,7 +153,7 @@ export async function startRelay(onMessage: (message: RelayMessage) => void) {
 	setInterval(() => sendToRelay({ type: 'ping' }), REMOTE.keepAliveMs);
 }
 
-export function sendToRelay(message: object) {
+export function sendToRelay(message: RelayRequest) {
 	if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 
