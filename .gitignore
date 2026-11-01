@@ -12,4 +12,5 @@ dev/samples/
 
 # Local setup from .env.example
 /.env
+/navidrome.env
 /music/

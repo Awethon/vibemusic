@@ -1,7 +1,8 @@
 #!/bin/sh
-# Sets vibemusic up with docker compose: writes .env from .env.example, starts everything, and can
-# create the Navidrome account the relay uses for "This is" playlists. Safe to run again: it keeps
-# an existing .env and only offers the steps that are still missing.
+# Sets vibemusic up with docker compose: writes .env from .env.example (and navidrome.env for the
+# bundled Navidrome), starts everything, and can create the Navidrome account the relay uses for
+# "This is" playlists. Safe to run again: it keeps existing files and only offers the steps that
+# are still missing.
 set -eu
 
 cd "$(dirname "$0")"
@@ -26,14 +27,14 @@ env_value() {
 	sed -n "s/^$1=//p" .env | tail -n 1
 }
 
-# Sets KEY=value in .env, replacing an existing line or a commented-out example of it.
+# set_env FILE KEY value: replaces an existing line or a commented-out example of it.
 set_env() {
-	escaped=$(printf '%s' "$2" | sed 's/[\\&|]/\\&/g')
-	if grep -q "^#* *$1=" .env; then
-		# Rewritten in place so .env keeps its owner-only permissions.
-		sed "s|^#* *$1=.*|$1=$escaped|" .env >.env.tmp && cat .env.tmp >.env && rm .env.tmp
+	escaped=$(printf '%s' "$3" | sed 's/[\\&|]/\\&/g')
+	if grep -q "^#* *$2=" "$1"; then
+		# Rewritten in place so the file keeps its owner-only permissions.
+		sed "s|^#* *$2=.*|$2=$escaped|" "$1" >"$1.tmp" && cat "$1.tmp" >"$1" && rm "$1.tmp"
 	else
-		printf '%s=%s\n' "$1" "$2" >>.env
+		printf '%s=%s\n' "$2" "$3" >>"$1"
 	fi
 }
 
@@ -64,19 +65,33 @@ else
 		while [ -z "$navidrome" ]; do
 			ask navidrome "Navidrome's address as Docker containers reach it (e.g. http://192.168.1.10:4533)" ""
 		done
-		set_env NAVIDROME_URL "$navidrome"
-		set_env COMPOSE_PROFILES relay
+		set_env .env NAVIDROME_URL "$navidrome"
+		set_env .env COMPOSE_PROFILES relay
+		echo "For share links, set ND_ENABLESHARING=true in your Navidrome, and ND_SHAREURL to vibemusic's"
+		echo "public address if you have one."
 		;;
 	*)
 		ask music "Your music folder" "./music"
-		set_env MUSIC_FOLDER "$music"
-		set_env COMPOSE_PROFILES relay,navidrome
+		set_env .env MUSIC_FOLDER "$music"
+		set_env .env COMPOSE_PROFILES relay,navidrome
 		;;
 	esac
 	ask port "Port for vibemusic on this machine" "8080"
-	set_env VIBEMUSIC_PORT "$port"
+	set_env .env VIBEMUSIC_PORT "$port"
 	echo "Wrote .env. Every other setting is optional; see the comments in it."
 fi
+
+case ",$(env_value COMPOSE_PROFILES)," in
+*,navidrome,*)
+	if [ ! -f navidrome.env ]; then
+		cp navidrome.env.example navidrome.env
+		chmod 600 navidrome.env
+		ask public "Public address for vibemusic, if you have a domain (e.g. https://music.example.com)" ""
+		[ -z "$public" ] || set_env navidrome.env ND_SHAREURL "$public"
+		echo "Wrote navidrome.env, for Navidrome's own options."
+	fi
+	;;
+esac
 
 port=$(env_value VIBEMUSIC_PORT)
 base="http://localhost:${port:-8080}"
@@ -149,7 +164,7 @@ case "$status" in
 	;;
 esac
 
-set_env VIBEMUSIC_RELAY_NAVIDROME_USER "$relay_user"
-set_env VIBEMUSIC_RELAY_NAVIDROME_PASSWORD "$relay_password"
+set_env .env VIBEMUSIC_RELAY_NAVIDROME_USER "$relay_user"
+set_env .env VIBEMUSIC_RELAY_NAVIDROME_PASSWORD "$relay_password"
 docker compose up -d relay
 echo "Created the account '$relay_user' and restarted the relay. \"This is\" playlists appear after its first run."

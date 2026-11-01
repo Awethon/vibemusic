@@ -38,24 +38,30 @@ services:
     restart: unless-stopped
     environment:
       - NAVIDROME_URL=${NAVIDROME_URL:-http://navidrome:4533}
-      - ENRICHMENT_SOURCES=${ENRICHMENT_SOURCES:-musicbrainz,deezer,apple}
+      # "-" rather than ":-": set but empty means "ask no service".
+      - ENRICHMENT_SOURCES=${ENRICHMENT_SOURCES-musicbrainz,deezer,apple}
       - APPLE_STOREFRONTS=${APPLE_STOREFRONTS:-us}
+      - APPLE_PAUSE_MS=${APPLE_PAUSE_MS:-}
       - VIBEMUSIC_RELAY_NAVIDROME_USER=${VIBEMUSIC_RELAY_NAVIDROME_USER:-}
       - VIBEMUSIC_RELAY_NAVIDROME_PASSWORD=${VIBEMUSIC_RELAY_NAVIDROME_PASSWORD:-}
       - THIS_IS_SKIP=${THIS_IS_SKIP:-}
+      - THIS_IS_MIN_TRACKS=${THIS_IS_MIN_TRACKS:-}
+      - THIS_IS_MAX_TRACKS=${THIS_IS_MAX_TRACKS:-}
+      - THIS_IS_EVERY_HOURS=${THIS_IS_EVERY_HOURS:-}
+      - RADIO_LOCAL_PROXY=${RADIO_LOCAL_PROXY:-}
       - RUST_LOG=${RELAY_LOG:-info}
     volumes:
       - relay-data:/data
 
   # For a new setup. Skip this profile to use a Navidrome you already run (set NAVIDROME_URL).
+  # Its own options (ND_*) go in navidrome.env; see navidrome.env.example.
   navidrome:
     image: deluan/navidrome:0.64.2
     profiles: [navidrome]
     restart: unless-stopped
-    environment:
-      - ND_ENABLESHARING=true
-      - ND_ENABLEINSIGHTSCOLLECTOR=false
-      - ND_SCANSCHEDULE=${NAVIDROME_SCAN_SCHEDULE:-1h}
+    env_file:
+      - path: ./navidrome.env
+        required: false
     volumes:
       - ${MUSIC_FOLDER:-./music}:/music:ro
       - navidrome-data:/data
