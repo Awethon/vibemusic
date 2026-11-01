@@ -105,7 +105,7 @@ export const BENTO = Object.freeze({
 	phoneListRows: 5,
 	phoneGenreColumns: 3,
 	phoneGenreRows: 2,
-	genreTileMaxSizePx: 150,
+	genreTileMinPx: 104,
 	genreMaxColumns: 5,
 	genreMaxRows: 2,
 	listMaxColumns: 2,
