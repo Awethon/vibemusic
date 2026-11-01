@@ -292,7 +292,7 @@ body.panel-open { --panel-w: 376px; }
 
 .grid:hover .tile, .vgrid:hover .tile, .pl-grid:hover .pl-card, .shelf:hover .pl-tile, .bb-body.tiles:hover .g-tile { transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
 
-.grid:hover .tile:hover, .vgrid:hover .tile:hover, .pl-grid:hover .pl-card:hover, .shelf:hover .pl-tile:hover, .bb-body.tiles:hover .g-tile:hover { transition-delay: 0s; }
+.grid:hover .tile:hover, .vgrid:hover .tile:hover, .pl-grid:hover .pl-card:hover, .shelf:hover .pl-tile:hover, .bb-body.tiles:hover .g-tile:hover { transition: opacity var(--focus-leave) var(--ease); }
 
 .tile .t {
 	display: block;
