@@ -33,7 +33,8 @@ import {
 	removeQueued
 } from './queueActions.ts';
 import { isUnreachable } from '../connection.svelte.ts';
-import { showToast } from './state.svelte.ts';
+import { copyText } from './clipboard.ts';
+import { showShareLink, showToast } from './state.svelte.ts';
 
 const SEPARATOR: MenuItem = { separator: true };
 
@@ -81,13 +82,9 @@ async function share(ids: string[], description: string) {
 		showToast('Couldn’t create a share link');
 		return;
 	}
-	try {
-		await navigator.clipboard.writeText(url);
-		showToast('Share link copied');
-	} catch {
-		// Clipboard access can be denied (permissions, insecure context); show the link instead.
-		showToast(url);
-	}
+	// On plain http copying can fail this long after the click; then the link opens for copying by hand.
+	if (await copyText(url)) showToast('Share link copied');
+	else showShareLink(url);
 }
 
 const shareEntry = (ids: () => Promise<string[]> | string[], description: string): MenuItem => ({

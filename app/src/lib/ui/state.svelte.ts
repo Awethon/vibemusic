@@ -23,6 +23,8 @@ export const ui = $state({
 	filterPopover: null as { kind: FilterKind } | null,
 	queuePressed: false,
 	toast: '',
+	// A share link waiting to be copied by hand (see ShareLink.svelte); empty when closed.
+	shareLink: '',
 	toastVisible: false,
 	filters: { genres: [], decades: [] } as Filters,
 	albumSort: 'mostPlayed' as AlbumSort,
@@ -38,6 +40,14 @@ export function showToast(message: string) {
 	ui.toastVisible = true;
 	clearTimeout(toastTimer);
 	toastTimer = setTimeout(() => (ui.toastVisible = false), TOAST.visibleMs);
+}
+
+export function showShareLink(url: string) {
+	ui.shareLink = url;
+}
+
+export function closeShareLink() {
+	ui.shareLink = '';
 }
 
 export function setFullScreenStyle(style: FullScreenStyle) {

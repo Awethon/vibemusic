@@ -44,6 +44,7 @@
 	import SearchPalette from '#lib/ui/SearchPalette.svelte';
 	import { restoreMainScroll } from '#lib/ui/scrollRestore.ts';
 	import SettingsPopover from '#lib/ui/SettingsPopover.svelte';
+	import ShareLink from '#lib/ui/ShareLink.svelte';
 	import Toast from '#lib/ui/Toast.svelte';
 	import type { LayoutProps, Snapshot } from './$types';
 
@@ -136,6 +137,7 @@
 		<SearchPalette />
 		<RemoteBanner />
 		<ConnectionNote />
+		<ShareLink />
 		<Toast />
 	{/if}
 {/if}

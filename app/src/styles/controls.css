@@ -393,6 +393,39 @@
 		transform 0.25s var(--ease);
 }
 
+/* Share link popup (plain http fallback): sits where the toast appears. */
+#shareLink {
+	left: 50%;
+	bottom: 96px;
+	width: min(460px, calc(100vw - 32px));
+	padding: 8px 8px 10px;
+	translate: -50% 0;
+}
+
+.share-link-row {
+	display: flex;
+	gap: 8px;
+	margin: 0 2px;
+}
+
+.share-link-row input {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 12px;
+	border: 1px solid var(--line-2);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.06);
+	color: var(--ink);
+	font: 500 13px var(--ui);
+	outline: none;
+}
+
+.share-link-hint {
+	margin: 8px 4px 0;
+	font-size: 12px;
+	color: var(--ink-3);
+}
+
 #toast.on {
 	opacity: 1;
 	transform: translate(-50%, 0);

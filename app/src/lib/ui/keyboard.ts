@@ -4,10 +4,14 @@ import { playNextTrack, playPreviousTrack, seekBy, togglePlay } from '../player/
 import { PLAYBACK } from '../tuning.ts';
 import { anyMenuOpen, closeAllMenus } from './menu.svelte.ts';
 import { setFullScreen, toggleFullScreen, togglePanel, togglePanelTab } from './shell.ts';
-import { ui } from './state.svelte.ts';
+import { closeShareLink, ui } from './state.svelte.ts';
 
 // Escape peels off one layer at a time, top layer first.
 function closeTopmost() {
+	if (ui.shareLink) {
+		closeShareLink();
+		return true;
+	}
 	if (ui.searchOpen) {
 		ui.searchOpen = false;
 		previewPalette(null);
