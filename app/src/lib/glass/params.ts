@@ -130,22 +130,23 @@ export const DEFAULT_LOOK: GlassPreset = {
 	name: 'Default',
 	values: {
 		...BASE,
-		thick: 23,
+		thick: 30,
 		bevel: 11,
-		curve: 4.2,
-		cut: 0.05,
+		curve: 3,
+		cut: -0.07,
 		body: 0.1,
-		lens: 0.15,
+		lens: 0.2,
 		merge: 6,
 		ior: 1.82,
 		disp: 0.16,
-		light: -23,
+		light: -47,
 		elev: 26,
-		spec: 0,
-		refl: 0.85,
-		studio: 0.6,
-		rim: 0.3,
-		tintA: 0.82
+		spec: 0.05,
+		refl: 0.4,
+		studio: 0.58,
+		rim: 0.18,
+		tintA: 0.82,
+		shadow: 0
 	}
 };
 
