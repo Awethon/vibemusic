@@ -338,11 +338,11 @@ body.panel-open { --panel-w: 376px; }
 
 .stack { display: flex; }
 
-.stack img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; margin-left: -18px; box-shadow: -6px 0 16px rgba(0, 0, 0, 0.4); transition: transform 0.35s var(--ease); }
+.stack img, .stack .photo-pending { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; margin-left: -18px; box-shadow: -6px 0 16px rgba(0, 0, 0, 0.4); transition: transform 0.35s var(--ease); }
 
-.artist-row:hover .stack img { transform: translateX(-6px); }
+.artist-row:hover .stack img, .artist-row:hover .stack .photo-pending { transform: translateX(-6px); }
 
-.artist-row:hover .stack img:first-child { transform: none; }
+.artist-row:hover .stack img:first-child, .artist-row:hover .stack .photo-pending:first-child { transform: none; }
 
 .btn {
 	display: inline-flex;
@@ -1631,6 +1631,8 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 	.share-meta p { margin-top: 2px; font-size: 13px; }
 	.share-queue { top: calc(44px + var(--safe-t)); bottom: calc(84px + var(--safe-b)); }
 }
+
+.photo-pending { display: block; width: 100%; height: 100%; }
 
 .cover-icon { display: grid; place-items: center; width: 100%; height: 100%; background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)); color: var(--ink); container-type: size; }
 

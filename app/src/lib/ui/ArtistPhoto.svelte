@@ -52,5 +52,5 @@
 {:else if photo === null}
 	<Cover albumId={fallbackAlbumId} {size} />
 {:else}
-	<img style={placeholder} alt="" draggable="false" />
+	<span class="photo-pending" style={placeholder}></span>
 {/if}
