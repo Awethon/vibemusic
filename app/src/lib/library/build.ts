@@ -9,6 +9,7 @@ import { createGenreResolver, regionalGenres, withAncestors } from '../genres/ge
 import { songRanks } from '../genres/titles.ts';
 import { GENRE_EVIDENCE, GENRE_PLAYLISTS, HIDDEN_GENRE_PLAYLISTS } from '../tuning.ts';
 import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
+import { DEFAULT_SERVER_CONFIG, type GenrePlaylistConfig } from '../serverConfig.ts';
 import { KEPT_TABLES, normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
 
@@ -445,7 +446,7 @@ function refreshGenrePlaylists(db: Database): string[] {
 			rank: apple.get(row.artistId as string)?.(row.title as string) ?? null
 		};
 	});
-	const wanted = chooseGenres(songs).map(({ genre, songs: picked }) => {
+	const wanted = chooseGenres(songs, genreRules.rules, genreRules.hidden, genreRules.pinned).map(({ genre, songs: picked }) => {
 		const albumCount = new Set(picked.map((song) => song.albumId)).size;
 		const duration = picked.reduce((total, song) => total + (durations.get(song.id) ?? 0), 0);
 		return {
@@ -505,15 +506,39 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
+// Genre playlist rules: the defaults in tuning.ts, overridden by the instance's config.json
+// (serverConfig.ts). The worker sets them before handling any request.
+let genreRules = resolveGenreRules(DEFAULT_SERVER_CONFIG.genrePlaylists);
+
+function resolveGenreRules(config: GenrePlaylistConfig) {
+	return {
+		rules: {
+			...GENRE_PLAYLISTS,
+			...(config.maxPlaylists && { maxPlaylists: config.maxPlaylists }),
+			...(config.songCap && { songCap: config.songCap }),
+			...(config.minSongs && { rootMinSongs: config.minSongs, subMinSongs: config.minSongs }),
+			...(config.minArtists && { rootMinArtists: config.minArtists, subMinArtists: config.minArtists })
+		},
+		hidden: [...HIDDEN_GENRE_PLAYLISTS, ...config.hidden],
+		pinned: config.pinned
+	};
+}
+
+export function configureGenrePlaylists(config: GenrePlaylistConfig) {
+	genreRules = resolveGenreRules(config);
+}
+
 // Stored in meta. When it differs on load, refreshDerived rebuilds the derived tables without a
-// resync, so tuning changes apply to saved libraries. Bump `algorithm` when the derivation code
-// changes in a way the tuning values don't capture.
-const DERIVED_RULES = JSON.stringify({
-	algorithm: 10,
-	evidence: GENRE_EVIDENCE,
-	playlists: GENRE_PLAYLISTS,
-	hidden: HIDDEN_GENRE_PLAYLISTS
-});
+// resync, so tuning or config.json changes apply to saved libraries. Bump `algorithm` when the
+// derivation code changes in a way the rule values don't capture.
+const derivedRules = () =>
+	JSON.stringify({
+		algorithm: 11,
+		evidence: GENRE_EVIDENCE,
+		playlists: genreRules.rules,
+		hidden: genreRules.hidden,
+		pinned: genreRules.pinned
+	});
 
 function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 'tracks' | 'playlists'>, sync: SyncState): LibraryMeta {
 	const count = (table: string) => Number(db.selectValue(`select count(*) from ${table}`));
@@ -526,7 +551,7 @@ function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 
 	};
 	db.exec({
 		sql: 'insert or replace into meta values (?, ?), (?, ?), (?, ?), (?, ?)',
-		bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync), 'derived', DERIVED_RULES]
+		bind: ['meta', JSON.stringify(full), 'schema', String(SCHEMA_VERSION), 'sync', JSON.stringify(sync), 'derived', derivedRules()]
 	});
 	return full;
 }
@@ -773,7 +798,7 @@ export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState
 
 export function refreshDerived(db: Database, meta: LibraryMeta): LibraryMeta | null {
 	const sync = readSyncState(db);
-	if (!sync || db.selectValue("select value from meta where key = 'derived'") === DERIVED_RULES) return null;
+	if (!sync || db.selectValue("select value from meta where key = 'derived'") === derivedRules()) return null;
 	db.transaction(() => rebuildDerived(db));
 	return writeMeta(db, { version: new Date().toISOString(), syncedAt: meta.syncedAt, userId: meta.userId }, sync);
 }

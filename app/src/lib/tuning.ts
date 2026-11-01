@@ -332,7 +332,7 @@ export const SEARCH = Object.freeze({
 export const QUEUE_DRAG = Object.freeze({ startDistancePx: 4 });
 
 // Weights for choosing a track's genres from file tags, MusicBrainz tags and store genres.
-// Part of DERIVED_RULES in library/build.ts: changing it rebuilds genres in saved libraries.
+// Part of derivedRules() in library/build.ts: changing it rebuilds genres in saved libraries.
 export const GENRE_EVIDENCE = Object.freeze({
 	fileTagWeight: 1,
 	minTagShare: 0.4,
@@ -341,11 +341,13 @@ export const GENRE_EVIDENCE = Object.freeze({
 	minWeight: 1
 });
 
-// Genres never turned into genre playlists.
-export const HIDDEN_GENRE_PLAYLISTS: readonly string[] = Object.freeze(['Nu Metal']);
+// Genres never turned into genre playlists. Hosts add their own with VIBEMUSIC_GENRE_HIDDEN
+// (config.json, see serverConfig.ts).
+export const HIDDEN_GENRE_PLAYLISTS: readonly string[] = Object.freeze([]);
 
-// Which genres get a generated playlist and how its songs are picked and ordered.
-// Part of DERIVED_RULES in library/build.ts: changing it rebuilds genre playlists in saved libraries.
+// Which genres get a generated playlist and how its songs are picked and ordered. Some can be
+// overridden per instance in config.json (serverConfig.ts). Part of derivedRules() in
+// library/build.ts: changing them rebuilds genre playlists in saved libraries.
 export const GENRE_PLAYLISTS = Object.freeze({
 	rootMinSongs: 30,
 	rootMinArtists: 2,

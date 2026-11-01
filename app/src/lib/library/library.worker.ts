@@ -6,7 +6,17 @@ import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.or
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { LIBRARY_STORE, LIBRARY_SYNC } from '../tuning.ts';
-import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState, refreshDerived } from './build.ts';
+import {
+	applyChanges,
+	applyEnrichment,
+	buildLibrary,
+	configureGenrePlaylists,
+	enrichmentRequest,
+	readMeta,
+	readSyncState,
+	refreshDerived
+} from './build.ts';
+import { loadServerConfig } from '../serverConfig.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
@@ -25,9 +35,12 @@ let writing: Promise<unknown> = Promise.resolve();
 // Chunk hashes from the last save of each database, so the next save writes only changed chunks.
 const savedState = new WeakMap<Database, Saved>();
 
-const ready = sqlite3InitModule().then((module) => {
-	sqlite = module;
-});
+const ready = Promise.all([
+	sqlite3InitModule().then((module) => {
+		sqlite = module;
+	}),
+	loadServerConfig().then((config) => configureGenrePlaylists(config.genrePlaylists))
+]);
 
 // The schema version is part of the name, so a new app version never reads an incompatible file.
 const snapshotName = () => `library-${userId}-v${SCHEMA_VERSION}.sqlite`;
@@ -151,7 +164,7 @@ async function loadSnapshot() {
 		}
 		if (stored) savedState.set(database, stored.saved);
 		replaceDatabase(database);
-		// Genre/playlist rules may have changed since this file was saved (see DERIVED_RULES in build.ts).
+		// Genre/playlist rules may have changed since this file was saved (see derivedRules() in build.ts).
 		const refreshed = refreshDerived(database, meta);
 		if (refreshed || legacy) await writeSnapshot(database);
 		if (legacy) void removeLegacy();

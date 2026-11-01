@@ -51,7 +51,8 @@ function overlaps(ids: Set<string>, other: Set<string>) {
 export function chooseGenres(
 	songs: GenreSong[],
 	rules: Rules = GENRE_PLAYLISTS,
-	hidden: readonly string[] = HIDDEN_GENRE_PLAYLISTS
+	hidden: readonly string[] = HIDDEN_GENRE_PLAYLISTS,
+	pinned: readonly string[] = []
 ): GenrePlaylist[] {
 	const byGenre = new Map<string, GenreSong[]>();
 	for (const song of songs) {
@@ -61,12 +62,15 @@ export function chooseGenres(
 			else byGenre.set(genre, [song]);
 		}
 	}
-	// Broad genres first (fewest ancestors, then fewest descendants), so a sub-genre is only added
-	// later if it isn't mostly a copy of a playlist already chosen.
+	// Pinned genres first, whatever their size; then broad genres (fewest ancestors, then fewest
+	// descendants), so a sub-genre is only added later if it isn't mostly a copy of a playlist
+	// already chosen.
+	const isPinned = (genre: string) => pinned.includes(genre);
 	const candidates = [...byGenre]
-		.filter(([genre, members]) => !hidden.includes(genre) && qualifies(genre, members, rules))
+		.filter(([genre, members]) => !hidden.includes(genre) && (isPinned(genre) || qualifies(genre, members, rules)))
 		.toSorted(
 			([a, aSongs], [b, bSongs]) =>
+				Number(isPinned(b)) - Number(isPinned(a)) ||
 				withAncestors(a).length - withAncestors(b).length ||
 				descendantCount(a) - descendantCount(b) ||
 				bSongs.length - aSongs.length ||
@@ -77,15 +81,21 @@ export function chooseGenres(
 		if (chosen.length >= rules.maxPlaylists) break;
 		const ids = new Set(members.map((song) => song.id));
 		const ancestors = new Set(withAncestors(genre));
-		const repeats = chosen.some((other) =>
-			ancestors.has(other.genre)
-				? ids.size / other.ids.size >= rules.maxParentShare
-				: overlaps(ids, other.ids) / ids.size >= rules.maxSiblingShare
-		);
+		const repeats =
+			!isPinned(genre) &&
+			chosen.some((other) =>
+				ancestors.has(other.genre)
+					? ids.size / other.ids.size >= rules.maxParentShare
+					: overlaps(ids, other.ids) / ids.size >= rules.maxSiblingShare
+			);
 		if (repeats) continue;
 		const best = pickBest(members, rules);
+		if (!best.length) continue;
 		const picked = new Set(best.map((song) => song.id));
-		if (chosen.some((other) => !ancestors.has(other.genre) && overlaps(picked, other.picked) / picked.size >= rules.maxPickedShare))
+		if (
+			!isPinned(genre) &&
+			chosen.some((other) => !ancestors.has(other.genre) && overlaps(picked, other.picked) / picked.size >= rules.maxPickedShare)
+		)
 			continue;
 		chosen.push({ genre, ids, picked, best });
 	}

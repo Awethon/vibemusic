@@ -63,6 +63,17 @@ describe('genre playlists', () => {
 		expect(chooseGenres(library, GENRE_PLAYLISTS, ['Trap']).map((playlist) => playlist.genre)).toEqual(['Hip-Hop']);
 	});
 
+	it('always makes a playlist for a pinned genre, even a small one', () => {
+		const library = [...songs('Hip-Hop', 40, 4), ...songs('Classical', 15, 2)];
+		expect(chooseGenres(library, GENRE_PLAYLISTS, [], ['Classical']).map((playlist) => playlist.genre)).toEqual(['Classical', 'Hip-Hop']);
+	});
+
+	it('keeps a pinned subgenre over the parent it would repeat', () => {
+		expect(chooseGenres(songs('Nu Metal', 80, 6), GENRE_PLAYLISTS, [], ['Nu Metal']).map((playlist) => playlist.genre)).toEqual([
+			'Nu Metal'
+		]);
+	});
+
 	it('skips genres that are too small', () => {
 		expect(chosen([...songs('Hip-Hop', 40, 4), ...songs('Classical', 15, 2), ...songs('Jazz', 40, 1)])).toEqual(['Hip-Hop']);
 	});
