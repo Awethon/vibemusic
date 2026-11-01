@@ -3,7 +3,7 @@
 	// skips the app shell and library and runs its own small <audio> player against the relay
 	// (/relay/share) and Navidrome's public share endpoints (/share/img, /share/s).
 	import { page } from '$app/state';
-	import { medianCut } from '#lib/library/medianCut.ts';
+	import { coverPalette } from '#lib/library/coverPalette.ts';
 	import { PALETTE } from '#lib/tuning.ts';
 	import { accentFromPalette, vividFromPalette } from '#lib/ui/accent.ts';
 	import { setFaviconAccent } from '#lib/ui/favicon.svelte.ts';
@@ -114,7 +114,7 @@
 		const context = canvas.getContext('2d')!;
 		context.drawImage(bitmap, 0, 0);
 		bitmap.close();
-		const colors = medianCut(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data);
+		const colors = coverPalette(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data);
 		const rgb = accentFromPalette(colors);
 		return { accent: rgb ? `rgb(${rgb.map(Math.round).join(' ')})` : '', favicon: vividFromPalette(colors) };
 	}

@@ -263,7 +263,7 @@ export const PALETTE = Object.freeze({
 	trackChangeRate: 1.1,
 	revertDelayMs: 160,
 	coverColors: 5,
-	coverSamplePx: 64
+	coverSamplePx: 96
 });
 
 // Deriving the UI accent colour from the album palette. vivid* values are HSL, 0..1.

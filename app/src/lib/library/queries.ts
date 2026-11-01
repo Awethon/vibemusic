@@ -372,17 +372,23 @@ export async function search(
 export const timelineAlbums = () =>
 	query<TimelineAlbum>('select id, name, artist_id as artistId, artist, year from album order by year, name');
 
+// Palettes are stored under album id + this suffix. Bumping it makes every palette recompute when
+// the extraction changes, without rebuilding the library; rows under older suffixes are ignored.
+export const PALETTE_KEY_SUFFIX = '@2';
+
 export async function paletteLeads(): Promise<Map<string, string>> {
-	const rows = await query<{ albumId: string; colors: string }>('select album_id as albumId, colors from palette');
+	const rows = await query<{ key: string; colors: string }>('select album_id as key, colors from palette where album_id like ?', [
+		'%' + PALETTE_KEY_SUFFIX
+	]);
 	return new Map(
 		rows.flatMap((row) => {
 			const lead = (JSON.parse(row.colors) as string[])[0];
-			return lead ? [[row.albumId, lead] as const] : [];
+			return lead ? [[row.key.slice(0, -PALETTE_KEY_SUFFIX.length), lead] as const] : [];
 		})
 	);
 }
 
 export async function savedPalette(albumId: string): Promise<string[] | null> {
-	const rows = await query<{ colors: string }>('select colors from palette where album_id = ?', [albumId]);
+	const rows = await query<{ colors: string }>('select colors from palette where album_id = ?', [albumId + PALETTE_KEY_SUFFIX]);
 	return rows[0] ? (JSON.parse(rows[0].colors) as string[]) : null;
 }
