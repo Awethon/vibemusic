@@ -1095,7 +1095,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .artist-tile .art img { width: 100%; height: 100%; object-fit: cover; }
 
-.bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 16px; }
+.bento { display: grid; align-items: start; gap: 16px; }
 
 .bento-block { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 16px 18px 18px; border-radius: 20px; background: rgba(12, 11, 16, 0.26); border: 1px solid var(--line); }
 

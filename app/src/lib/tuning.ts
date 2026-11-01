@@ -101,11 +101,6 @@ export const SHELVES = Object.freeze({
 
 export const BENTO = Object.freeze({
 	minHeightPx: 360,
-	blockSpansByKindCount: Object.freeze({
-		1: [[4, 3]],
-		2: [[2, 3], [2, 3]],
-		3: [[2, 3], [2, 2], [2, 1]]
-	}),
 	genreTileGapPx: 12,
 	phoneListRows: 5,
 	phoneGenreColumns: 3,
