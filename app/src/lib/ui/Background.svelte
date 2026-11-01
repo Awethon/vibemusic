@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { idle } from '../engine/idle.svelte.ts';
 	import { attachField, followTrackPalette } from '../engine/palette.ts';
 	import { albumPalette } from '../library/palette.ts';
 	import { audioLive, currentTrack, sampleAudio } from '../player/player.svelte.ts';
 	import { FIELD, PALETTE } from '../tuning.ts';
-	import { createField, type Field } from '../visual/field.ts';
+	import { createAmber } from '../visual/amber.ts';
+	import { createField, type BackgroundRenderer } from '../visual/field.ts';
 	import { copyField } from '../visual/fieldSnapshot.ts';
 	import type { Rgb } from '../color.ts';
 	import { accentFromPalette, blendAccent, vividFromPalette } from './accent.ts';
@@ -37,7 +39,10 @@
 
 	$effect(() => {
 		if (!canvas) return;
-		let field: Field | null = null;
+		// Switching backgrounds recreates the canvas ({#key} below): the field may hold a WebGPU
+		// context, and a canvas can't change context type. The new canvas reruns this effect.
+		const style = untrack(() => ui.background);
+		let field: BackgroundRenderer | null = null;
 		let destroyed = false;
 		let frame = 0;
 		let lastFrame = performance.now();
@@ -73,7 +78,8 @@
 		};
 		const onVisibility = () => (document.hidden ? stop() : start());
 		const onResize = () => field?.resize();
-		void createField(canvas)
+		const surface = canvas;
+		void (style === 'amber' ? createAmber(surface).catch(() => createField(surface)) : createField(surface))
 			.then((created) => {
 				if (destroyed) return created.destroy();
 				field = created;
@@ -95,6 +101,8 @@
 	});
 </script>
 
-<div id="fieldBox" aria-hidden="true"><canvas id="field" bind:this={canvas}></canvas></div>
+<div id="fieldBox" aria-hidden="true">
+	{#key ui.background}<canvas id="field" bind:this={canvas}></canvas>{/key}
+</div>
 <svelte:window bind:innerWidth={viewportWidth} />
 <div id="scrim" aria-hidden="true" style:background={scrimBackground(viewportWidth)}></div>

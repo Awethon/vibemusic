@@ -6,12 +6,16 @@ export const FULL_SCREEN_STYLES = ['minimal', 'classic'] as const;
 export type FullScreenStyle = (typeof FULL_SCREEN_STYLES)[number];
 export type PanelTab = 'queue' | 'lyrics';
 export type FilterKind = 'genre' | 'decade';
+// 'field' is the drifting colour field (visual/field.ts); 'amber' is the caustics (visual/amber.ts).
+export const BACKGROUNDS = ['field', 'amber'] as const;
+export type BackgroundStyle = (typeof BACKGROUNDS)[number];
 
 export const ui = $state({
 	panelOpen: false,
 	panelTab: 'queue' as PanelTab,
 	fullScreen: false,
 	fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'minimal'),
+	background: readPreference('background', BACKGROUNDS, 'field'),
 	ripples: readPreference('ripples', ['on', 'off'] as const, 'off') === 'on',
 	railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
 	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
@@ -53,6 +57,11 @@ export function closeShareLink() {
 export function setFullScreenStyle(style: FullScreenStyle) {
 	ui.fullScreenStyle = style;
 	writePreference('fs', style);
+}
+
+export function setBackground(style: BackgroundStyle) {
+	ui.background = style;
+	writePreference('background', style);
 }
 
 export function setRipples(on: boolean) {

@@ -3,9 +3,9 @@
 // Previews revert after a delay so moving the pointer across gaps between tiles doesn't flicker.
 import { albumPalette } from '../library/palette.ts';
 import { PALETTE } from '../tuning.ts';
-import type { Field, FieldPaletteOptions } from '../visual/field.ts';
+import type { BackgroundRenderer, FieldPaletteOptions } from '../visual/field.ts';
 
-let field: Field | null = null;
+let field: BackgroundRenderer | null = null;
 let shownColors: string[] = [];
 let requestNumber = 0;
 let playingAlbumId = '';
@@ -16,7 +16,7 @@ const preview = {
 	revertTimer: undefined as ReturnType<typeof setTimeout> | undefined
 };
 
-export function attachField(attached: Field | null) {
+export function attachField(attached: BackgroundRenderer | null) {
 	field = attached;
 	if (field && shownColors.length) field.setPalette(shownColors, { instant: true });
 }

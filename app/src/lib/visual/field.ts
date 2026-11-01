@@ -112,6 +112,9 @@ export type Field = {
 	destroy(): void;
 };
 
+// What the page needs from any background renderer (this field, or the caustics in amber.ts).
+export type BackgroundRenderer = Pick<Field, 'renderer' | 'canvas' | 'setPalette' | 'frame' | 'kick' | 'resize' | 'destroy'>;
+
 const GLSL_VERTEX = `#version 300 es
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}`;
 

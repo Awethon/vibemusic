@@ -8,7 +8,7 @@
 	import { POPOVER } from '../tuning.ts';
 	import { relativeTime } from './format.ts';
 	import { applyFullScreenStyleClass } from './shell.ts';
-	import { setFullScreenStyle, setNavItem, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
+	import { setBackground, setFullScreenStyle, setNavItem, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
 
 	const options: [FullScreenStyle, string, string][] = [
 		['minimal', 'Minimal', 'Cover and one line'],
@@ -97,9 +97,16 @@
 	{/if}
 	<section class="set-group">
 		<p class="pop-title">Background</p>
-		<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}
-			><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button
+		<button
+			type="button"
+			class="set-row"
+			class:on={ui.background === 'amber'}
+			onclick={() => setBackground(ui.background === 'amber' ? 'field' : 'amber')}
+			><span>Caustics<small>Light through water, tinted by the album</small></span><span class="switch"></span></button
 		>
+		{#if ui.background === 'field'}<button type="button" class="set-row" class:on={ui.ripples} onclick={() => setRipples(!ui.ripples)}
+				><span>Ripples<small>Gentle motion with the music</small></span><span class="switch"></span></button
+			>{/if}
 	</section>
 	<section class="set-group">
 		<p class="pop-title">{formFactor.phone ? 'Tabs' : 'Sidebar'}</p>
