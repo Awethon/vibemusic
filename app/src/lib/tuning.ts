@@ -114,6 +114,7 @@ export const BENTO = Object.freeze({
 	soloListMaxColumns: 3,
 	listMaxRows: 6,
 	alignWithinPx: 72,
+	growMaxRatio: 1.25,
 	rowMinWidthPx: 200,
 	rowColumnGapPx: 12,
 	rowHeightPx: 64,

@@ -1109,7 +1109,9 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .bento.solo .bento-block { padding: 0; border-color: transparent; background: none; }
 
-.bb-body .pl-row { margin: 0 -6px; }
+.bb-body .pl-row { margin: 0 -6px; grid-template-columns: calc(var(--row-h, 64px) - 8px) minmax(0, 1fr); }
+
+.bb-body .pl-row .mini-mosaic { width: calc(var(--row-h, 64px) - 8px); height: calc(var(--row-h, 64px) - 8px); }
 
 .g-tile { display: block; width: 100%; height: 100%; transition: opacity 0.35s var(--ease); }
 
