@@ -151,7 +151,7 @@ body.now-open #chrome { opacity: 0; pointer-events: none; transform: scale(0.985
 	transition: color 0.15s;
 }
 
-.nav .ni { display: grid; flex: none; filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55)); transition: transform 0.2s var(--ease); }
+.nav .ni { display: grid; flex: none; filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55)); transform: rotate(0.02deg); transition: transform 0.2s var(--ease); }
 
 .nav .ni svg { width: 21px; height: 21px; }
 
@@ -159,7 +159,7 @@ body.now-open #chrome { opacity: 0; pointer-events: none; transform: scale(0.985
 
 .nav:hover { color: var(--ink); }
 
-.nav:hover .ni { transform: scale(1.08); }
+.nav:hover .ni { transform: scale(1.08) rotate(0.02deg); }
 
 .nav.active { color: var(--ink); }
 
