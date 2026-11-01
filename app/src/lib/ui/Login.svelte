@@ -43,8 +43,7 @@
 		<h1>vibe<span>music</span></h1>
 		{#if firstRun}
 			<p class="note">
-				Welcome! Create the first account. It’s also Navidrome’s admin: you can manage users and settings at
-				<a href="/app/">/app</a>.
+				Welcome! Create the first account. It’s also Navidrome’s admin, for managing users and settings in Navidrome’s own web UI.
 			</p>
 		{:else}
 			<p class="note">{session.expired ? 'Your session expired. Sign in again.' : 'Sign in with your Navidrome account.'}</p>

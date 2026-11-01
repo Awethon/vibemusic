@@ -62,6 +62,9 @@ services:
     env_file:
       - path: ./navidrome.env
         required: false
+    # Navidrome's own web UI (users, libraries, plugins), meant for the local network only.
+    ports:
+      - ${NAVIDROME_PORT:-4533}:4533
     volumes:
       - ${MUSIC_FOLDER:-./music}:/music:ro
       - navidrome-data:/data

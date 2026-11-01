@@ -26,10 +26,19 @@
 		}
 	}
 
-	# Navidrome's APIs, its public share files, and its own web UI under /app (first admin
-	# account, plugins, users).
-	@navidrome path /auth/* /api/* /rest/* /share/s/* /share/img/* /share/d/* /share/*/m3u /app /app/*
+	# Navidrome's APIs and its public share files.
+	@navidrome path /auth/* /api/* /rest/* /share/s/* /share/img/* /share/d/* /share/*/m3u
 	handle @navidrome {
+		reverse_proxy {$NAVIDROME_URL:http://navidrome:4533}
+	}
+	# Only the page of Navidrome's web UI, and only for scripts, not for a browser opening it: it
+	# carries the flag the app's first-run screen reads (no users yet). The UI itself, with its admin
+	# pages, is never served here; it stays on Navidrome's own port, for the local network.
+	@navidromeflag {
+		path /app/
+		not header Sec-Fetch-Dest document
+	}
+	handle @navidromeflag {
 		reverse_proxy {$NAVIDROME_URL:http://navidrome:4533}
 	}
 

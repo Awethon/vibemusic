@@ -118,6 +118,13 @@ if [ "$first_run" != 0 ]; then
 else
 	echo "vibemusic is running at $base"
 fi
+case ",$(env_value COMPOSE_PROFILES)," in
+*,navidrome,*)
+	nd_port=$(env_value NAVIDROME_PORT)
+	echo "Navidrome's own web UI (users, libraries, plugins) is at http://localhost:${nd_port:-4533},"
+	echo "for your local network only."
+	;;
+esac
 
 case ",$(env_value COMPOSE_PROFILES)," in
 *,relay,*) ;;
