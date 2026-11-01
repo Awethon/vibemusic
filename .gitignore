@@ -2,5 +2,9 @@ dev/.env
 dev/music/
 node_modules/
 .DS_Store
-mockups/shared/
 dev/samples/
+
+# Private notes and design work, kept out of the published repo
+/PLAN.md
+/docs-internal/
+/mockups/

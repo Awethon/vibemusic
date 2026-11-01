@@ -75,7 +75,7 @@ describe('genre playlists', () => {
 
 	it('plays each song once even when the library has several editions of it', () => {
 		const editions = ['Lighthouse', 'Lighthouse (Live)', 'Driftwood', 'Driftwood'].map((title, index) => ({ ...songs('Metal', 1, 1, `edition-${index}`)[0], title, artistId: 'harbor', plays: index }));
-		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Lighthouse', 'Driftwood']);
+		expect(pickBest(editions).map((song) => song.title).toSorted()).toEqual(['Driftwood', 'Lighthouse']);
 	});
 
 	it('keeps the original edition of a song even after the later one was played more', () => {

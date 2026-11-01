@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn reads_only_the_wanted_kind_of_result() {
-        let value = json!({ "results": [{ "wrapperType": "artist", "artistName": "ДК-12" }, { "wrapperType": "collection", "collectionName": "Old Harbour" }] });
+        let value = json!({ "results": [{ "wrapperType": "artist", "artistName": "Северный ветер" }, { "wrapperType": "collection", "collectionName": "Old Harbour" }] });
         assert_eq!(results(&value, "collection", "collectionName"), ["Old Harbour"]);
     }
 
