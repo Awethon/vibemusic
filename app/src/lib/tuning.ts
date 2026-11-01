@@ -347,6 +347,15 @@ export const LIBRARY_SYNC = Object.freeze({
 	albumsPerSongRequest: 40,
 	fullSyncChangedAlbumShare: 0.3,
 	fullSyncChangedAlbumMin: 50,
-	imageHashSettleMs: 60 * 1000,
-	albumListPageSize: 500
+	livePollIntervalMs: 5 * 60 * 1000,
+	eventDebounceMs: 1500,
+	eventRetryMinMs: 2000,
+	eventRetryMaxMs: 60 * 1000,
+	eventSilenceMs: 45 * 1000
+});
+
+export const COVER_RETRY = Object.freeze({
+	attempts: 4,
+	baseDelayMs: 600,
+	jitterMs: 900
 });

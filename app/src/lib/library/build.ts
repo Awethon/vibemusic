@@ -46,7 +46,7 @@ function deleteWhereIn(db: Database, sql: string, ids: string[]) {
 }
 
 function insertAlbums(db: Database, albums: NativeAlbum[]) {
-	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId, album.imageHash]));
+	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId, album.imageHash, album.dominantColor]));
 	eachBound(db, 'insert or ignore into album_credit values (?,?,?,?,?)', albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order])));
 	eachBound(db, 'insert into search values (?,?,?)', albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]));
 }
@@ -104,17 +104,6 @@ function updateStats(db: Database, table: 'album' | 'track', rows: { id: string;
 	}
 	counted.finalize();
 	dated.finalize();
-	return changed;
-}
-
-function updateImageHashes(db: Database, hashes: Map<string, string>): number {
-	const update = db.prepare('update album set image_hash = ? where id = ? and image_hash != ?');
-	let changed = 0;
-	for (const [id, hash] of hashes) {
-		update.bind([hash, id, hash]).stepReset();
-		changed += db.changes();
-	}
-	update.finalize();
 	return changed;
 }
 
@@ -308,8 +297,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 			songStarred: newest(snapshot.songs.map((song) => song.starredAt))
 		},
 		playlists: Object.fromEntries(snapshot.playlists.map((playlist) => [playlist.id, playlistSignature(playlist)])),
-		fullSyncAt: syncedAt,
-		lastScan: ''
+		fullSyncAt: syncedAt
 	};
 	return writeMeta(db, { version: syncedAt, syncedAt, userId }, sync);
 }
@@ -319,7 +307,6 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 	const playlistsChanged = changes.playlistTracks.size > 0 || changes.playlists.length !== Object.keys(sync.playlists).length || changes.playlists.some((playlist) => !(playlist.id in sync.playlists));
 	let statsChanged = 0;
 	let radioChanged = false;
-	let hashesChanged = 0;
 	db.transaction(() => {
 		if (contentChanged) {
 			const ids = changes.albums.map((album) => album.id);
@@ -339,15 +326,13 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			insertPlaylistTracks(db, changes.playlistTracks);
 		}
 		radioChanged = replaceRadioStations(db, changes.radioStations);
-		if (changes.imageHashes) hashesChanged = updateImageHashes(db, changes.imageHashes);
 		if (contentChanged || playlistsChanged) rebuildDerived(db);
 	});
-	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0 || hashesChanged > 0;
+	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0;
 	const next: SyncState = {
 		marks: changes.marks,
 		playlists: Object.fromEntries(changes.playlists.map((playlist) => [playlist.id, playlistSignature(playlist)])),
-		fullSyncAt: sync.fullSyncAt,
-		lastScan: changes.lastScan
+		fullSyncAt: sync.fullSyncAt
 	};
 	return { meta: writeMeta(db, { version: changed ? syncedAt : meta.version, syncedAt, userId: meta.userId }, next), changed };
 }

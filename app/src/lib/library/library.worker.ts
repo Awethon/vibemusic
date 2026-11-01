@@ -138,11 +138,11 @@ async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ me
 	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes, steps: snapshot.steps ?? {} } };
 }
 
-async function syncChanges(http: NavidromeHttp): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
+async function syncChanges(http: NavidromeHttp, albumIds: string[]): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
 	const meta = db && readMeta(db);
 	const sync = db && readSyncState(db);
 	if (!meta || !sync || Date.now() - Date.parse(sync.fullSyncAt) > LIBRARY_SYNC.fullSyncIntervalMs) return null;
-	const changes = await fetchChanges(http, sync, meta.albums);
+	const changes = await fetchChanges(http, sync, meta.albums, albumIds);
 	if (!changes || !db) return null;
 	const result = applyChanges(db, meta, sync, changes, new Date().toISOString());
 	if (changes.totals && (changes.totals.albums !== result.meta.albums || changes.totals.tracks !== result.meta.tracks)) return null;
@@ -170,7 +170,7 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 		case 'sync': {
 			let token = request.credentials.token;
 			const http = new NavidromeHttp(request.credentials, (renewed) => (token = renewed));
-			const incremental = request.full ? null : await syncChanges(http);
+			const incremental = request.full ? null : await syncChanges(http, request.albumIds);
 			if (incremental) return { ...incremental, token, timings: null };
 			const started = performance.now();
 			const snapshot = await fetchLibrary(http, (progress) => self.postMessage({ id, progress } satisfies WorkerReply));

@@ -10,7 +10,7 @@ export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; s
 export type WorkerRequest =
 	| { kind: 'open'; userId: string }
 	| { kind: 'reload' }
-	| { kind: 'sync'; credentials: Credentials; full: boolean }
+	| { kind: 'sync'; credentials: Credentials; full: boolean; albumIds: string[] }
 	| { kind: 'loadFile'; url: string }
 	| { kind: 'persist' }
 	| { kind: 'query'; sql: string; params: SqlParam[] }

@@ -5,6 +5,20 @@ export type NativePage<T> = { items: T[]; total: number };
 export type TokenListener = (token: string) => void;
 
 const TOKEN_HEADER = 'x-nd-authorization';
+const CLIENT_ID_HEADER = 'x-nd-client-unique-id';
+const CLIENT_ID_KEY = 'vibemusic.client-id';
+
+const clientId = (() => {
+	try {
+		const stored = localStorage.getItem(CLIENT_ID_KEY);
+		if (stored) return stored;
+		const created = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+		localStorage.setItem(CLIENT_ID_KEY, created);
+		return created;
+	} catch {
+		return '';
+	}
+})();
 
 let reachability: (reachable: boolean) => void = () => {};
 
@@ -13,8 +27,10 @@ export function watchReachability(listener: (reachable: boolean) => void) {
 }
 
 async function request(input: string, init: RequestInit): Promise<Response> {
+	const headers = new Headers(init.headers);
+	if (clientId) headers.set(CLIENT_ID_HEADER, clientId);
 	try {
-		const response = await reachNavidrome(input, init);
+		const response = await reachNavidrome(input, { ...init, headers });
 		reachability(true);
 		return response;
 	} catch (error) {

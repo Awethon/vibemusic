@@ -26,6 +26,7 @@ export const nativeAlbum = z.object({
 	missing: z.boolean().nullish().transform((value) => value ?? false),
 	mbzReleaseGroupId: optionalString,
 	imageHash: optionalString,
+	dominantColor: optionalString,
 	participants: z
 		.object({ albumartist: z.array(z.object({ id: z.string(), name: z.string() })).nullish() })
 		.nullish()

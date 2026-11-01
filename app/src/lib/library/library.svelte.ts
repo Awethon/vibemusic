@@ -5,7 +5,8 @@ import { listenToRelay, relay, sendToRelay } from '../remote/relay.svelte.ts';
 import { ENRICHMENT, LIBRARY_SYNC } from '../tuning.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
-import { coverAlbumOverrides, coverStamps } from '../navidrome/credentials.ts';
+import { albumArt, coverAlbumOverrides } from '../navidrome/credentials.ts';
+import { listenToNavidrome } from '../navidrome/events.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
@@ -32,6 +33,10 @@ let channel: BroadcastChannel | null = null;
 let nextRequestId = 0;
 const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 let syncing: Promise<void> | null = null;
+let lastSyncAt = 0;
+let eventsLive = false;
+let eventTimer: ReturnType<typeof setTimeout> | undefined;
+const refreshedAlbums = new Set<string>();
 
 function call<K extends WorkerRequest['kind']>(request: Extract<WorkerRequest, { kind: K }>): Promise<WorkerResults[K]> {
 	if (!worker) return Promise.reject(new Error('Library not started'));
@@ -57,8 +62,11 @@ function onWorkerReply(event: MessageEvent<WorkerReply>) {
 }
 
 async function refreshCoverStamps() {
-	const rows = await query<{ id: string; image_hash: string }>("select id, image_hash from album where image_hash != ''");
-	for (const { id, image_hash } of rows) if (coverStamps.get(id) !== image_hash) coverStamps.set(id, image_hash);
+	const rows = await query<{ id: string; image_hash: string; dominant_color: string }>("select id, image_hash, dominant_color from album where image_hash != '' or dominant_color != ''");
+	for (const { id, image_hash: hash, dominant_color: color } of rows) {
+		const known = albumArt.get(id);
+		if (known?.hash !== hash || known.color !== color) albumArt.set(id, { hash, color });
+	}
 }
 
 async function loaded(meta: LibraryMeta | null) {
@@ -82,7 +90,16 @@ function failed(error: unknown) {
 
 async function syncNow(full: boolean) {
 	if (!library.meta) library.status = 'syncing';
-	const result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()), full });
+	const albumIds = [...refreshedAlbums];
+	refreshedAlbums.clear();
+	let result: WorkerResults['sync'];
+	try {
+		result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()), full, albumIds });
+	} catch (error) {
+		for (const id of albumIds) refreshedAlbums.add(id);
+		throw error;
+	}
+	lastSyncAt = Date.now();
 	reportReachable();
 	renewToken(result.token);
 	library.progress = null;
@@ -170,10 +187,20 @@ onReconnect(() => {
 	if (library.leader) void checkForChanges();
 });
 
+function queueEventSync(albumIds: string[]) {
+	for (const id of albumIds) refreshedAlbums.add(id);
+	clearTimeout(eventTimer);
+	eventTimer = setTimeout(() => void checkForChanges(), LIBRARY_SYNC.eventDebounceMs);
+}
+
 function lead() {
 	library.leader = true;
 	void checkForChanges().then(() => requestEnrichment(true));
-	setInterval(() => void checkForChanges().then(() => requestEnrichment()), LIBRARY_SYNC.pollIntervalMs);
+	listenToNavidrome(() => requireCredentials().token, { changed: queueEventSync, live: (live) => (eventsLive = live) });
+	setInterval(() => {
+		const due = !eventsLive || Date.now() - lastSyncAt >= LIBRARY_SYNC.livePollIntervalMs;
+		void (due ? checkForChanges() : Promise.resolve()).then(() => requestEnrichment());
+	}, LIBRARY_SYNC.pollIntervalMs);
 }
 
 async function onChannelMessage(event: MessageEvent<ChannelMessage>) {

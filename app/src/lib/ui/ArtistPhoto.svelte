@@ -1,12 +1,21 @@
 <script lang="ts" module>
+	import { COVER_RETRY } from '../tuning.ts';
+
 	const photos = new Map<string, Promise<string | null>>();
+
+	async function loadPhoto(url: string, attempt = 0): Promise<string | null> {
+		const response = await fetch(url);
+		if (response.status === 429 && attempt < COVER_RETRY.attempts) {
+			await new Promise((resolve) => setTimeout(resolve, COVER_RETRY.baseDelayMs * 2 ** attempt + Math.random() * COVER_RETRY.jitterMs));
+			return loadPhoto(url, attempt + 1);
+		}
+		return response.ok && response.headers.has('etag') ? URL.createObjectURL(await response.blob()) : null;
+	}
 
 	function photoOf(url: string) {
 		let photo = photos.get(url);
 		if (!photo) {
-			photo = fetch(url)
-				.then(async (response) => (response.ok && response.headers.has('etag') ? URL.createObjectURL(await response.blob()) : null))
-				.catch(() => null);
+			photo = loadPhoto(url).catch(() => null);
 			photos.set(url, photo);
 		}
 		return photo;

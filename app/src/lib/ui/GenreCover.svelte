@@ -6,6 +6,7 @@
 	import { genreTheme } from './genreTheme.ts';
 	import { playlistMetaLine } from './playlistText.ts';
 	import { COVER_PX, GENRE_COVER } from '../tuning.ts';
+	import { retryCover } from './retryCover.ts';
 
 	let { playlist, mini = false, size = COVER_PX.fallback }: { playlist: Playlist; mini?: boolean; size?: number } = $props();
 
@@ -36,7 +37,7 @@
 	<span class="gc-canvas">
 		<span class="gc-wall">
 			{#if session.credentials}
-				{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
+				{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
 			{/if}
 		</span>
 		<span class="gc-shade"></span>
