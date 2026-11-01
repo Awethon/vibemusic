@@ -38,13 +38,13 @@
 	function planFor(item: Geometry, room: number): Plan {
 		if (item.kind === 'genre') {
 			const gap = BENTO.genreTileGapPx;
-			const columns = Math.max(1, Math.floor((item.width + gap) / (Math.min(room, BENTO.genreTileMaxSizePx) + gap)));
-			const tileSize = Math.floor(Math.min(room, (item.width - gap * (columns - 1)) / columns));
-			const rows = Math.max(1, Math.min(Math.floor((room + gap) / (tileSize + gap)), Math.ceil(item.count / columns)));
+			const columns = Math.max(1, Math.min(BENTO.genreMaxColumns, Math.floor((item.width + gap) / (Math.min(room, BENTO.genreTileMaxSizePx) + gap))));
+			const tileSize = Math.floor(Math.min(room, BENTO.genreTileMaxSizePx, (item.width - gap * (columns - 1)) / columns));
+			const rows = Math.max(1, Math.min(BENTO.genreMaxRows, Math.floor((room + gap) / (tileSize + gap)), Math.ceil(item.count / columns)));
 			return { columns, rows, tileSize, itemCount: columns * rows, bodyHeight: rows * tileSize + (rows - 1) * gap };
 		}
-		const columns = Math.max(1, Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx)));
-		const rows = Math.max(1, Math.min(Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)), Math.ceil(item.count / columns)));
+		const columns = Math.max(1, Math.min(BENTO.listMaxColumns, Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx))));
+		const rows = Math.max(1, Math.min(BENTO.listMaxRows, Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)), Math.ceil(item.count / columns)));
 		return { columns, rows, tileSize: 0, itemCount: columns * rows, bodyHeight: rows * BENTO.rowHeightPx + (rows - 1) * BENTO.rowGapPx };
 	}
 
