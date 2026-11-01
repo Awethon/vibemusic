@@ -16,7 +16,7 @@
 //!   keep the cache in memory only.
 //! - `APPLE_PAUSE_MS`, `APPLE_STOREFRONTS`: see `apple.rs`.
 //! - `RADIO_LOCAL_PROXY`: see `radio.rs`.
-//! - `VIBEMUSIC_NAVIDROME_USER`, `VIBEMUSIC_NAVIDROME_PASSWORD`: turn on "This is" playlists;
+//! - `VIBEMUSIC_RELAY_NAVIDROME_USER`, `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD`: turn on "This is" playlists;
 //!   `THIS_IS_STATE`, `THIS_IS_MIN_TRACKS`, `THIS_IS_MAX_TRACKS`, `THIS_IS_EVERY_HOURS` and
 //!   `THIS_IS_SKIP` tune them (see `this_is.rs`).
 //! - `RUST_LOG`: log filter (default `info`).
@@ -96,7 +96,7 @@ async fn main() {
     match this_is::Settings::from_env(&navidrome_url) {
         Some(settings) => this_is::start(settings, enricher.clone()),
         None => tracing::info!(
-            "This is playlists are off: set VIBEMUSIC_NAVIDROME_USER and VIBEMUSIC_NAVIDROME_PASSWORD to turn them on"
+            "This is playlists are off: set VIBEMUSIC_RELAY_NAVIDROME_USER and VIBEMUSIC_RELAY_NAVIDROME_PASSWORD to turn them on"
         ),
     }
     let app = App {

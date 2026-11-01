@@ -1,5 +1,5 @@
 //! A Navidrome account the relay signs in to itself, used by "This is" playlists
-//! (`VIBEMUSIC_NAVIDROME_USER`/`VIBEMUSIC_NAVIDROME_PASSWORD`).
+//! (`VIBEMUSIC_RELAY_NAVIDROME_USER`/`VIBEMUSIC_RELAY_NAVIDROME_PASSWORD`).
 //!
 //! It speaks both of Navidrome's APIs: the native REST API (`/api`, the one Navidrome's own UI
 //! uses) for paging the library and editing playlists, and the Subsonic API (`/rest`).

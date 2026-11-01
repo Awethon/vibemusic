@@ -1,6 +1,6 @@
 //! "This is <artist>" playlists: public Navidrome playlists of each artist's most popular songs
-//! in the library, with a generated cover. On only when `VIBEMUSIC_NAVIDROME_USER` and
-//! `VIBEMUSIC_NAVIDROME_PASSWORD` name a dedicated Navidrome admin account, which owns the
+//! in the library, with a generated cover. On only when `VIBEMUSIC_RELAY_NAVIDROME_USER` and
+//! `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` name a dedicated Navidrome admin account, which owns the
 //! playlists. Popularity comes from Apple and Deezer (see `enrich.rs`).
 
 use std::collections::{HashMap, HashSet};
@@ -53,10 +53,10 @@ impl Settings {
     /// artist names to leave out, `THIS_IS_STATE` (`/data/this-is.json`, empty for none) file
     /// that remembers the last run and drawn covers across restarts.
     pub fn from_env(url: &str) -> Option<Self> {
-        let username = std::env::var("VIBEMUSIC_NAVIDROME_USER")
+        let username = std::env::var("VIBEMUSIC_RELAY_NAVIDROME_USER")
             .ok()
             .filter(|value| !value.is_empty())?;
-        let password = std::env::var("VIBEMUSIC_NAVIDROME_PASSWORD")
+        let password = std::env::var("VIBEMUSIC_RELAY_NAVIDROME_PASSWORD")
             .ok()
             .filter(|value| !value.is_empty())?;
         let state = std::env::var("THIS_IS_STATE").unwrap_or_else(|_| "/data/this-is.json".into());
