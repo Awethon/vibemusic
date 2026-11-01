@@ -10,6 +10,7 @@ import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
 
 let sqlite: Sqlite3Static;
 let db: Database | null = null;
+let outdated: Database | null = null;
 let userId = '';
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -56,6 +57,19 @@ async function writeBytes(bytes: Uint8Array<ArrayBuffer>) {
 	} finally {
 		access.close();
 	}
+}
+
+async function loadOutdatedSnapshot(): Promise<Database | null> {
+	try {
+		const directory = await navigator.storage.getDirectory();
+		for await (const [name, handle] of directory.entries()) {
+			if (!name.startsWith(`library-${userId}-v`) || name === snapshotName() || handle.kind !== 'file') continue;
+			return databaseFrom(new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer()));
+		}
+	} catch {
+		return null;
+	}
+	return null;
 }
 
 async function removeOutdatedSnapshots() {
@@ -112,8 +126,13 @@ function scheduleSnapshotWrite() {
 async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ meta: LibraryMeta; timings: SyncTimings }> {
 	const buildStarted = performance.now();
 	const database = new sqlite.oo1.DB();
-	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString(), db);
+	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString(), db ?? outdated);
 	replaceDatabase(database);
+	if (outdated) {
+		outdated.close();
+		outdated = null;
+		void removeOutdatedSnapshots();
+	}
 	const writeStarted = performance.now();
 	const snapshotBytes = await writeSnapshot(database);
 	return { meta, timings: { fetchMs, buildMs: writeStarted - buildStarted, writeMs: performance.now() - writeStarted, snapshotBytes, steps: snapshot.steps ?? {} } };
@@ -139,10 +158,13 @@ function requireDatabase(): Database {
 async function handle(id: number, request: WorkerRequest): Promise<WorkerResults[keyof WorkerResults]> {
 	await ready;
 	switch (request.kind) {
-		case 'open':
+		case 'open': {
 			userId = request.userId;
-			void removeOutdatedSnapshots();
-			return loadSnapshot();
+			const meta = await loadSnapshot();
+			if (meta) void removeOutdatedSnapshots();
+			else outdated = await loadOutdatedSnapshot();
+			return meta;
+		}
 		case 'reload':
 			return loadSnapshot();
 		case 'sync': {

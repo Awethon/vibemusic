@@ -1,3 +1,4 @@
+import { SvelteMap } from 'svelte/reactivity';
 import { COVER_TIERS } from '../tuning.ts';
 
 export type Credentials = {
@@ -70,8 +71,15 @@ const coverTier = (size: number) => COVER_TIERS.find((tier) => tier >= size) ?? 
 
 export const coverAlbumOverrides = new Map<string, string>();
 
+export const coverStamps = new SvelteMap<string, string>();
+
+const albumCoverId = (albumId: string) => {
+	const stamp = coverStamps.get(albumId);
+	return `al-${coverAlbumOverrides.get(albumId) ?? albumId}${stamp ? `_${stamp}` : ''}`;
+};
+
 export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>
-	subsonicUrl(credentials, 'getCoverArt', { id: `al-${coverAlbumOverrides.get(albumId) ?? albumId}`, size: coverTier(size) });
+	subsonicUrl(credentials, 'getCoverArt', { id: albumCoverId(albumId), size: coverTier(size) });
 
 export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size: coverTier(size) });
 

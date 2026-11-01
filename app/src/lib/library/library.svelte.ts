@@ -5,7 +5,7 @@ import { listenToRelay, relay, sendToRelay } from '../remote/relay.svelte.ts';
 import { ENRICHMENT, LIBRARY_SYNC } from '../tuning.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
-import { coverAlbumOverrides } from '../navidrome/credentials.ts';
+import { coverAlbumOverrides, coverStamps } from '../navidrome/credentials.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
@@ -56,8 +56,14 @@ function onWorkerReply(event: MessageEvent<WorkerReply>) {
 	else waiter.reject(reply.expired ? new SessionExpiredError() : reply.unreachable ? new NavidromeUnreachableError() : new Error(reply.error));
 }
 
-function loaded(meta: LibraryMeta | null) {
+async function refreshCoverStamps() {
+	const rows = await query<{ id: string; image_hash: string }>("select id, image_hash from album where image_hash != ''");
+	for (const { id, image_hash } of rows) if (coverStamps.get(id) !== image_hash) coverStamps.set(id, image_hash);
+}
+
+async function loaded(meta: LibraryMeta | null) {
 	if (!meta) return;
+	await refreshCoverStamps();
 	library.meta = meta;
 	library.status = 'ready';
 	library.revision += 1;
@@ -85,7 +91,7 @@ async function syncNow(full: boolean) {
 		library.meta = result.meta;
 		return;
 	}
-	loaded(result.meta);
+	await loaded(result.meta);
 	channel?.postMessage({ kind: 'snapshot', version: result.meta.version } satisfies ChannelMessage);
 	void requestEnrichment(true);
 }
@@ -130,7 +136,7 @@ async function applyEnrichment() {
 	lastEnrichmentAt = Date.now();
 	try {
 		const meta = await call({ kind: 'enrich', enrichment });
-		loaded(meta);
+		await loaded(meta);
 		channel?.postMessage({ kind: 'snapshot', version: meta.version } satisfies ChannelMessage);
 	} catch (error) {
 		console.warn('Could not apply genre and popularity data', error);
@@ -175,7 +181,7 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 	if (message.kind === 'snapshot') {
 		if (library.meta?.version === message.version && library.status === 'ready') return;
 		try {
-			loaded(await call({ kind: 'reload' }));
+			await loaded(await call({ kind: 'reload' }));
 		} catch (error) {
 			failed(error);
 		}
@@ -198,7 +204,7 @@ async function startSyntheticLibrary() {
 	library.status = 'syncing';
 	const result = await call({ kind: 'loadFile', url: SYNTHETIC_LIBRARY.snapshotUrl });
 	library.timings = result.timings;
-	loaded(result.meta);
+	await loaded(result.meta);
 }
 
 export async function startLibrary() {
@@ -211,7 +217,7 @@ export async function startLibrary() {
 	channel.addEventListener('message', onChannelMessage);
 	try {
 		const openStarted = performance.now();
-		loaded(await call({ kind: 'open', userId }));
+		await loaded(await call({ kind: 'open', userId }));
 		library.openMs = performance.now() - openStarted;
 		if (syntheticLibrary) {
 			await startSyntheticLibrary();

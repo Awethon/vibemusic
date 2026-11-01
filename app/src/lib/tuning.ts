@@ -346,5 +346,7 @@ export const LIBRARY_SYNC = Object.freeze({
 	changePageSize: 2,
 	albumsPerSongRequest: 40,
 	fullSyncChangedAlbumShare: 0.3,
-	fullSyncChangedAlbumMin: 50
+	fullSyncChangedAlbumMin: 50,
+	imageHashSettleMs: 60 * 1000,
+	albumListPageSize: 500
 });

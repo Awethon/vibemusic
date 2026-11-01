@@ -22,12 +22,15 @@ export type LibraryChanges = {
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
 	radioStations: RadioStation[] | null;
 	totals: { albums: number; tracks: number } | null;
+	imageHashes: Map<string, string> | null;
+	lastScan: string;
 };
 
 export type SyncState = {
 	marks: SyncMarks;
 	playlists: Record<string, string>;
 	fullSyncAt: string;
+	lastScan: string;
 };
 
 export type LibraryMeta = {

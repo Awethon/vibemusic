@@ -82,6 +82,25 @@ async function changedSince<T>(http: NavidromeHttp, path: string, schema: z.ZodT
 	}
 }
 
+type ScanStatusResponse = { scanStatus?: { scanning?: boolean; lastScan?: string } };
+type AlbumListResponse = { albumList2?: { album?: { id: string; coverArt?: string }[] } };
+
+async function settledScan(http: NavidromeHttp, seen: string): Promise<string | null> {
+	const { scanStatus } = await http.subsonic<ScanStatusResponse>('getScanStatus');
+	const lastScan = scanStatus?.lastScan ?? '';
+	if (!lastScan || lastScan === seen || scanStatus?.scanning || Date.now() - Date.parse(lastScan) < LIBRARY_SYNC.imageHashSettleMs) return null;
+	return lastScan;
+}
+
+async function fetchImageHashes(http: NavidromeHttp): Promise<Map<string, string>> {
+	const hashes = new Map<string, string>();
+	for (let offset = 0; ; offset += LIBRARY_SYNC.albumListPageSize) {
+		const albums = (await http.subsonic<AlbumListResponse>('getAlbumList2', { type: 'alphabeticalByName', size: LIBRARY_SYNC.albumListPageSize, offset })).albumList2?.album ?? [];
+		for (const album of albums) hashes.set(album.id, album.coverArt?.match(/_([0-9a-f]+)$/)?.[1] ?? '');
+		if (albums.length < LIBRARY_SYNC.albumListPageSize) return hashes;
+	}
+}
+
 async function fetchTotal(http: NavidromeHttp, path: string): Promise<number> {
 	return (await http.nativePage(path, 0, 1)).total;
 }
@@ -95,7 +114,7 @@ async function fetchAlbumSongs(http: NavidromeHttp, albumIds: string[]) {
 
 export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAlbums: number): Promise<LibraryChanges | null> {
 	const { marks } = sync;
-	const [albums, albumPlays, albumStars, songPlays, songStars, rated, playlists, radioStations] = await Promise.all([
+	const [albums, albumPlays, albumStars, songPlays, songStars, rated, playlists, radioStations, scan] = await Promise.all([
 		changedSince(http, 'album?_sort=importedAt&_order=DESC', nativeAlbum, (album) => album.importedAt, marks.albumImported),
 		changedSince(http, 'album?_sort=playDate&_order=DESC', nativeAlbum, (album) => album.playDate, marks.albumPlayed),
 		changedSince(http, 'album?_sort=starredAt&_order=DESC', nativeAlbum, (album) => album.starredAt, marks.albumStarred),
@@ -103,15 +122,17 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		changedSince(http, 'song?_sort=starredAt&_order=DESC', nativeSong, (song) => song.starredAt, marks.songStarred),
 		http.nativeAll('song?has_rating=true&_sort=title&_order=ASC', LIBRARY_SYNC.pageSize).then((songs) => nativeSong.array().parse(songs)),
 		fetchPlaylists(http),
-		fetchRadioStations(http)
+		fetchRadioStations(http),
+		settledScan(http, sync.lastScan)
 	]);
 	if (albums.length > Math.max(LIBRARY_SYNC.fullSyncChangedAlbumMin, localAlbums * LIBRARY_SYNC.fullSyncChangedAlbumShare)) return null;
 	const libraryChanged = albums.length + albumPlays.length + albumStars.length + songPlays.length + songStars.length > 0;
 	const stale = playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || (playlist.rules && libraryChanged));
-	const [albumSongs, playlistTracks, totals] = await Promise.all([
+	const [albumSongs, playlistTracks, totals, imageHashes] = await Promise.all([
 		fetchAlbumSongs(http, albums.filter((album) => !album.missing).map((album) => album.id)),
 		Promise.all(stale.map(async (playlist) => [playlist.id, await fetchPlaylistTracks(http, playlist)] as const)),
-		albums.length ? Promise.all([fetchTotal(http, 'album?missing=false'), fetchTotal(http, 'song?missing=false')]) : null
+		albums.length ? Promise.all([fetchTotal(http, 'album?missing=false'), fetchTotal(http, 'song?missing=false')]) : null,
+		scan ? fetchImageHashes(http) : null
 	]);
 	const latest = <T extends { id: string }>(lists: T[][]) => [...new Map(lists.flat().map((item) => [item.id, item])).values()];
 	return {
@@ -130,7 +151,9 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		playlists,
 		playlistTracks: new Map(playlistTracks),
 		radioStations,
-		totals: totals && { albums: totals[0], tracks: totals[1] }
+		totals: totals && { albums: totals[0], tracks: totals[1] },
+		imageHashes,
+		lastScan: scan ?? sync.lastScan
 	};
 }
 
