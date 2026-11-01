@@ -73,7 +73,7 @@ body.now-open #phoneDock { opacity: 0; transform: translateY(12px); pointer-even
 
 .pd-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; height: 100%; text-align: left; }
 
-.pd-cover { flex: none; width: 44px; height: 44px; border-radius: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
+.pd-cover { flex: none; width: 44px; height: 44px; border-radius: 8px; overflow: hidden; }
 
 .pd-cover img { width: 100%; height: 100%; object-fit: cover; }
 
