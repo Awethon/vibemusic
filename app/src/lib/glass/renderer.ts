@@ -167,7 +167,8 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 
 	function render(params: GlassParams, shapes: GlassShape[], areas: Region[], region: Region, dpr: number, index = 0) {
 		const slot = slotAt(index);
-		const blurTex = blurred(slot, params.frost, dpr);
+		// Blur radii are in pixels of the page copy, which can be lower resolution than the glass.
+		const blurTex = blurred(slot, params.frost, slot.size[0] / region.width);
 		const { program, u } = programs.glass;
 		context.bindFramebuffer(context.FRAMEBUFFER, null);
 		context.viewport(0, 0, width, height);

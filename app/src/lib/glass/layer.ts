@@ -2,7 +2,7 @@
 // glass surfaces, and only when something behind them changed repaints the backdrop and redraws.
 // Started from GlassLayer.svelte inside untrack, since it reads layout and runs its own loop.
 import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
-import { glassMargin, scenePad, type GlassParams } from './params.ts';
+import { glassMargin, RENDER, scenePad, type GlassParams } from './params.ts';
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import { createGlassRenderer, type GlassRenderer, type GlassShape, type Region } from './renderer.ts';
 
@@ -168,8 +168,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	};
 
 	const draw = (gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
-		// Capped at 2x: the shader runs per pixel, and 3x screens would cost over twice as much.
-		const ratio = Math.min(devicePixelRatio || 1, 2);
+		const ratio = Math.min(devicePixelRatio || 1, RENDER.maxPixelRatio);
 		if (ratio !== dpr || canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
 			dpr = ratio;
 			gl.resize(innerWidth, innerHeight, dpr);
@@ -199,7 +198,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		gl.clear();
 		shapes.forEach((shape, index) => {
 			if (sceneStale || regionKeys[index] !== lastRegions[index]) {
-				paintBackdrop(paint, regions[index], dpr, above);
+				paintBackdrop(paint, regions[index], Math.min(dpr, RENDER.backdropPixelRatio), above);
 				gl.setScene(paint.canvas, index);
 			}
 			gl.render(current, shapes, areas[index], regions[index], dpr, index);
