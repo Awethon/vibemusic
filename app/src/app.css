@@ -1107,6 +1107,8 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .bb-body.tiles { gap: 12px; }
 
+.bento.solo .bento-block { padding: 0; border-color: transparent; background: none; }
+
 .bb-body .pl-row { margin: 0 -6px; }
 
 .g-tile { display: block; width: 100%; height: 100%; transition: opacity 0.35s var(--ease); }

@@ -21,6 +21,8 @@
 	let aligned = $state(false);
 
 	const columnCount = $derived(Math.min(blocks.length, 2));
+	const solo = $derived(!formFactor.phone && blocks.length === 1);
+	const tileGap = () => (solo ? BENTO.soloTileGapPx : BENTO.genreTileGapPx);
 
 	function fillHeight() {
 		const scroller = mainScroller();
@@ -39,14 +41,16 @@
 
 	function planFor(item: Geometry, room: number): Plan {
 		if (item.kind === 'genre') {
-			const gap = BENTO.genreTileGapPx;
-			const columns = Math.max(1, Math.min(BENTO.genreMaxColumns, Math.floor((item.width + gap) / (Math.min(room, BENTO.genreTileMinPx) + gap))));
+			const gap = tileGap();
+			const maxTiles = BENTO.genreMaxColumns * BENTO.genreMaxRows;
+			const columns = Math.max(1, Math.min(solo ? maxTiles : BENTO.genreMaxColumns, Math.floor((item.width + gap) / (Math.min(room, solo ? BENTO.soloTileMinPx : BENTO.genreTileMinPx) + gap))));
 			const tileSize = Math.floor(Math.min(room, (item.width - gap * (columns - 1)) / columns));
-			const rows = Math.max(1, Math.min(BENTO.genreMaxRows, Math.floor((room + gap) / (tileSize + gap)), Math.ceil(item.count / columns)));
+			const rows = Math.max(1, Math.min(BENTO.genreMaxRows, solo ? Infinity : Math.floor(maxTiles / columns), Math.floor((room + gap) / (tileSize + gap)), Math.ceil(item.count / columns)));
 			return { columns, rows, tileSize, itemCount: columns * rows, bodyHeight: rows * tileSize + (rows - 1) * gap };
 		}
-		const columns = Math.max(1, Math.min(BENTO.listMaxColumns, Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx))));
-		const rows = Math.max(1, Math.min(BENTO.listMaxRows, Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)), Math.ceil(item.count / columns)));
+		const maxItems = BENTO.listMaxColumns * BENTO.listMaxRows;
+		const columns = Math.max(1, Math.min(solo ? BENTO.soloListMaxColumns : BENTO.listMaxColumns, Math.floor((item.width + BENTO.rowColumnGapPx) / (BENTO.rowMinWidthPx + BENTO.rowColumnGapPx))));
+		const rows = Math.max(1, Math.min(BENTO.listMaxRows, Math.floor(maxItems / columns), Math.floor((room + BENTO.rowGapPx) / (BENTO.rowHeightPx + BENTO.rowGapPx)), Math.ceil(item.count / columns)));
 		return { columns, rows, tileSize: 0, itemCount: columns * rows, bodyHeight: rows * BENTO.rowHeightPx + (rows - 1) * BENTO.rowGapPx };
 	}
 
@@ -73,7 +77,7 @@
 		}
 	}
 
-	const rowStep = (item: Geometry, plan: Plan) => (item.kind === 'genre' ? plan.tileSize + BENTO.genreTileGapPx : BENTO.rowHeightPx + BENTO.rowGapPx);
+	const rowStep = (item: Geometry, plan: Plan) => (item.kind === 'genre' ? plan.tileSize + tileGap() : BENTO.rowHeightPx + BENTO.rowGapPx);
 
 	const sideHeight = (side: Geometry[], planned: [PlaylistKind, Plan][], gap: number) => side.reduce((sum, item, index) => sum + item.chrome + planned[index][1].bodyHeight, 0) + gap * (side.length - 1);
 
@@ -144,7 +148,7 @@
 	});
 </script>
 
-<div class="bento" class:stacked={formFactor.phone} id="bento" bind:this={bento} style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`} style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined} style:align-items={aligned ? 'stretch' : 'start'}>
+<div class="bento" class:stacked={formFactor.phone} class:solo id="bento" bind:this={bento} style:grid-template-columns={formFactor.phone ? undefined : `repeat(${columnCount}, minmax(0, 1fr))`} style:grid-template-rows={!formFactor.phone && blocks.length > 2 ? 'auto 1fr' : undefined} style:align-items={aligned ? 'stretch' : 'start'}>
 	{#each blocks as block, index (block.kind)}
 		{@const plan = plans[block.kind]}
 		<section class="bento-block" data-kind={block.kind} style:grid-row={!formFactor.phone && blocks.length > 2 && index === 0 ? 'span 2' : undefined}>
@@ -155,6 +159,7 @@
 			<div
 				class="bb-body"
 				class:tiles={block.kind === 'genre'}
+				style:gap={solo && block.kind === 'genre' ? `${BENTO.soloTileGapPx}px` : undefined}
 				data-body={block.kind}
 				style:height={!formFactor.phone && plan ? `${plan.bodyHeight}px` : undefined}
 				style:grid-template-columns={plan ? (plan.tileSize ? `repeat(${plan.columns}, ${plan.tileSize}px)` : `repeat(${plan.columns}, minmax(0, 1fr))`) : undefined}
