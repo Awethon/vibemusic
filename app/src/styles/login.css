@@ -58,6 +58,11 @@
 	color: var(--ink-2);
 	font-size: 13.5px;
 }
+.login .note a {
+	color: var(--ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
 .login .server {
 	display: flex;
 	align-items: center;

@@ -49,14 +49,7 @@ function stableSalt(username: string, fallback: string): string {
 	}
 }
 
-export async function logIn(username: string, password: string): Promise<Credentials> {
-	const response = await reachNavidrome('/auth/login', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ username, password })
-	});
-	if (response.status === 401) throw new NavidromeError('Wrong username or password');
-	if (!response.ok) throw new NavidromeError(`Navidrome answered ${response.status}`);
+async function signIn(response: Response, password: string): Promise<Credentials> {
 	const body = (await response.json()) as LoginResponse;
 	const salt = stableSalt(body.username, body.subsonicSalt);
 	const credentials: Credentials = {
@@ -71,4 +64,51 @@ export async function logIn(username: string, password: string): Promise<Credent
 	};
 	saveCredentials(credentials);
 	return credentials;
+}
+
+const postJson = (path: string, body: unknown) =>
+	reachNavidrome(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+export async function logIn(username: string, password: string): Promise<Credentials> {
+	const response = await postJson('/auth/login', { username, password });
+	if (response.status === 401) throw new NavidromeError('Wrong username or password');
+	if (!response.ok) throw new NavidromeError(`Navidrome answered ${response.status}`);
+	return signIn(response, password);
+}
+
+export class AdminExistsError extends NavidromeError {
+	constructor() {
+		super('This server already has an account. Sign in with it.');
+	}
+}
+
+// A new Navidrome has no users; its first account is created as admin. Navidrome checks nothing
+// about the name or password, so callers must.
+export async function createAdmin(username: string, password: string): Promise<Credentials> {
+	const response = await postJson('/auth/createAdmin', { username, password });
+	if (response.status === 403) throw new AdminExistsError();
+	if (!response.ok) throw new NavidromeError(`Navidrome answered ${response.status}`);
+	return signIn(response, password);
+}
+
+// Navidrome's web UI page (/app/) embeds the config its own first-run screen reads; firstTime is
+// true while it has no users.
+export function firstRunFromPage(html: string): boolean {
+	const config = html.match(/__APP_CONFIG__\s*=\s*("(?:[^"\\]|\\.)*")/)?.[1];
+	if (!config) return false;
+	try {
+		return (JSON.parse(JSON.parse(config) as string) as { firstTime?: boolean }).firstTime === true;
+	} catch {
+		return false;
+	}
+}
+
+// Anything unexpected (no /app/ route, a proxy's page) means no.
+export async function isFirstRun(): Promise<boolean> {
+	try {
+		const response = await fetch('/app/', { cache: 'no-cache' });
+		return response.ok && firstRunFromPage(await response.text());
+	} catch {
+		return false;
+	}
 }
