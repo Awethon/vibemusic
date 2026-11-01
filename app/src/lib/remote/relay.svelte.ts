@@ -1,5 +1,6 @@
 import { session } from '../session.svelte.ts';
 import type { Enrichment } from '../library/snapshot.ts';
+import { randomId } from '../randomId.ts';
 import { REMOTE } from '../tuning.ts';
 
 export type Device = { id: string; name: string; online: boolean };
@@ -16,6 +17,7 @@ export type RelayMessage =
 	| { type: 'unauthorized' };
 
 const DEVICE_KEY = 'vibemusic.device';
+const DEVICE_CHANNEL = 'vibemusic-devices';
 
 export const relay = $state<{ connected: boolean; deviceId: string; devices: Device[]; active: string | null }>({
 	connected: false,
@@ -57,21 +59,43 @@ export function deviceName() {
 	return [browserName(agent), systemName(agent)].filter(Boolean).join(' · ');
 }
 
-async function claimDeviceId(): Promise<string> {
-	const stored = sessionStorage.getItem(DEVICE_KEY);
-	const candidates = stored ? [stored] : [];
-	for (const id of [...candidates, crypto.randomUUID()]) {
+async function lockedDeviceId(stored: string | null): Promise<string> {
+	for (const id of [...(stored ? [stored] : []), randomId()]) {
 		const held = await new Promise<boolean>((resolve) => {
 			void navigator.locks.request(`vibemusic-device-${id}`, { ifAvailable: true }, (lock) => {
 				resolve(!!lock);
 				return lock ? new Promise(() => {}) : undefined;
 			});
 		});
-		if (!held) continue;
-		sessionStorage.setItem(DEVICE_KEY, id);
-		return id;
+		if (held) return id;
 	}
 	throw new Error('No device id');
+}
+
+async function announcedDeviceId(stored: string | null): Promise<string> {
+	const channel = new BroadcastChannel(DEVICE_CHANNEL);
+	let taken = false;
+	const listen = (event: MessageEvent<{ taken?: string }>) => {
+		if (stored && event.data.taken === stored) taken = true;
+	};
+	channel.addEventListener('message', listen);
+	if (stored) {
+		channel.postMessage({ asking: stored });
+		await new Promise((resolve) => setTimeout(resolve, REMOTE.deviceProbeMs));
+	}
+	channel.removeEventListener('message', listen);
+	const id = stored && !taken ? stored : randomId();
+	channel.addEventListener('message', (event: MessageEvent<{ asking?: string }>) => {
+		if (event.data.asking === id) channel.postMessage({ taken: id });
+	});
+	return id;
+}
+
+async function claimDeviceId(): Promise<string> {
+	const stored = sessionStorage.getItem(DEVICE_KEY);
+	const id = navigator.locks ? await lockedDeviceId(stored) : await announcedDeviceId(stored);
+	sessionStorage.setItem(DEVICE_KEY, id);
+	return id;
 }
 
 function connect() {

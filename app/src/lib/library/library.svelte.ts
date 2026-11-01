@@ -7,6 +7,7 @@ import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import { albumArt, coverAlbumOverrides } from '../navidrome/credentials.ts';
 import { listenToNavidrome } from '../navidrome/events.ts';
+import { leadWhenFree } from './lease.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
@@ -27,6 +28,7 @@ export const library = $state<{ status: Status; meta: LibraryMeta | null; revisi
 
 const SYNTHETIC_LIBRARY = { snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
 const syntheticLibrary = import.meta.env.DEV && new URLSearchParams(location.search).get('lib') === 'synthetic';
+const devChunkBytes = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('chunkKb')) * 1024 || undefined : undefined;
 
 let worker: Worker | null = null;
 let channel: BroadcastChannel | null = null;
@@ -244,7 +246,7 @@ export async function startLibrary() {
 	channel.addEventListener('message', onChannelMessage);
 	try {
 		const openStarted = performance.now();
-		await loaded(await call({ kind: 'open', userId }));
+		await loaded(await call({ kind: 'open', userId, chunkBytes: devChunkBytes }));
 		library.openMs = performance.now() - openStarted;
 		if (syntheticLibrary) {
 			await startSyntheticLibrary();
@@ -257,8 +259,13 @@ export async function startLibrary() {
 	} catch (error) {
 		failed(error);
 	}
-	void navigator.storage.persist?.();
-	void navigator.locks.request(`vibemusic-library-leader-${userId}-v${SCHEMA_VERSION}`, () => {
+	void navigator.storage?.persist?.();
+	const leaderName = `vibemusic-library-leader-${userId}-v${SCHEMA_VERSION}`;
+	if (!navigator.locks) {
+		leadWhenFree(leaderName, lead);
+		return;
+	}
+	void navigator.locks.request(leaderName, () => {
 		lead();
 		return new Promise(() => {});
 	});

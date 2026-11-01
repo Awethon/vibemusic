@@ -1,3 +1,4 @@
+import { randomId } from '../randomId.ts';
 import { appendParams, NavidromeError, NavidromeUnreachableError, reachNavidrome, SessionExpiredError, subsonicUrl, type Credentials, type SubsonicParams } from './credentials.ts';
 
 export type NativePage<T> = { items: T[]; total: number };
@@ -12,7 +13,7 @@ const clientId = (() => {
 	try {
 		const stored = localStorage.getItem(CLIENT_ID_KEY);
 		if (stored) return stored;
-		const created = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+		const created = randomId();
 		localStorage.setItem(CLIENT_ID_KEY, created);
 		return created;
 	} catch {

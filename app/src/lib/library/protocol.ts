@@ -8,7 +8,7 @@ export type SyncProgress = { albums: number; albumTotal: number; tracks: number;
 export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number; steps: Record<string, number> };
 
 export type WorkerRequest =
-	| { kind: 'open'; userId: string }
+	| { kind: 'open'; userId: string; chunkBytes?: number }
 	| { kind: 'reload' }
 	| { kind: 'sync'; credentials: Credentials; full: boolean; albumIds: string[] }
 	| { kind: 'loadFile'; url: string }

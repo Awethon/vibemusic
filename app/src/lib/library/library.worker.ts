@@ -1,70 +1,44 @@
 import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
-import { LIBRARY_SYNC } from '../tuning.ts';
+import { LIBRARY_STORE, LIBRARY_SYNC } from '../tuning.ts';
 import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState, refreshDerived } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary, fetchSnapshotFile } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
+import { listFiles, readFile, removeFile, writeFile, type Saved } from './store.ts';
 
 let sqlite: Sqlite3Static;
 let db: Database | null = null;
 let outdated: Database | null = null;
 let userId = '';
+let chunkSize: number = LIBRARY_STORE.chunkBytes;
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+let writing: Promise<unknown> = Promise.resolve();
+const savedState = new WeakMap<Database, Saved>();
 
 const ready = sqlite3InitModule().then((module) => {
 	sqlite = module;
 });
 
 const snapshotName = () => `library-${userId}-v${SCHEMA_VERSION}.sqlite`;
+const isOutdated = (name: string) => name.startsWith(`library-${userId}-v`) && name !== snapshotName();
 
-async function readSnapshot(): Promise<Uint8Array | null> {
+async function legacyDirectory(): Promise<FileSystemDirectoryHandle | null> {
 	try {
-		const directory = await navigator.storage.getDirectory();
-		const file = await directory.getFileHandle(snapshotName());
-		return new Uint8Array(await (await file.getFile()).arrayBuffer());
+		return (await navigator.storage?.getDirectory?.()) ?? null;
 	} catch {
 		return null;
 	}
 }
 
-async function writeSnapshot(database: Database) {
-	const bytes = sqlite.capi.sqlite3_js_db_export(database);
-	await writeBytes(bytes);
-	return bytes.byteLength;
-}
-
-type SyncAccessHandle = { truncate(size: number): void; write(buffer: Uint8Array, options: { at: number }): number; flush(): void; close(): void };
-type WorkerFileHandle = Omit<FileSystemFileHandle, 'createWritable'> & { createWritable?: FileSystemFileHandle['createWritable']; createSyncAccessHandle?(): Promise<SyncAccessHandle> };
-
-async function writeBytes(bytes: Uint8Array<ArrayBuffer>) {
-	const directory = await navigator.storage.getDirectory();
-	const file: WorkerFileHandle = await directory.getFileHandle(snapshotName(), { create: true });
-	if (file.createWritable) {
-		const writable = await file.createWritable();
-		await writable.write(bytes);
-		await writable.close();
-		return;
-	}
-	if (!file.createSyncAccessHandle) throw new Error('This browser cannot save the library');
-	const access = await file.createSyncAccessHandle();
+async function readLegacy(match: (name: string) => boolean): Promise<Uint8Array | null> {
+	const directory = await legacyDirectory();
+	if (!directory) return null;
 	try {
-		access.truncate(0);
-		access.write(bytes, { at: 0 });
-		access.flush();
-	} finally {
-		access.close();
-	}
-}
-
-async function loadOutdatedSnapshot(): Promise<Database | null> {
-	try {
-		const directory = await navigator.storage.getDirectory();
 		for await (const [name, handle] of directory.entries()) {
-			if (!name.startsWith(`library-${userId}-v`) || name === snapshotName() || handle.kind !== 'file') continue;
-			return databaseFrom(new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer()));
+			if (handle.kind === 'file' && match(name)) return new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer());
 		}
 	} catch {
 		return null;
@@ -72,15 +46,43 @@ async function loadOutdatedSnapshot(): Promise<Database | null> {
 	return null;
 }
 
-async function removeOutdatedSnapshots() {
+async function removeLegacy() {
+	const directory = await legacyDirectory();
+	if (!directory) return;
 	try {
-		const directory = await navigator.storage.getDirectory();
-		for await (const name of directory.keys()) {
-			if (name.startsWith(`library-${userId}`) && name !== snapshotName()) await directory.removeEntry(name);
-		}
+		for await (const name of directory.keys()) if (name.startsWith(`library-${userId}`)) await directory.removeEntry(name);
 	} catch {
 		return;
 	}
+}
+
+function liveBytes(database: Database): Uint8Array {
+	const { capi, wasm } = sqlite;
+	const sizeOut = wasm.alloc(8);
+	try {
+		const pointer = capi.sqlite3_serialize(database.pointer!, 'main', sizeOut, capi.SQLITE_SERIALIZE_NOCOPY);
+		if (pointer) return wasm.heap8u().subarray(pointer, pointer + Number(wasm.peek(sizeOut, 'i64')));
+	} finally {
+		wasm.dealloc(sizeOut);
+	}
+	return capi.sqlite3_js_db_export(database);
+}
+
+function writeSnapshot(database: Database): Promise<number> {
+	const next = writing.then(async () => {
+		const result = await writeFile(snapshotName(), () => liveBytes(database), chunkSize, savedState.get(database) ?? null);
+		savedState.set(database, result.saved);
+		return result.size;
+	});
+	writing = next.catch(() => {});
+	return next;
+}
+
+function emptyDatabase(): Database {
+	const database = new sqlite.oo1.DB();
+	const flags = sqlite.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite.capi.SQLITE_DESERIALIZE_RESIZEABLE;
+	database.checkRc(sqlite.capi.sqlite3_deserialize(database.pointer!, 'main', 0, 0, 0, flags));
+	return database;
 }
 
 function databaseFrom(bytes: Uint8Array): Database {
@@ -91,6 +93,26 @@ function databaseFrom(bytes: Uint8Array): Database {
 	return database;
 }
 
+async function loadOutdatedSnapshot(): Promise<Database | null> {
+	try {
+		const name = (await listFiles()).find(isOutdated);
+		const stored = name ? await readFile(name) : null;
+		if (stored) return databaseFrom(stored.bytes);
+	} catch {
+		return null;
+	}
+	const legacy = await readLegacy(isOutdated);
+	return legacy && databaseFrom(legacy);
+}
+
+async function removeOutdatedSnapshots() {
+	try {
+		for (const name of await listFiles()) if (isOutdated(name)) await removeFile(name);
+	} catch {
+		return;
+	}
+}
+
 function replaceDatabase(next: Database | null) {
 	const previous = db;
 	db = next;
@@ -98,7 +120,9 @@ function replaceDatabase(next: Database | null) {
 }
 
 async function loadSnapshot() {
-	const bytes = await readSnapshot();
+	const stored = await readFile(snapshotName()).catch(() => null);
+	const legacy = stored ? null : await readLegacy((name) => name === snapshotName());
+	const bytes = stored?.bytes ?? legacy;
 	if (!bytes) return null;
 	try {
 		const database = databaseFrom(bytes);
@@ -107,9 +131,11 @@ async function loadSnapshot() {
 			database.close();
 			return null;
 		}
+		if (stored) savedState.set(database, stored.saved);
 		replaceDatabase(database);
 		const refreshed = refreshDerived(database, meta);
-		if (refreshed) await writeSnapshot(database);
+		if (refreshed || legacy) await writeSnapshot(database);
+		if (legacy) void removeLegacy();
 		return refreshed ?? meta;
 	} catch {
 		return null;
@@ -125,13 +151,14 @@ function scheduleSnapshotWrite() {
 
 async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ meta: LibraryMeta; timings: SyncTimings }> {
 	const buildStarted = performance.now();
-	const database = new sqlite.oo1.DB();
+	const database = emptyDatabase();
 	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString(), db ?? outdated);
 	replaceDatabase(database);
 	if (outdated) {
 		outdated.close();
 		outdated = null;
 		void removeOutdatedSnapshots();
+		void removeLegacy();
 	}
 	const writeStarted = performance.now();
 	const snapshotBytes = await writeSnapshot(database);
@@ -160,6 +187,7 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 	switch (request.kind) {
 		case 'open': {
 			userId = request.userId;
+			chunkSize = request.chunkBytes ?? LIBRARY_STORE.chunkBytes;
 			const meta = await loadSnapshot();
 			if (meta) void removeOutdatedSnapshots();
 			else outdated = await loadOutdatedSnapshot();

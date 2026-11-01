@@ -326,6 +326,7 @@ export const SAVED_QUEUE = Object.freeze({
 export const REMOTE = Object.freeze({
 	reconnectMinMs: 1000,
 	reconnectMaxMs: 30000,
+	deviceProbeMs: 150,
 	keepAliveMs: 25000,
 	playbackResyncMs: 10000,
 	positionJumpSeconds: 1.5,
@@ -352,6 +353,16 @@ export const LIBRARY_SYNC = Object.freeze({
 	eventRetryMinMs: 2000,
 	eventRetryMaxMs: 60 * 1000,
 	eventSilenceMs: 45 * 1000
+});
+
+export const LEADER_LEASE = Object.freeze({
+	ttlMs: 90 * 1000,
+	renewMs: 20 * 1000,
+	settleMs: 300
+});
+
+export const LIBRARY_STORE = Object.freeze({
+	chunkBytes: 4 * 1024 * 1024
 });
 
 export const COVER_RETRY = Object.freeze({
