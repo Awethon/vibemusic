@@ -71,9 +71,11 @@ const coverTier = (size: number) => COVER_TIERS.find((tier) => tier >= size) ?? 
 
 export const coverAlbumOverrides = new Map<string, string>();
 
-export type AlbumArt = { hash: string; color: string };
+export type AlbumArt = { hash: string; color: string; thumb: string };
+export type ArtistArt = { color: string; thumb: string };
 
 export const albumArt = new SvelteMap<string, AlbumArt>();
+export const artistArt = new SvelteMap<string, ArtistArt>();
 
 const albumCoverId = (albumId: string) => {
 	const stamp = albumArt.get(albumId)?.hash;

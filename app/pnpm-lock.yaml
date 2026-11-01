@@ -17,6 +17,9 @@ importers:
       '@sqlite.org/sqlite-wasm':
         specifier: 3.54.1-build1
         version: 3.54.1-build1
+      thumbhash:
+        specifier: 0.1.1
+        version: 0.1.1
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -619,6 +622,9 @@ packages:
     resolution: {integrity: sha512-1YiPCAXT0Ct6g1vOMmSLa0Nsc3QRMvtDF32ihgglGVrugIuIK38RyDiFNXVDhtQ81TJjSO57NdMw6DyYLqSGDQ==}
     engines: {node: '>=18'}
 
+  thumbhash@0.1.1:
+    resolution: {integrity: sha512-kH5pKeIIBPQXAOni2AiY/Cu/NKdkFREdpH+TLdM0g6WA7RriCv0kPLgP731ady67MhTAqrVG/4mnEeibVuCJcg==}
+
   tinybench@6.2.2:
     resolution: {integrity: sha512-nIZ2N2dFpjBsg2hgitKu7mA+FvsIJuGJOwysRngmVRRmWgR/UyPjwJj8c/fT/dhm8EkHnF5EOogRf+0Z2qrimA==}
     engines: {node: '>=20.0.0'}
@@ -1161,6 +1167,8 @@ snapshots:
       zimmerframe: 1.1.5
     transitivePeerDependencies:
       - '@typescript-eslint/types'
+
+  thumbhash@0.1.1: {}
 
   tinybench@6.2.2: {}
 

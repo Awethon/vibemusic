@@ -1,5 +1,5 @@
 import type { Database } from '@sqlite.org/sqlite-wasm';
-import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
+import type { NativeAlbum, NativeArtist, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
 import { deezerAlbumGenre } from '../genres/deezer.ts';
 import { genresFromEvidence, type Tag } from '../genres/evidence.ts';
 import { createGenreResolver, regionalGenres, withAncestors } from '../genres/genres.ts';
@@ -46,7 +46,7 @@ function deleteWhereIn(db: Database, sql: string, ids: string[]) {
 }
 
 function insertAlbums(db: Database, albums: NativeAlbum[]) {
-	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId, album.imageHash, album.dominantColor]));
+	eachBound(db, 'insert into album values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', albums.map((album) => [album.id, album.name, album.orderAlbumName || album.name.toLowerCase(), album.albumArtistId, album.albumArtist, album.orderAlbumArtistName || album.albumArtist.toLowerCase(), album.maxYear, JSON.stringify(albumGenresOf(album)), album.songCount, album.duration, album.createdAt, album.updatedAt, album.playCount, album.playDate, album.starred ? 1 : 0, JSON.stringify(albumGenresOf(album)), album.mbzReleaseGroupId, album.imageHash, album.dominantColor, album.thumbHash]));
 	eachBound(db, 'insert or ignore into album_credit values (?,?,?,?,?)', albums.flatMap((album) => albumCreditsOf(album).map((credit, position) => [credit.id, album.id, position, credit.name, credit.order])));
 	eachBound(db, 'insert into search values (?,?,?)', albums.map((album) => ['album', album.id, normalizeForSearch(`${album.name} ${album.albumArtist}`)]));
 }
@@ -92,13 +92,25 @@ function updateRatings(db: Database, ratings: Map<string, number>): number {
 }
 
 function updateArtwork(db: Database, albums: NativeAlbum[]): number {
-	const update = db.prepare('update album set image_hash = ?, dominant_color = ? where id = ? and (image_hash != ? or dominant_color != ?)');
+	const update = db.prepare('update album set image_hash = ?, dominant_color = ?, thumb_hash = ? where id = ? and (image_hash != ? or dominant_color != ? or thumb_hash != ?)');
 	let changed = 0;
 	for (const album of albums) {
-		update.bind([album.imageHash, album.dominantColor, album.id, album.imageHash, album.dominantColor]).stepReset();
+		update.bind([album.imageHash, album.dominantColor, album.thumbHash, album.id, album.imageHash, album.dominantColor, album.thumbHash]).stepReset();
 		changed += db.changes();
 	}
 	update.finalize();
+	return changed;
+}
+
+function upsertArtistArt(db: Database, artists: NativeArtist[]): number {
+	const upsert = db.prepare(`insert into artist_art values (?, ?, ?, ?) on conflict (artist_id) do update set image_hash = excluded.image_hash, thumb_hash = excluded.thumb_hash, dominant_color = excluded.dominant_color
+		where image_hash != excluded.image_hash or thumb_hash != excluded.thumb_hash or dominant_color != excluded.dominant_color`);
+	let changed = 0;
+	for (const artist of artists) {
+		upsert.bind([artist.id, artist.imageHash, artist.thumbHash, artist.dominantColor]).stepReset();
+		changed += db.changes();
+	}
+	upsert.finalize();
 	return changed;
 }
 
@@ -318,6 +330,7 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 		insertPlaylists(db, snapshot.playlists, userId);
 		insertPlaylistTracks(db, snapshot.playlistTracks);
 		replaceRadioStations(db, snapshot.radioStations);
+		upsertArtistArt(db, snapshot.artists);
 		rebuildDerived(db);
 	});
 	const sync: SyncState = {
@@ -354,7 +367,7 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			insertTracks(db, changes.albumSongs);
 		}
 		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats) + updateRatings(db, changes.ratings);
-		artworkChanged = updateArtwork(db, changes.artwork);
+		artworkChanged = updateArtwork(db, changes.artwork) + upsertArtistArt(db, changes.artistArt);
 		if (playlistsChanged) {
 			deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", touched);
 			deleteWhereIn(db, 'delete from playlist where id = ?', touched);

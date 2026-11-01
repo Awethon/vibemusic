@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Playlist } from '../library/queries.ts';
 	import { albumPalette } from '../library/palette.ts';
-	import { coverUrl } from '../navidrome/credentials.ts';
+	import { albumArt, coverUrl } from '../navidrome/credentials.ts';
 	import { session } from '../session.svelte.ts';
 	import { genreTheme } from './genreTheme.ts';
 	import { playlistMetaLine } from './playlistText.ts';
 	import { COVER_PX, GENRE_COVER } from '../tuning.ts';
+	import { placeholderStyle } from './placeholder.ts';
 	import { retryCover } from './retryCover.ts';
 
 	let { playlist, mini = false, size = COVER_PX.fallback }: { playlist: Playlist; mini?: boolean; size?: number } = $props();
@@ -37,7 +38,7 @@
 	<span class="gc-canvas">
 		<span class="gc-wall">
 			{#if session.credentials}
-				{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
+				{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} style={placeholderStyle(albumArt.get(albumId))} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
 			{/if}
 		</span>
 		<span class="gc-shade"></span>

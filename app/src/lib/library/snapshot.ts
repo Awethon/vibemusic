@@ -1,4 +1,4 @@
-import type { NativeAlbum, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
+import type { NativeAlbum, NativeArtist, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
 
 export type LibrarySnapshot = {
 	albums: NativeAlbum[];
@@ -6,6 +6,7 @@ export type LibrarySnapshot = {
 	playlists: NativePlaylist[];
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
 	radioStations: RadioStation[];
+	artists: NativeArtist[];
 	steps?: Record<string, number>;
 };
 
@@ -17,6 +18,7 @@ export type LibraryChanges = {
 	albumSongs: NativeSong[];
 	albumStats: NativeAlbum[];
 	artwork: NativeAlbum[];
+	artistArt: NativeArtist[];
 	songStats: NativeSong[];
 	ratings: Map<string, number>;
 	playlists: NativePlaylist[];

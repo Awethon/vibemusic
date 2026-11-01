@@ -23,13 +23,15 @@
 </script>
 
 <script lang="ts">
-	import { artistPhotoUrl } from '../navidrome/credentials.ts';
+	import { albumArt, artistArt, artistPhotoUrl } from '../navidrome/credentials.ts';
 	import { session } from '../session.svelte.ts';
 	import Cover from './Cover.svelte';
+	import { placeholderStyle } from './placeholder.ts';
 
 	let { artistId, fallbackAlbumId, size }: { artistId: string; fallbackAlbumId: string; size: number } = $props();
 
 	let photo = $state<string | null | undefined>(undefined);
+	const placeholder = $derived(placeholderStyle(artistArt.get(artistId) ?? albumArt.get(fallbackAlbumId)));
 
 	$effect(() => {
 		const credentials = session.credentials;
@@ -46,9 +48,9 @@
 </script>
 
 {#if photo}
-	<img src={photo} alt="" decoding="async" draggable="false" />
+	<img src={photo} style={placeholder} alt="" decoding="async" draggable="false" />
 {:else if photo === null}
 	<Cover albumId={fallbackAlbumId} {size} />
 {:else}
-	<img alt="" draggable="false" />
+	<img style={placeholder} alt="" draggable="false" />
 {/if}

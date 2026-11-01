@@ -27,6 +27,7 @@ export const nativeAlbum = z.object({
 	mbzReleaseGroupId: optionalString,
 	imageHash: optionalString,
 	dominantColor: optionalString,
+	thumbHash: optionalString,
 	participants: z
 		.object({ albumartist: z.array(z.object({ id: z.string(), name: z.string() })).nullish() })
 		.nullish()
@@ -73,6 +74,13 @@ export const nativePlaylist = z.object({
 	sync: z.boolean().nullish().transform((value) => value ?? false)
 });
 
+export const nativeArtist = z.object({
+	id: z.string(),
+	imageHash: optionalString,
+	thumbHash: optionalString,
+	dominantColor: optionalString
+});
+
 export const nativePlaylistTrack = z.object({
 	id: z.string(),
 	mediaFileId: z.string()
@@ -80,6 +88,7 @@ export const nativePlaylistTrack = z.object({
 
 export type NativeAlbum = z.infer<typeof nativeAlbum>;
 export type NativeSong = z.infer<typeof nativeSong>;
+export type NativeArtist = z.infer<typeof nativeArtist>;
 export type NativePlaylist = z.infer<typeof nativePlaylist>;
 export type RadioStation = z.infer<typeof radioStation>;
 export type NativePlaylistTrack = z.infer<typeof nativePlaylistTrack>;

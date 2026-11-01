@@ -1,13 +1,17 @@
 import { LIBRARY_SYNC } from '../tuning.ts';
 
-export type NavidromeEventHandlers = { changed: (albumIds: string[]) => void; live: (live: boolean) => void };
+export type RefreshedIds = { albums: string[]; artists: string[] };
 
-function albumIdsIn(data: string): string[] {
+export type NavidromeEventHandlers = { changed: (refreshed: RefreshedIds) => void; live: (live: boolean) => void };
+
+const idsOf = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string' && id !== '*') : []);
+
+function refreshedIn(data: string): RefreshedIds {
 	try {
-		const ids = (JSON.parse(data) as { album?: unknown }).album;
-		return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string' && id !== '*') : [];
+		const resources = JSON.parse(data) as { album?: unknown; artist?: unknown };
+		return { albums: idsOf(resources.album), artists: idsOf(resources.artist) };
 	} catch {
-		return [];
+		return { albums: [], artists: [] };
 	}
 }
 
@@ -35,11 +39,11 @@ export function listenToNavidrome(token: () => string, handlers: NavidromeEventH
 		current.addEventListener('keepAlive', heard);
 		current.addEventListener('serverStart', () => {
 			heard();
-			handlers.changed([]);
+			handlers.changed({ albums: [], artists: [] });
 		});
 		current.addEventListener('refreshResource', (event) => {
 			heard();
-			handlers.changed(albumIdsIn((event as MessageEvent<string>).data));
+			handlers.changed(refreshedIn((event as MessageEvent<string>).data));
 		});
 		current.addEventListener('error', drop);
 	};

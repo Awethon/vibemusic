@@ -1,6 +1,6 @@
 import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { nativeAlbum, nativePlaylist, nativeSong, type NativeAlbum, type NativePlaylist, type NativePlaylistTrack, type NativeSong } from '../navidrome/schemas.ts';
+import { nativeAlbum, nativeArtist, nativePlaylist, nativeSong, type NativeAlbum, type NativePlaylist, type NativePlaylistTrack, type NativeSong } from '../navidrome/schemas.ts';
 import { applyChanges, buildLibrary, readMeta, readSyncState } from './build.ts';
 import { followsListening } from './fetch.ts';
 import type { LibraryChanges, LibrarySnapshot } from './snapshot.ts';
@@ -36,7 +36,8 @@ function library(): LibrarySnapshot {
 		['pl-smart', ['s-5-1-1', 's-6-2-2'].map((id, index) => ({ id: String(index), mediaFileId: id }))],
 		['pl-this', ['s-3-0-0', 's-3-1-1'].map((id, index) => ({ id: String(index), mediaFileId: id }))]
 	]);
-	return { albums, songs, playlists, playlistTracks, radioStations: [] };
+	const artists = Array.from({ length: 12 }, (_, artist) => nativeArtist.parse({ id: `ar-${artist}`, imageHash: `hash-${artist}`, thumbHash: `thumb-${artist}`, dominantColor: '#202020' }));
+	return { albums, songs, playlists, playlistTracks, radioStations: [], artists };
 }
 
 function built(snapshot: LibrarySnapshot): Database {
@@ -48,12 +49,14 @@ function built(snapshot: LibrarySnapshot): Database {
 function changesFor(base: LibrarySnapshot, next: LibrarySnapshot, refetched: string[]): LibraryChanges {
 	const before = new Map(base.songs.map((song) => [song.id, song]));
 	const albumsBefore = new Map(base.albums.map((album) => [album.id, album]));
+	const artistsBefore = new Map(base.artists.map((artist) => [artist.id, artist]));
 	return {
 		marks: { albumImported: '', albumPlayed: '', albumStarred: '', songPlayed: '', songStarred: '' },
 		albums: [],
 		albumSongs: [],
 		albumStats: [],
 		artwork: next.albums.filter((album) => JSON.stringify(album) !== JSON.stringify(albumsBefore.get(album.id))),
+		artistArt: next.artists.filter((artist) => JSON.stringify(artist) !== JSON.stringify(artistsBefore.get(artist.id))),
 		songStats: next.songs.filter((song) => JSON.stringify(song) !== JSON.stringify(before.get(song.id))),
 		ratings: new Map(),
 		playlists: next.playlists,
@@ -85,7 +88,9 @@ const TABLES = {
 	playlist_track: 'select * from playlist_track order by playlist_id, position',
 	search: 'select kind, ref, text from search order by kind, ref',
 	search_key: 'select kind, ref, text from search_key order by kind, ref',
-	track: 'select id, play_count, starred from track order by id'
+	track: 'select id, play_count, starred from track order by id',
+	album_art: 'select id, image_hash, dominant_color, thumb_hash from album order by id',
+	artist_art: 'select * from artist_art order by artist_id'
 };
 
 function expectSameLibrary(actual: Database, expected: Database) {
@@ -138,11 +143,20 @@ describe('applyChanges', () => {
 
 	it('updates a new cover without rebuilding anything', () => {
 		const base = library();
-		const next: LibrarySnapshot = { ...base, albums: base.albums.map((album) => (album.id === 'al-2-1' ? { ...album, imageHash: '0123456789abcdef', dominantColor: '#336699' } : album)) };
+		const next: LibrarySnapshot = { ...base, albums: base.albums.map((album) => (album.id === 'al-2-1' ? { ...album, imageHash: '0123456789abcdef', dominantColor: '#336699', thumbHash: 'CSgGFwhHZZh/eHdzeUZnaXaJeffHd38M' } : album)) };
 		const result = applied(base, next, []);
 		expect(result.changed).toBe(true);
 		expectSameLibrary(result.db, built(next));
 		expect(result.db.selectValue("select image_hash || ' ' || dominant_color from album where id = 'al-2-1'")).toBe('0123456789abcdef #336699');
+		expect(result.changedPages / result.pages).toBeLessThan(0.05);
+	});
+
+	it('updates a new artist photo without rebuilding anything', () => {
+		const base = library();
+		const next: LibrarySnapshot = { ...base, artists: base.artists.map((artist) => (artist.id === 'ar-5' ? { ...artist, imageHash: 'new-hash', thumbHash: 'new-thumb', dominantColor: '#aa5500' } : artist)) };
+		const result = applied(base, next, []);
+		expect(result.changed).toBe(true);
+		expectSameLibrary(result.db, built(next));
 		expect(result.changedPages / result.pages).toBeLessThan(0.05);
 	});
 
