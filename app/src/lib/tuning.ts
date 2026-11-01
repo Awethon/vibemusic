@@ -157,7 +157,7 @@ export const COVER_PX = Object.freeze({
 	mosaicMini: 60,
 	ambient: 600,
 	albumPage: 700,
-	nowCanvas: 800,
+	nowPhone: 800,
 	nowClassic: 900,
 	mediaSession: 512,
 	playlistPage: 440,
@@ -241,7 +241,7 @@ export const FIELD = Object.freeze({
 
 export const LYRICS = Object.freeze({
 	ambientSwapMs: 380,
-	focusLineRatio: Object.freeze({ canvas: 0.4, classic: 0.36, panel: 0.32 })
+	focusLineRatio: Object.freeze({ classic: 0.36, panel: 0.32 })
 });
 
 export const IDLE = Object.freeze({

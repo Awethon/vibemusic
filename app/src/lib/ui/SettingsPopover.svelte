@@ -11,9 +11,8 @@
 	import { setFullScreenStyle, setNavItem, setRipples, ui, type FullScreenStyle } from './state.svelte.ts';
 
 	const options: [FullScreenStyle, string, string][] = [
-		['canvas', 'Canvas', 'Lyrics centre stage'],
-		['classic', 'Classic', 'Large cover beside lyrics'],
-		['minimal', 'Minimal', 'Cover and one line']
+		['minimal', 'Minimal', 'Cover and one line'],
+		['classic', 'Classic', 'Large cover beside lyrics']
 	];
 
 	let element = $state<HTMLElement | null>(null);

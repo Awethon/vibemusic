@@ -32,7 +32,6 @@
 	import LibraryGate from '#lib/ui/LibraryGate.svelte';
 	import Login from '#lib/ui/Login.svelte';
 	import { showView } from '#lib/ui/navigation.ts';
-	import NowCanvas from '#lib/ui/NowCanvas.svelte';
 	import NowClassic from '#lib/ui/NowClassic.svelte';
 	import NowPhone from '#lib/ui/NowPhone.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -117,7 +116,6 @@
 	{#if formFactor.phone}
 		<NowPhone />
 	{:else}
-		<NowCanvas />
 		<NowClassic />
 		<Ambient />
 	{/if}

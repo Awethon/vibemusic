@@ -42,7 +42,7 @@
 		{/if}
 	</header>
 	<div class="nf-stage">
-		<div class="nf-cover"><Cover albumId={track?.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.nowCanvas} eager /></div>
+		<div class="nf-cover"><Cover albumId={track?.albumId} icon={live ? 'radio' : undefined} size={COVER_PX.nowPhone} eager /></div>
 	</div>
 	<div class="nf-info">
 		<div class="nf-text">

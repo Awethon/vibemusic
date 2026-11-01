@@ -2,7 +2,7 @@ import type { AlbumSort, ArtistSort, Filters } from '../library/queries.ts';
 import { TOAST } from '../tuning.ts';
 import { readPreference, writePreference } from './preferences.ts';
 
-export const FULL_SCREEN_STYLES = ['canvas', 'classic', 'minimal'] as const;
+export const FULL_SCREEN_STYLES = ['minimal', 'classic'] as const;
 export type FullScreenStyle = (typeof FULL_SCREEN_STYLES)[number];
 export type PanelTab = 'queue' | 'lyrics';
 export type FilterKind = 'genre' | 'decade';
@@ -11,7 +11,7 @@ export const ui = $state({
 	panelOpen: false,
 	panelTab: 'queue' as PanelTab,
 	fullScreen: false,
-	fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'canvas'),
+	fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'minimal'),
 	ripples: readPreference('ripples', ['on', 'off'] as const, 'on') === 'on',
 	railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
 	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),

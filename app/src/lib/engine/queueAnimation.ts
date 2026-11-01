@@ -4,26 +4,16 @@ import { EASING, QUEUE_MOTION } from '../tuning.ts';
 import { ui } from '../ui/state.svelte.ts';
 import { bodyHasClass, prefersReducedMotion } from './dom.ts';
 
-export const QUEUE_ROW_SELECTOR = '.qlist li, #npNext li';
+export const QUEUE_ROW_SELECTOR = '.qlist li';
 
-const PANEL_GROUP = 'pn';
-const FULL_SCREEN_GROUP = 'np';
+type RowSnapshot = { row: HTMLElement; rect: DOMRect; visible: boolean };
 
-type RowSnapshot = { row: HTMLElement; group: string; rect: DOMRect; visible: boolean };
-
-const rowGroupOf = (row: HTMLElement) => (row.parentElement?.id === 'npNext' ? FULL_SCREEN_GROUP : PANEL_GROUP);
-
-function isRowGroupVisible(group: string) {
-	if (group === FULL_SCREEN_GROUP) return bodyHasClass('now-open') && ui.fullScreenStyle === 'canvas';
-	return bodyHasClass('panel-open') && !bodyHasClass('now-open') && ui.panelTab === 'queue';
-}
+const isQueueVisible = () => bodyHasClass('panel-open') && !bodyHasClass('now-open') && ui.panelTab === 'queue';
 
 function snapshotQueueRows() {
 	const rowsByKey = new Map<string, RowSnapshot>();
-	for (const row of document.querySelectorAll<HTMLElement>(QUEUE_ROW_SELECTOR)) {
-		const group = rowGroupOf(row);
-		rowsByKey.set(`${group}:${row.dataset.entry}`, { row, group, rect: row.getBoundingClientRect(), visible: isRowGroupVisible(group) });
-	}
+	const visible = isQueueVisible();
+	for (const row of document.querySelectorAll<HTMLElement>(QUEUE_ROW_SELECTOR)) rowsByKey.set(row.dataset.entry ?? '', { row, rect: row.getBoundingClientRect(), visible });
 	return rowsByKey;
 }
 
@@ -50,9 +40,7 @@ function animateRowLeaving(original: HTMLElement, rect: DOMRect, exitTransform: 
 function captureNowPlayingBlocks() {
 	const blocks: HTMLElement[] = [];
 	const panelNow = document.querySelector<HTMLElement>('.pn-now');
-	const canvasNow = document.querySelector<HTMLElement>('#now .np-left');
 	if (bodyHasClass('panel-open') && !bodyHasClass('now-open') && panelNow) blocks.push(panelNow);
-	if (bodyHasClass('now-open') && ui.fullScreenStyle === 'canvas' && canvasNow) blocks.push(canvasNow);
 	return blocks.map((block) => ({ block, rect: block.getBoundingClientRect(), copy: block.cloneNode(true) as HTMLElement }));
 }
 
@@ -109,7 +97,7 @@ function animateTravel(row: HTMLElement, offsetY: number) {
 }
 
 function animateRemainingRows(before: Map<string, RowSnapshot>, after: Map<string, RowSnapshot>, movedEntryId?: string) {
-	const groupsWithTravel = new Set<string>();
+	let travelled = false;
 	for (const [key, current] of after) {
 		const previous = before.get(key);
 		if (!previous) {
@@ -118,9 +106,9 @@ function animateRemainingRows(before: Map<string, RowSnapshot>, after: Map<strin
 		}
 		const offsetY = previous.rect.top - current.rect.top;
 		if (Math.abs(offsetY) < QUEUE_MOTION.minRowOffsetPx) continue;
-		const travels = movedEntryId !== undefined && current.row.dataset.entry === movedEntryId && !groupsWithTravel.has(current.group);
+		const travels = movedEntryId !== undefined && current.row.dataset.entry === movedEntryId && !travelled;
 		if (travels) {
-			groupsWithTravel.add(current.group);
+			travelled = true;
 			animateTravel(current.row, offsetY);
 		} else {
 			animateGlide(current.row, offsetY);
