@@ -5,7 +5,7 @@ import { listenToRelay, relay, sendToRelay } from '../remote/relay.svelte.ts';
 import { ENRICHMENT, LIBRARY_SYNC } from '../tuning.ts';
 import LibraryWorker from './library.worker.ts?worker';
 import type { SqlParam, SyncProgress, SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
-import { albumArt, artistArt, coverAlbumOverrides } from '../navidrome/credentials.ts';
+import { albumArt, artistArt } from '../navidrome/credentials.ts';
 import { listenToNavidrome, type RefreshedIds } from '../navidrome/events.ts';
 import { leadWhenFree } from './lease.ts';
 import { SCHEMA_VERSION } from './schema.ts';
@@ -38,10 +38,6 @@ export const library = $state<{
 	timings: null,
 	progress: null
 });
-
-const SYNTHETIC_LIBRARY = { snapshotUrl: '/dev/library-large.json', coversUrl: '/dev/library-large-covers.json' };
-const syntheticLibrary = import.meta.env.DEV && new URLSearchParams(location.search).get('lib') === 'synthetic';
-const devChunkBytes = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('chunkKb')) * 1024 || undefined : undefined;
 
 let worker: Worker | null = null;
 let channel: BroadcastChannel | null = null;
@@ -150,7 +146,7 @@ let lastEnrichmentAt = 0;
 let lastEnrichmentRequestAt = 0;
 
 async function requestEnrichment(force = false) {
-	if (!library.leader || !relay.connected || !library.meta || syntheticLibrary) return;
+	if (!library.leader || !relay.connected || !library.meta) return;
 	if (!force && Date.now() - lastEnrichmentRequestAt < ENRICHMENT.requestIntervalMs) return;
 	lastEnrichmentRequestAt = Date.now();
 	try {
@@ -264,19 +260,9 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 	}
 }
 
-async function startSyntheticLibrary() {
-	const covers = (await (await fetch(SYNTHETIC_LIBRARY.coversUrl)).json()) as Record<string, string>;
-	for (const [albumId, coverAlbumId] of Object.entries(covers)) coverAlbumOverrides.set(albumId, coverAlbumId);
-	if (library.meta) return;
-	library.status = 'syncing';
-	const result = await call({ kind: 'loadFile', url: SYNTHETIC_LIBRARY.snapshotUrl });
-	library.timings = result.timings;
-	await loaded(result.meta);
-}
-
 export async function startLibrary() {
 	if (worker) return;
-	const userId = syntheticLibrary ? 'synthetic' : requireCredentials().userId;
+	const userId = requireCredentials().userId;
 	library.status = 'loading';
 	worker = new LibraryWorker();
 	worker.addEventListener('message', onWorkerReply);
@@ -284,12 +270,8 @@ export async function startLibrary() {
 	channel.addEventListener('message', onChannelMessage);
 	try {
 		const openStarted = performance.now();
-		await loaded(await call({ kind: 'open', userId, chunkBytes: devChunkBytes }));
+		await loaded(await call({ kind: 'open', userId }));
 		library.openMs = performance.now() - openStarted;
-		if (syntheticLibrary) {
-			await startSyntheticLibrary();
-			return;
-		}
 		if (!library.meta) {
 			library.status = 'syncing';
 			channel.postMessage({ kind: 'need-snapshot' } satisfies ChannelMessage);

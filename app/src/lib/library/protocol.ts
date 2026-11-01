@@ -16,10 +16,9 @@ export type SyncProgress = {
 export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number; steps: Record<string, number> };
 
 export type WorkerRequest =
-	| { kind: 'open'; userId: string; chunkBytes?: number }
+	| { kind: 'open'; userId: string }
 	| { kind: 'reload' }
 	| { kind: 'sync'; credentials: Credentials; full: boolean; albumIds: string[]; artistIds: string[] }
-	| { kind: 'loadFile'; url: string }
 	| { kind: 'persist' }
 	| { kind: 'query'; sql: string; params: SqlParam[] }
 	| { kind: 'run'; sql: string; params: SqlParam[]; persist: boolean }
@@ -30,7 +29,6 @@ export type WorkerResults = {
 	open: LibraryMeta | null;
 	reload: LibraryMeta | null;
 	sync: { meta: LibraryMeta; token: string; timings: SyncTimings | null; changed: boolean };
-	loadFile: { meta: LibraryMeta; timings: SyncTimings };
 	query: { columns: string[]; rows: SqlParam[][] };
 	run: number;
 	persist: number;

@@ -72,8 +72,6 @@ export const streamUrl = (credentials: Credentials, trackId: string) =>
 
 const coverTier = (size: number) => COVER_TIERS.find((tier) => tier >= size) ?? COVER_TIERS[COVER_TIERS.length - 1];
 
-export const coverAlbumOverrides = new Map<string, string>();
-
 export type AlbumArt = { hash: string; color: string; thumb: string };
 export type ArtistArt = { color: string; thumb: string };
 
@@ -82,7 +80,7 @@ export const artistArt = new SvelteMap<string, ArtistArt>();
 
 const albumCoverId = (albumId: string) => {
 	const stamp = albumArt.get(albumId)?.hash;
-	return `al-${coverAlbumOverrides.get(albumId) ?? albumId}${stamp ? `_${stamp}` : ''}`;
+	return `al-${albumId}${stamp ? `_${stamp}` : ''}`;
 };
 
 export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>

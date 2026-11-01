@@ -4,7 +4,7 @@ import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/cre
 import { LIBRARY_STORE, LIBRARY_SYNC } from '../tuning.ts';
 import { applyChanges, applyEnrichment, buildLibrary, enrichmentRequest, readMeta, readSyncState, refreshDerived } from './build.ts';
 import { SCHEMA_VERSION } from './schema.ts';
-import { fetchChanges, fetchLibrary, fetchSnapshotFile } from './fetch.ts';
+import { fetchChanges, fetchLibrary } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
 import { listFiles, readFile, removeFile, writeFile, type Saved } from './store.ts';
@@ -13,7 +13,6 @@ let sqlite: Sqlite3Static;
 let db: Database | null = null;
 let outdated: Database | null = null;
 let userId = '';
-let chunkSize: number = LIBRARY_STORE.chunkBytes;
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
 let writing: Promise<unknown> = Promise.resolve();
 const savedState = new WeakMap<Database, Saved>();
@@ -71,7 +70,7 @@ function liveBytes(database: Database): Uint8Array {
 
 function writeSnapshot(database: Database): Promise<number> {
 	const next = writing.then(async () => {
-		const result = await writeFile(snapshotName(), () => liveBytes(database), chunkSize, savedState.get(database) ?? null);
+		const result = await writeFile(snapshotName(), () => liveBytes(database), LIBRARY_STORE.chunkBytes, savedState.get(database) ?? null);
 		savedState.set(database, result.saved);
 		return result.size;
 	});
@@ -201,7 +200,6 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 	switch (request.kind) {
 		case 'open': {
 			userId = request.userId;
-			chunkSize = request.chunkBytes ?? LIBRARY_STORE.chunkBytes;
 			const meta = await loadSnapshot();
 			if (meta) void removeOutdatedSnapshots();
 			else outdated = await loadOutdatedSnapshot();
@@ -217,11 +215,6 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 			const started = performance.now();
 			const snapshot = await fetchLibrary(http, (progress) => self.postMessage({ id, progress } satisfies WorkerReply));
 			return { ...(await install(snapshot, performance.now() - started)), token, changed: true };
-		}
-		case 'loadFile': {
-			const started = performance.now();
-			const snapshot = await fetchSnapshotFile(request.url);
-			return install(snapshot, performance.now() - started);
 		}
 		case 'query': {
 			const columns: string[] = [];

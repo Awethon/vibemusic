@@ -9,7 +9,6 @@ import { settlePalette } from './palette.ts';
 export const idle = $state({ isIdle: false, isResting: false });
 
 let lastActivityAt = performance.now();
-const idleDelayMs = Number(new URLSearchParams(location.search).get('idle')) || IDLE.defaultDelayMs;
 
 export function wakeFromIdle() {
 	lastActivityAt = performance.now();
@@ -46,7 +45,7 @@ function checkIdle() {
 		return;
 	}
 	if (idle.isIdle || idle.isResting || !playerQueue().currentTrackId || !player.playing) return;
-	if (somethingKeepsUiAwake() || performance.now() - lastActivityAt <= idleDelayMs) return;
+	if (somethingKeepsUiAwake() || performance.now() - lastActivityAt <= IDLE.defaultDelayMs) return;
 	enterIdleOrRest();
 }
 

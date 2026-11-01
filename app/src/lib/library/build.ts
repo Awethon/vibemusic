@@ -305,15 +305,13 @@ type MbArtistRow = { tags: Tag[] | null; countries: string[] };
 
 function musicBrainzArtists(db: Database) {
 	const artists = new Map(
-		db
-			.selectObjects('select id, tags, countries from mb_artist')
-			.map((row) => [
-				row.id as string,
-				{
-					tags: parsedTags(row.tags),
-					countries: typeof row.countries === 'string' ? (JSON.parse(row.countries) as string[]) : []
-				} satisfies MbArtistRow
-			])
+		db.selectObjects('select id, tags, countries from mb_artist').map((row) => [
+			row.id as string,
+			{
+				tags: parsedTags(row.tags),
+				countries: typeof row.countries === 'string' ? (JSON.parse(row.countries) as string[]) : []
+			} satisfies MbArtistRow
+		])
 	);
 	const byAlbumArtist = new Map<string, string>(
 		db.selectArrays('select artist_id, mbid from artist_match where mbid is not null') as [string, string][]

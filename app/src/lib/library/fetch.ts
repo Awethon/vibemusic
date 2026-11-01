@@ -260,17 +260,3 @@ export async function fetchChanges(
 		totals: totals && { albums: totals[0], tracks: totals[1] }
 	};
 }
-
-type RawSnapshot = { albums: unknown[]; songs: unknown[]; playlists: unknown[]; playlistTracks: Record<string, unknown[]> };
-
-export async function fetchSnapshotFile(url: string): Promise<LibrarySnapshot> {
-	const raw = (await (await fetch(url)).json()) as RawSnapshot;
-	return {
-		albums: nativeAlbum.array().parse(raw.albums),
-		songs: nativeSong.array().parse(raw.songs),
-		playlists: nativePlaylist.array().parse(raw.playlists),
-		playlistTracks: new Map(Object.entries(raw.playlistTracks).map(([id, tracks]) => [id, nativePlaylistTrack.array().parse(tracks)])),
-		radioStations: [],
-		artists: []
-	};
-}
