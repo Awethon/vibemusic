@@ -163,17 +163,20 @@
 .grid:has(.tile:hover) .tile:not(:hover),
 .vgrid:has(.tile:hover) .tile:not(:hover) {
 	opacity: 0.5;
-	transition-delay: 0s;
+	transition: opacity var(--focus-fade) var(--ease);
 }
 
 /* With the pointer in the gap between tiles (grid hovered, no tile hovered), wait --focus-return
-   before un-dimming, so moving from one tile to the next doesn't flash the whole grid. */
+   before un-dimming, so moving from one tile to the next doesn't flash the whole grid. The
+   un-dimming runs at the hovered tile's speed (--focus-leave): a tile hovered while it is already
+   brightening keeps that transition (its end value doesn't change), so a slower one here would
+   make the hovered tile brighten slower after a slow pointer move than after a quick one. */
 .grid:hover .tile,
 .vgrid:hover .tile,
 .pl-grid:hover .pl-card,
 .shelf:hover .pl-tile,
 .bb-body.tiles:hover .g-tile {
-	transition: opacity var(--focus-fade) var(--ease) var(--focus-return);
+	transition: opacity var(--focus-leave) var(--ease) var(--focus-return);
 }
 
 .grid:hover .tile:hover,
@@ -518,7 +521,7 @@ body.is-playing .trk.playing .n::after {
 
 .pl-grid:has(.pl-card:hover) .pl-card:not(:hover) {
 	opacity: 0.5;
-	transition-delay: 0s;
+	transition: opacity var(--focus-fade) var(--ease);
 }
 
 .mosaic {

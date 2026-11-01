@@ -142,7 +142,7 @@
 
 .shelf:has(.pl-tile:hover) .pl-tile:not(:hover) {
 	opacity: 0.5;
-	transition-delay: 0s;
+	transition: opacity var(--focus-fade) var(--ease);
 }
 
 .pl-tile .mosaic {
@@ -354,7 +354,7 @@
 
 .bb-body.tiles:has(.g-tile:hover) .g-tile:not(:hover) {
 	opacity: 0.5;
-	transition-delay: 0s;
+	transition: opacity var(--focus-fade) var(--ease);
 }
 
 .album-main {
