@@ -64,6 +64,29 @@ function transformText(text: string, transform: string) {
 	return text;
 }
 
+// One box per line. The browser can report a line as several boxes: text cut off with an
+// ellipsis comes back as one box for the whole text and one for the visible part, both on the
+// same line. Treating those as separate lines drew the rest of the text over its start.
+function lineBoxes(rects: DOMRect[]): DOMRect[] {
+	const lines: DOMRect[] = [];
+	for (const rect of rects.toSorted((a, b) => a.top - b.top || a.left - b.left)) {
+		const line = lines.at(-1);
+		if (line && Math.abs(rect.top + rect.height / 2 - (line.top + line.height / 2)) < line.height / 2) {
+			const left = Math.min(line.left, rect.left);
+			lines[lines.length - 1] = new DOMRect(left, line.top, Math.max(line.right, rect.right) - left, line.height);
+		} else lines.push(rect);
+	}
+	return lines;
+}
+
+// Shortens a single-line text to what the page shows when the element ends it with an ellipsis.
+function ellipsized(context: CanvasRenderingContext2D, text: string, width: number): string {
+	if (context.measureText(text).width <= width) return text;
+	let end = text.length;
+	while (end > 0 && context.measureText(`${text.slice(0, end).trimEnd()}…`).width > width) end -= 1;
+	return `${text.slice(0, end).trimEnd()}…`;
+}
+
 function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyleDeclaration, region: Box) {
 	const raw = node.data.replace(/\s+/g, ' ');
 	if (!raw.trim()) return;
@@ -71,7 +94,7 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	range.selectNodeContents(node);
 	// The browser already wrapped the text; its line boxes come from the Range. Words are then
 	// re-flowed greedily into those boxes, which is close enough behind blurred, refracting glass.
-	const lines = [...range.getClientRects()].filter((line) => line.width > 0 && line.height > 0);
+	const lines = lineBoxes([...range.getClientRects()].filter((line) => line.width > 0 && line.height > 0));
 	if (!lines.length || !lines.some((line) => intersects(line, region))) return;
 	context.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
 	context.fillStyle = style.color;
@@ -79,7 +102,13 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	context.textBaseline = 'middle';
 	const text = transformText(raw.trim(), style.textTransform);
 	if (lines.length === 1) {
-		context.fillText(text, lines[0].left, lines[0].top + lines[0].height / 2);
+		const [line] = lines;
+		const parent = node.parentElement;
+		const shown =
+			style.textOverflow === 'ellipsis' && parent
+				? ellipsized(context, text, parent.getBoundingClientRect().right - (parseFloat(style.paddingRight) || 0) - line.left)
+				: text;
+		context.fillText(shown, line.left, line.top + line.height / 2);
 		return;
 	}
 	const words = text.split(' ');
