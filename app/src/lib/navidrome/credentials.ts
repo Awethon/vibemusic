@@ -22,6 +22,10 @@ export class SessionExpiredError extends Error {
 
 export class NavidromeError extends Error {}
 
+// Navidrome answers 501 for endpoints it leaves out, including ones its config turns off (sharing
+// without EnableSharing).
+export class NavidromeNotImplementedError extends NavidromeError {}
+
 export class NavidromeUnreachableError extends NavidromeError {
 	constructor() {
 		super('Navidrome isn’t reachable');

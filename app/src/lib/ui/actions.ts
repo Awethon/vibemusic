@@ -33,6 +33,7 @@ import {
 	removeQueued
 } from './queueActions.ts';
 import { isUnreachable } from '../connection.svelte.ts';
+import { NavidromeNotImplementedError } from '../navidrome/credentials.ts';
 import { copyText } from './clipboard.ts';
 import { showShareLink, showToast } from './state.svelte.ts';
 
@@ -75,7 +76,8 @@ async function share(ids: string[], description: string) {
 	try {
 		url = (await navidrome().subsonic<ShareResponse>('createShare', { id: ids, description })).shares?.share?.[0]?.url;
 	} catch (error) {
-		reportFailure('create a share link', error);
+		if (error instanceof NavidromeNotImplementedError) showToast('Sharing is turned off in Navidrome');
+		else reportFailure('create a share link', error);
 		return;
 	}
 	if (!url) {

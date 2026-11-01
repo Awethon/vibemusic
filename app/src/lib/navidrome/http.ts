@@ -6,6 +6,7 @@ import { randomId } from '../randomId.ts';
 import {
 	appendParams,
 	NavidromeError,
+	NavidromeNotImplementedError,
 	NavidromeUnreachableError,
 	reachNavidrome,
 	SessionExpiredError,
@@ -113,6 +114,7 @@ export class NavidromeHttp {
 			headers: { 'content-type': 'application/x-www-form-urlencoded' },
 			body: appendParams(new URLSearchParams(), params)
 		});
+		if (response.status === 501) throw new NavidromeNotImplementedError(`Subsonic ${method}: 501`);
 		if (!response.ok) throw new NavidromeError(`Subsonic ${method}: ${response.status}`);
 		const body = (await response.json())['subsonic-response'];
 		if (body?.status !== 'ok') {
