@@ -281,12 +281,13 @@ body.panel-open { --panel-w: 376px; }
 	overflow: hidden;
 	background: rgba(255, 255, 255, 0.05);
 	box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+	transform: translateY(0) scale(1) rotate(0deg);
 	transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease);
 }
 
 .tile img { width: 100%; height: 100%; object-fit: cover; }
 
-.tile:hover .art { transform: translateY(-4px) scale(1.02); box-shadow: 0 22px 40px -16px rgba(0, 0, 0, 0.75); }
+.tile:hover .art { transform: translateY(-4px) scale(1.02) rotate(0.02deg); box-shadow: 0 22px 40px -16px rgba(0, 0, 0, 0.75); }
 
 .grid:has(.tile:hover) .tile:not(:hover), .vgrid:has(.tile:hover) .tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
@@ -354,12 +355,13 @@ body.panel-open { --panel-w: 376px; }
 	background: var(--ink);
 	color: #0d0c10;
 	font-weight: 600;
+	transform: scale(1) rotate(0deg);
 	transition: transform 0.2s var(--ease), background 0.3s;
 }
 
-.btn:hover { transform: scale(1.03); }
+.btn:hover { transform: scale(1.03) rotate(0.02deg); }
 
-.btn:active { transform: scale(0.97); }
+.btn:active { transform: scale(0.97) rotate(0.02deg); }
 
 .btn svg { width: 16px; height: 16px; }
 
@@ -523,11 +525,11 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 
 .icon-btn svg { width: 18px; height: 18px; }
 
-.play { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #0d0c10; transition: transform 0.2s var(--ease); }
+.play { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #0d0c10; transform: scale(1) rotate(0deg); transition: transform 0.2s var(--ease); }
 
-.play:hover { transform: scale(1.06); }
+.play:hover { transform: scale(1.06) rotate(0.02deg); }
 
-.play:active { transform: scale(0.94); }
+.play:active { transform: scale(0.94) rotate(0.02deg); }
 
 .play svg { width: 18px; height: 18px; }
 
@@ -710,9 +712,9 @@ body.rest #capsule { opacity: 0; transform: translateY(12px); pointer-events: no
 
 body.has-az #az { display: flex; }
 
-#az button { flex: 0 1 18px; min-height: 0; font-size: 10px; font-weight: 600; color: var(--ink-3); line-height: 1; border-radius: 6px; overflow: hidden; transition: color 0.15s, transform 0.15s var(--ease); }
+#az button { flex: 0 1 18px; min-height: 0; font-size: 10px; font-weight: 600; color: var(--ink-3); line-height: 1; border-radius: 6px; overflow: hidden; transform: scale(1) rotate(0deg); transition: color 0.15s, transform 0.15s var(--ease); }
 
-#az button:hover { color: var(--ink); transform: scale(1.35); }
+#az button:hover { color: var(--ink); transform: scale(1.35) rotate(0.02deg); }
 
 #az button.cur { color: var(--accent); }
 
@@ -771,9 +773,9 @@ body.now-open #dock { left: 0; right: 0; padding: 0 28px; }
 
 .cap-cover { width: 48px; height: 48px; flex: none; border-radius: 50%; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
 
-.cap-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s var(--ease); }
+.cap-cover img { width: 100%; height: 100%; object-fit: cover; transform: scale(1) rotate(0deg); transition: transform 0.3s var(--ease); }
 
-.cap-cover:hover img { transform: scale(1.06); }
+.cap-cover:hover img { transform: scale(1.06) rotate(0.02deg); }
 
 .cap-meta { flex: 0 1 auto; min-width: 0; }
 
@@ -1428,12 +1430,13 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 	border-radius: 7px;
 	overflow: hidden;
 	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	transform: scale(1) rotate(0deg);
 	transition: transform 0.18s, opacity 0.2s;
 }
 
 .tl-item img { display: block; width: 100%; height: 100%; object-fit: cover; background: rgba(255, 255, 255, 0.06); }
 
-.tl-item:hover { transform: scale(1.08); z-index: 1; }
+.tl-item:hover { transform: scale(1.08) rotate(0.02deg); z-index: 1; }
 
 .tl-era {
 	position: absolute;
@@ -1496,11 +1499,11 @@ a.tl-label:hover b { text-decoration: underline; text-underline-offset: 3px; }
 
 .share-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(14px, 3vh, 28px); min-height: 0; padding: 12px 0; }
 
-.share-cover { position: relative; flex: none; width: min(56dvh, 82vw, 560px); aspect-ratio: 1; padding: 0; border-radius: 18px; overflow: hidden; background: rgba(255, 255, 255, 0.06); box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.7); transition: transform 0.25s var(--ease); }
+.share-cover { position: relative; flex: none; width: min(56dvh, 82vw, 560px); aspect-ratio: 1; padding: 0; border-radius: 18px; overflow: hidden; background: rgba(255, 255, 255, 0.06); box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.7); transform: scale(1) rotate(0deg); transition: transform 0.25s var(--ease); }
 
 .share-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-.share-cover:hover { transform: scale(1.01); }
+.share-cover:hover { transform: scale(1.01) rotate(0.02deg); }
 
 .share-cover-play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.18); opacity: 0; transition: opacity 0.2s; }
 
