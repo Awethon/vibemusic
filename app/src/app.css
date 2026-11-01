@@ -1232,11 +1232,11 @@ body.no-select, body.no-select * { -webkit-user-select: none !important; user-se
 .this-is-card .btn { align-self: flex-start; margin-top: 14px; height: 36px; padding: 0 16px 0 12px; font-size: 13px; }
 
 .genre-cover { display: block; width: 100%; aspect-ratio: 1; container-type: inline-size; overflow: hidden; }
-.gc-canvas { --gc-u: calc(100cqw / 600); position: relative; display: block; width: 100%; height: 100%; overflow: hidden; background: var(--gc-deep); color: #f6f3ee; isolation: isolate; filter: brightness(1); }
+.gc-canvas { --gc-u: calc(100cqw / 600); position: relative; display: block; width: 100%; height: 100%; overflow: hidden; background: var(--gc-deep); color: #f6f3ee; isolation: isolate; }
 .gc-wall { position: absolute; left: calc(var(--gc-u) * -170); top: calc(var(--gc-u) * -170); width: calc(var(--gc-u) * 940); height: calc(var(--gc-u) * 940); display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--gc-u) * 14); transform: rotate(-14deg); }
 .gc-wall img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: calc(var(--gc-u) * 8); }
-.gc-shade { position: absolute; inset: 0; background: linear-gradient(180deg, var(--gc-deep) 0%, var(--gc-deep-alpha) 26%, transparent 46%, transparent 72%, var(--gc-deep) 100%); }
-.genre-cover.mini .gc-shade { background: linear-gradient(180deg, transparent 40%, var(--gc-deep-alpha)); }
+.gc-fade { position: absolute; inset: 0; mask-image: linear-gradient(180deg, transparent 0%, rgb(0 0 0 / var(--gc-fade)) 26%, #000 46%, #000 72%, transparent 100%); }
+.genre-cover.mini .gc-fade { mask-image: linear-gradient(180deg, #000 40%, rgb(0 0 0 / var(--gc-fade)) 100%); }
 .gc-eyebrow { position: absolute; top: calc(var(--gc-u) * 44); left: calc(var(--gc-u) * 40); font-family: 'Onest', system-ui, sans-serif; font-weight: 600; font-size: calc(var(--gc-u) * 22); letter-spacing: 0.24em; text-transform: uppercase; color: var(--gc-accent); }
 .gc-name { position: absolute; top: calc(var(--gc-u) * 82); left: calc(var(--gc-u) * 40); right: calc(var(--gc-u) * 40); font-family: var(--display); font-weight: 700; line-height: 0.98; letter-spacing: -0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc-facts { position: absolute; left: calc(var(--gc-u) * 40); bottom: calc(var(--gc-u) * 44); font-family: 'Onest', system-ui, sans-serif; font-weight: 600; font-size: calc(var(--gc-u) * 20); letter-spacing: 0.04em; color: rgba(246, 243, 238, 0.7); }

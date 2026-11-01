@@ -34,14 +34,15 @@
 	});
 </script>
 
-<span class="genre-cover" class:mini style="--gc-accent: {theme.accent}; --gc-deep: {theme.deep}; --gc-deep-alpha: {theme.deepAlpha}">
+<span class="genre-cover" class:mini style="--gc-accent: {theme.accent}; --gc-deep: {theme.deep}; --gc-fade: {1 - GENRE_COVER.deepAlpha}">
 	<span class="gc-canvas">
-		<span class="gc-wall">
-			{#if session.credentials}
-				{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} style={placeholderStyle(albumArt.get(albumId))} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
-			{/if}
+		<span class="gc-fade">
+			<span class="gc-wall">
+				{#if session.credentials}
+					{#each tiles as albumId, index (index)}<img src={coverUrl(session.credentials, albumId, tileSize)} style={placeholderStyle(albumArt.get(albumId))} {@attach retryCover} alt="" loading="lazy" decoding="async" draggable="false" />{/each}
+				{/if}
+			</span>
 		</span>
-		<span class="gc-shade"></span>
 		{#if !mini}
 			<span class="gc-eyebrow">Genre</span>
 			<span class="gc-name" style="font-size: calc(var(--gc-u) * {nameSize.toFixed(1)})">{playlist.name}</span>

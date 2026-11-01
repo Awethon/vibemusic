@@ -6,11 +6,10 @@ const colourfulness = (rgb: Rgb) => {
 	return saturation * (1 - Math.abs(lightness - 0.5) * GENRE_COVER.offMidLightnessPenalty);
 };
 
-const hsl = (hue: number, saturation: number, lightness: number, alpha = 1) =>
-	`hsl(${hue.toFixed(1)} ${(saturation * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}% / ${alpha})`;
+const hsl = (hue: number, saturation: number, lightness: number) => `hsl(${hue.toFixed(1)} ${(saturation * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
 
 export function genreTheme(colors: string[]) {
-	if (!colors.length) return { accent: 'hsl(260 40% 80%)', deep: 'hsl(260 12% 7%)', deepAlpha: `hsl(260 12% 7% / ${GENRE_COVER.deepAlpha})` };
+	if (!colors.length) return { accent: 'hsl(260 40% 80%)', deep: 'hsl(260 12% 7%)' };
 	const best = colors.map(hexToRgb).reduce((winner, candidate) => (colourfulness(candidate) > colourfulness(winner) ? candidate : winner));
 	const [hue, saturation] = rgbToHsl(best);
 	const degrees = hue * 360;
@@ -18,7 +17,6 @@ export function genreTheme(colors: string[]) {
 	const deep = Math.min(GENRE_COVER.maxDeepSaturation, vivid);
 	return {
 		accent: hsl(degrees, vivid, GENRE_COVER.accentLightness),
-		deep: hsl(degrees, deep, GENRE_COVER.deepLightness),
-		deepAlpha: hsl(degrees, deep, GENRE_COVER.deepLightness, GENRE_COVER.deepAlpha)
+		deep: hsl(degrees, deep, GENRE_COVER.deepLightness)
 	};
 }
