@@ -1,0 +1,65 @@
+# vibemusic with its relay, and optionally Navidrome. Run ./setup.sh, which asks a few questions,
+# writes .env and starts everything. Or by hand: copy .env.example to .env, fill it in, then
+#   docker compose up -d
+# The app is then at http://<this machine>:8080. COMPOSE_PROFILES in .env picks the optional parts.
+
+services:
+  vibemusic:
+    build: ./app
+    image: vibemusic:local
+    restart: unless-stopped
+    ports:
+      - ${VIBEMUSIC_PORT:-8080}:80
+    environment:
+      - NAVIDROME_URL=${NAVIDROME_URL:-http://navidrome:4533}
+      - RELAY_URL=http://relay:4600
+      - VIBEMUSIC_GENRE_HIDDEN=${VIBEMUSIC_GENRE_HIDDEN:-}
+      - VIBEMUSIC_GENRE_PINNED=${VIBEMUSIC_GENRE_PINNED:-}
+      - VIBEMUSIC_GENRE_MAX_PLAYLISTS=${VIBEMUSIC_GENRE_MAX_PLAYLISTS:-}
+      - VIBEMUSIC_GENRE_SONG_CAP=${VIBEMUSIC_GENRE_SONG_CAP:-}
+      - VIBEMUSIC_GENRE_MIN_SONGS=${VIBEMUSIC_GENRE_MIN_SONGS:-}
+      - VIBEMUSIC_GENRE_MIN_ARTISTS=${VIBEMUSIC_GENRE_MIN_ARTISTS:-}
+      - VIBEMUSIC_DEFAULT_BACKGROUND=${VIBEMUSIC_DEFAULT_BACKGROUND:-}
+      - VIBEMUSIC_DEFAULT_RIPPLES=${VIBEMUSIC_DEFAULT_RIPPLES:-}
+      - VIBEMUSIC_DEFAULT_FULL_SCREEN=${VIBEMUSIC_DEFAULT_FULL_SCREEN:-}
+      - VIBEMUSIC_DEFAULT_SIDEBAR=${VIBEMUSIC_DEFAULT_SIDEBAR:-}
+      - VIBEMUSIC_DEFAULT_ARTIST_VIEW=${VIBEMUSIC_DEFAULT_ARTIST_VIEW:-}
+      - VIBEMUSIC_DEFAULT_TIMELINE=${VIBEMUSIC_DEFAULT_TIMELINE:-}
+      - VIBEMUSIC_DEFAULT_RADIO=${VIBEMUSIC_DEFAULT_RADIO:-}
+      - VIBEMUSIC_DEFAULT_GLASS=${VIBEMUSIC_DEFAULT_GLASS:-}
+      - VIBEMUSIC_DEFAULT_GLASS_LOOK=${VIBEMUSIC_DEFAULT_GLASS_LOOK:-}
+
+  # Remote control between devices, genre and popularity lookups, internet radio, share previews
+  # and "This is" playlists. Optional: without it the app works and those features are missing.
+  relay:
+    build: ./relay
+    image: vibemusic-relay:local
+    profiles: [relay]
+    restart: unless-stopped
+    environment:
+      - NAVIDROME_URL=${NAVIDROME_URL:-http://navidrome:4533}
+      - ENRICHMENT_SOURCES=${ENRICHMENT_SOURCES:-musicbrainz,deezer,apple}
+      - APPLE_STOREFRONTS=${APPLE_STOREFRONTS:-us}
+      - VIBEMUSIC_RELAY_NAVIDROME_USER=${VIBEMUSIC_RELAY_NAVIDROME_USER:-}
+      - VIBEMUSIC_RELAY_NAVIDROME_PASSWORD=${VIBEMUSIC_RELAY_NAVIDROME_PASSWORD:-}
+      - THIS_IS_SKIP=${THIS_IS_SKIP:-}
+      - RUST_LOG=${RELAY_LOG:-info}
+    volumes:
+      - relay-data:/data
+
+  # For a new setup. Skip this profile to use a Navidrome you already run (set NAVIDROME_URL).
+  navidrome:
+    image: deluan/navidrome:0.64.2
+    profiles: [navidrome]
+    restart: unless-stopped
+    environment:
+      - ND_ENABLESHARING=true
+      - ND_ENABLEINSIGHTSCOLLECTOR=false
+      - ND_SCANSCHEDULE=${NAVIDROME_SCAN_SCHEDULE:-1h}
+    volumes:
+      - ${MUSIC_FOLDER:-./music}:/music:ro
+      - navidrome-data:/data
+
+volumes:
+  relay-data:
+  navidrome-data:

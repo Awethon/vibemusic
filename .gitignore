@@ -9,3 +9,7 @@ dev/samples/
 
 # Local preview configuration
 /.claude/
+
+# Local setup from .env.example
+/.env
+/music/

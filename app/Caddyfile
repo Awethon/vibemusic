@@ -1,0 +1,68 @@
+# Serves the app and puts Navidrome and the relay behind the same origin, so the app can use
+# relative addresses. Read from the environment:
+#   NAVIDROME_URL  Navidrome as this container reaches it (default http://navidrome:4533)
+#   RELAY_URL      the relay (default http://relay:4600); without a relay its paths answer 502
+#   VIBEMUSIC_*    instance settings served as /config.json (see src/lib/serverConfig.ts)
+
+:80 {
+	encode zstd gzip
+
+	# Link previews of a share go to the relay, which answers with Open Graph tags.
+	@sharepreview {
+		path_regexp ^/share/[A-Za-z0-9_-]+$
+		header_regexp User-Agent (?i)(bot|crawler|spider|preview|facebookexternalhit|whatsapp|slack|discord|telegram|vkshare|skype|embedly|pinterest|linkedin|mastodon|signal)
+	}
+	handle @sharepreview {
+		rewrite * /relay{path}/preview
+		reverse_proxy {$RELAY_URL:http://relay:4600}
+	}
+	@relay path /relay /relay/*
+	handle @relay {
+		reverse_proxy {$RELAY_URL:http://relay:4600}
+	}
+	handle /radio/* {
+		reverse_proxy {$RELAY_URL:http://relay:4600} {
+			flush_interval -1
+		}
+	}
+
+	# Navidrome's APIs, its public share files, and its own web UI under /app (first admin
+	# account, plugins, users).
+	@navidrome path /auth/* /api/* /rest/* /share/s/* /share/img/* /share/d/* /share/*/m3u /app /app/*
+	handle @navidrome {
+		reverse_proxy {$NAVIDROME_URL:http://navidrome:4533}
+	}
+
+	# Unset variables come out as "" and mean "default". Values must not contain double quotes.
+	handle /config.json {
+		header Content-Type application/json
+		header Cache-Control no-cache
+		respond `{"genrePlaylists": {
+			"hidden": "{env.VIBEMUSIC_GENRE_HIDDEN}",
+			"pinned": "{env.VIBEMUSIC_GENRE_PINNED}",
+			"maxPlaylists": "{env.VIBEMUSIC_GENRE_MAX_PLAYLISTS}",
+			"songCap": "{env.VIBEMUSIC_GENRE_SONG_CAP}",
+			"minSongs": "{env.VIBEMUSIC_GENRE_MIN_SONGS}",
+			"minArtists": "{env.VIBEMUSIC_GENRE_MIN_ARTISTS}"
+		},
+		"settings": {
+			"background": "{env.VIBEMUSIC_DEFAULT_BACKGROUND}",
+			"ripples": "{env.VIBEMUSIC_DEFAULT_RIPPLES}",
+			"fullScreen": "{env.VIBEMUSIC_DEFAULT_FULL_SCREEN}",
+			"sidebar": "{env.VIBEMUSIC_DEFAULT_SIDEBAR}",
+			"artistView": "{env.VIBEMUSIC_DEFAULT_ARTIST_VIEW}",
+			"timeline": "{env.VIBEMUSIC_DEFAULT_TIMELINE}",
+			"radio": "{env.VIBEMUSIC_DEFAULT_RADIO}",
+			"glass": "{env.VIBEMUSIC_DEFAULT_GLASS}",
+			"glassLook": "{env.VIBEMUSIC_DEFAULT_GLASS_LOOK}"
+		}}` 200
+	}
+
+	handle {
+		root * /srv/vibemusic
+		@immutable path /_app/immutable/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
