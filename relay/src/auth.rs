@@ -1,3 +1,7 @@
+//! Checks a user's Navidrome token for the `/relay` WebSocket (`NAVIDROME_URL`).
+//!
+//! The relay does not know Navidrome's signing secret, so Navidrome itself validates the token.
+
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
@@ -21,7 +25,10 @@ impl Navidrome {
         }
     }
 
+    /// The Navidrome user id the token belongs to, or `None` if Navidrome rejects the token.
+    /// The id becomes the remote-control room, so all tabs of one user meet there.
     pub async fn user_of(&self, token: &str) -> Option<String> {
+        // keepalive is the cheapest authenticated endpoint of Navidrome's native API.
         let response = self
             .client
             .get(format!("{}/api/keepalive/keepalive", self.url))
@@ -32,6 +39,8 @@ impl Navidrome {
         if !response.status().is_success() {
             return None;
         }
+        // Navidrome accepted the token, so its payload can be trusted without checking the
+        // signature here. `uid` is the user id claim in Navidrome's JWT.
         user_id_in(token)
     }
 }

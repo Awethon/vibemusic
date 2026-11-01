@@ -1,3 +1,6 @@
+// Small colour-space helpers shared by the accent colour and the animated background.
+// Hsl components are all 0..1; Rgb is 0..255; "unit" RGB is 0..1.
+
 export type Rgb = [number, number, number];
 
 export type Hsl = [number, number, number];
@@ -31,4 +34,5 @@ export function hslToUnitRgb([hue, saturation, lightness]: Hsl): [number, number
 	return [hueToChannel(p, q, hue + 1 / 3), hueToChannel(p, q, hue), hueToChannel(p, q, hue - 1 / 3)];
 }
 
+// Rec. 709 weights applied directly to the given channels, without sRGB linearisation.
 export const relativeLuminance = ([red, green, blue]: [number, number, number]) => 0.2126 * red + 0.7152 * green + 0.0722 * blue;

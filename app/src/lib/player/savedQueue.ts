@@ -1,8 +1,12 @@
+// Saves the play queue to Navidrome (savePlayQueue) so it survives reloads and follows the user
+// across clients, and reads it back on load.
+
 import { isRadio } from '../library/queries.ts';
 import { navidrome } from '../session.svelte.ts';
 import { SAVED_QUEUE } from '../tuning.ts';
 import * as queue from './queue.ts';
 
+// Navidrome's saved play queue has no field for the source name, so it is kept locally.
 const SOURCE_NAME_KEY = 'vibemusic.queue.source';
 
 type SubsonicPlayQueue = { playQueue?: { entry?: { id: string }[]; current?: string; position?: number } };
@@ -14,6 +18,7 @@ let lastSavedAt = 0;
 export const saveIsDue = () => Date.now() - lastSavedAt > SAVED_QUEUE.whilePlayingMs;
 
 export async function saveQueue(state: queue.QueueState, positionSeconds: number) {
+	// Radio stations are not Navidrome songs, so they can't be part of a saved play queue.
 	if (!state.currentTrackId || isRadio(state.currentTrackId)) return;
 	lastSavedAt = Date.now();
 	const trackIds = queue.savedOrder(state).trackIds.filter((trackId) => !isRadio(trackId));

@@ -1,6 +1,13 @@
+// Splitting the database file into fixed-size chunks and hashing them, so a save only rewrites
+// chunks whose bytes changed (a play or a star touches just a few database pages).
+
+// Two independent 32-bit hashes combined into 64 bits. A collision would mean a changed chunk is
+// silently not saved, so keep it wide. Not cryptographic; it only needs to be fast.
 function hashRange(bytes: Uint8Array, start: number, end: number): string {
 	let first = 0x811c9dc5 ^ (end - start);
 	let second = 0x9e3779b9;
+	// Uint32Array needs 4-byte alignment. The byte-by-byte fallback builds the same little-endian
+	// words, so both paths hash identically on little-endian platforms (all browsers in practice).
 	const aligned = (bytes.byteOffset + start) % 4 === 0;
 	const words = aligned ? new Uint32Array(bytes.buffer, bytes.byteOffset + start, (end - start) >>> 2) : null;
 	const wordCount = (end - start) >>> 2;

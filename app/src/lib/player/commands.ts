@@ -1,3 +1,6 @@
+// Player commands: the only way the UI changes playback. The same command runs locally, or is
+// sent through the relay to the device that is playing (see remote.svelte.ts).
+
 import { PLAYBACK } from '../tuning.ts';
 import * as queue from './queue.ts';
 
@@ -14,6 +17,8 @@ export type Command =
 	| { kind: 'edit'; edit: queue.QueueEdit }
 	| { kind: 'liked'; trackId: string; starred: boolean };
 
+// Commands that make this tab start playing: when another device is active, sending one of these
+// from here claims playback for this tab instead of remote-controlling the other device.
 export const STARTS_PLAYBACK = new Set<Command['kind']>([
 	'playList',
 	'togglePlay',
@@ -24,6 +29,7 @@ export const STARTS_PLAYBACK = new Set<Command['kind']>([
 	'seek'
 ]);
 
+// Returns null for commands that don't touch the queue; the caller handles those itself.
 export function applyToQueue(state: queue.QueueState, command: Command, positionSeconds: number): queue.QueueEffect | null {
 	switch (command.kind) {
 		case 'playList':

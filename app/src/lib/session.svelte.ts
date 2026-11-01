@@ -1,3 +1,5 @@
+// Reactive sign-in state for the UI. Persistence and login live in navidrome/session.ts.
+
 import { NavidromeHttp } from './navidrome/http.ts';
 import type { Credentials } from './navidrome/credentials.ts';
 import { forgetCredentials, loadCredentials, saveCredentials } from './navidrome/session.ts';
@@ -12,6 +14,7 @@ export function signedIn(credentials: Credentials) {
 	session.expired = false;
 }
 
+// Navidrome rotates its JWT on every native API response; keep the newest so a reload still works.
 export function renewToken(token: string) {
 	if (!session.credentials || session.credentials.token === token) return;
 	session.credentials = { ...session.credentials, token };
@@ -24,6 +27,8 @@ export function sessionExpired() {
 
 export function signOut() {
 	forgetCredentials();
+	// A reload is the simplest way to drop everything tied to the old user: the library worker,
+	// the player and all cached state.
 	location.reload();
 }
 
@@ -32,4 +37,5 @@ export function requireCredentials(): Credentials {
 	return session.credentials;
 }
 
+// Built per call so it always uses the current credentials.
 export const navidrome = () => new NavidromeHttp(requireCredentials(), renewToken);

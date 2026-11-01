@@ -14,6 +14,8 @@
 	const live = $derived(isRadio(track?.id));
 	const remote = $derived(isActiveElsewhere());
 	const showDevices = $derived(relay.connected && (onlineDevices().length > 1 || remote));
+	// Only one button may be #bDevice: DevicesPopover anchors to it and treats clicks on it as
+	// its toggle. While full screen is open, NowPhone's button takes the id.
 	const progress = $derived(player.duration ? Math.min(1, player.position / player.duration) : 0);
 </script>
 

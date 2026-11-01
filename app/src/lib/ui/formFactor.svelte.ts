@@ -5,6 +5,7 @@ const phoneQuery = matchMedia(LAYOUT.phoneMediaQuery);
 
 export const formFactor = $state({ phone: phoneQuery.matches });
 
+// Set at import time, before installFormFactor runs, so the first render already has the right layout.
 setBodyClass('phone', phoneQuery.matches);
 
 export function installFormFactor(): () => void {

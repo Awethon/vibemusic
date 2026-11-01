@@ -11,6 +11,7 @@
 	const playing = $derived(currentTrack()?.albumId === album.id);
 </script>
 
+<!-- data-preview-album: hovering tints the background toward this album (lib/ui/palettePreview.ts). -->
 <a
 	class="tile"
 	class:playing

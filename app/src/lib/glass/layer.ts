@@ -1,3 +1,6 @@
+// One glass canvas per level (rail, player, popups), stacked in z-order. Each frame it finds the
+// glass surfaces, and only when something behind them changed repaints the backdrop and redraws.
+// Started from GlassLayer.svelte inside untrack, since it reads layout and runs its own loop.
 import { ABOVE_PLAYER_GLASS, ABOVE_POPUP_GLASS, ABOVE_RAIL_GLASS, paintBackdrop } from './backdrop.ts';
 import { glassMargin, scenePad, type GlassParams } from './params.ts';
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
@@ -11,6 +14,8 @@ const LEVELS: Record<GlassLevel, { surfaces: string; above: string }> = {
 	popups: { surfaces: '.pop.open', above: ABOVE_POPUP_GLASS }
 };
 
+// Popup glass refracts the player glass canvas beneath it, which changes without any DOM
+// mutation, so the player level announces each redraw.
 const PLAYER_RENDERED = 'vibemusic:glass-player-rendered';
 
 function effectiveOpacity(element: Element): number {
@@ -26,6 +31,7 @@ function surfaces(selector: string): GlassShape[] {
 		const rect = element.getBoundingClientRect();
 		if (rect.width < 2 || rect.height < 2 || rect.right <= 0 || rect.bottom <= 0 || rect.left >= innerWidth || rect.top >= innerHeight)
 			continue;
+		// The rail's visible panel is its ::before, so that's where its radius and opacity live.
 		const backing = element.id === 'rail' ? getComputedStyle(element, '::before') : getComputedStyle(element);
 		const alpha = effectiveOpacity(element) * Number(backing.opacity);
 		if (alpha < 0.02) continue;
@@ -59,6 +65,8 @@ function subtract(rect: Region, cut: Region): Region[] {
 	return pieces;
 }
 
+// Each shape's draw area (outline plus shadow/rim margin) minus the areas of every later shape,
+// so overlapping margins are drawn by exactly one pass. Shapes are sorted by size, so the larger one owns the overlap.
 function drawAreas(shapes: GlassShape[], params: GlassParams): Region[][] {
 	const margin = glassMargin(params);
 	const areas = shapes.map((shape) => around(shape, margin));
@@ -106,6 +114,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 		lastShapes = '';
 		lastRegions = [];
 	};
+	// preventDefault tells the browser we can restore, otherwise webglcontextrestored never fires.
 	const onLost = (event: Event) => {
 		event.preventDefault();
 		lost = true;
@@ -116,6 +125,8 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	};
 	canvas.addEventListener('webglcontextlost', onLost);
 	canvas.addEventListener('webglcontextrestored', onRestored);
+	// Repainting the backdrop walks the whole DOM, so it only happens when the page actually
+	// changed. Mutations inside elements above this layer can't affect what's behind the glass.
 	const observer = new MutationObserver((records) => {
 		if (records.some((record) => !inside(record.target, above))) pageDirty = true;
 	});
@@ -131,6 +142,8 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	addEventListener('resize', markDirty);
 	if (level === 'popups') addEventListener(PLAYER_RENDERED, markDirty);
 
+	// Web Animations (FLIP, queue motion) move things without mutating the DOM, so while any run
+	// below this layer the backdrop is repainted every frame.
 	const pageAnimating = () =>
 		document
 			.getAnimations()
@@ -144,6 +157,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 
 	const tick = () => {
 		frame = requestAnimationFrame(tick);
+		// A draw that threw marks the renderer broken; try a fresh one next frame instead of stopping.
 		if (broken) rebuild();
 		if (lost || !renderer || !backdrop) return;
 		try {
@@ -154,6 +168,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	};
 
 	const draw = (gl: GlassRenderer, paint: CanvasRenderingContext2D) => {
+		// Capped at 2x: the shader runs per pixel, and 3x screens would cost over twice as much.
 		const ratio = Math.min(devicePixelRatio || 1, 2);
 		if (ratio !== dpr || canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
 			dpr = ratio;
@@ -172,6 +187,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 			lastShapes = '';
 			return;
 		}
+		// Each shape gets its own backdrop texture, painted only for the region around it.
 		const pad = glassMargin(current) + scenePad(current);
 		const regions = shapes.map((shape) => around(shape, pad));
 		const areas = drawAreas(shapes, current);

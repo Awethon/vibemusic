@@ -1,3 +1,6 @@
+// Turning Navidrome data into the library database: full builds, incremental changes, enrichment,
+// and the derived tables (artists, genres, genre playlists, search) built from them.
+
 import type { Database } from '@sqlite.org/sqlite-wasm';
 import type { NativeAlbum, NativeArtist, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
 import { deezerAlbumGenre } from '../genres/deezer.ts';
@@ -9,6 +12,8 @@ import { chooseGenres, type GenreSong } from '../genres/playlists.ts';
 import { KEPT_TABLES, normalizeForSearch, SCHEMA, SCHEMA_VERSION } from './schema.ts';
 import type { Enrichment, EnrichmentRequest, LibraryChanges, LibraryMeta, LibrarySnapshot, SyncState } from './snapshot.ts';
 
+// Album artists from Navidrome's participants, falling back to the single albumArtist field.
+// The album's artist sort name covers the whole credit, so it is only used for a single artist.
 const albumCreditsOf = (album: NativeAlbum) => {
 	const credited = album.participants.filter((artist) => artist.id && artist.name);
 	if (!credited.length)
@@ -27,13 +32,18 @@ const albumGenresOf = (album: NativeAlbum) => {
 	return names.length ? [...new Set(names)] : album.genre ? [album.genre] : [];
 };
 
+// The relay can generate read-only "This is <artist>" playlists; those are shown on the artist
+// page rather than in the playlist list (see classifyArtistPlaylists).
 const ARTIST_PLAYLIST_PREFIX = 'This is ';
 
+// Derived from the name so a genre playlist keeps its id across rebuilds (diffing and links rely on it).
 export const genrePlaylistId = (genre: string) => 'genre-' + genre.toLowerCase().replace(/[^a-z0-9а-яё]+/g, '-');
 
 export const newest = (values: string[]) =>
 	values.reduce((latest, value) => (value && (!latest || Date.parse(value) > Date.parse(latest)) ? value : latest), '');
 
+// Changes when a playlist's tracks may have changed, so its tracks are refetched. Smart playlists
+// only track the image here; fetch.ts decides separately when to refetch their tracks.
 export function playlistSignature(playlist: NativePlaylist) {
 	return playlist.rules ? `smart:${playlist.uploadedImage}` : `${playlist.updatedAt}:${playlist.songCount}:${playlist.uploadedImage}`;
 }
@@ -92,6 +102,7 @@ function insertAlbums(db: Database, albums: NativeAlbum[]) {
 	);
 }
 
+// Also removes the albums' tracks currently in the database, so tracks deleted on the server go too.
 function removeAlbums(db: Database, ids: string[]) {
 	deleteWhereIn(db, 'delete from album where id = ?', ids);
 	deleteWhereIn(db, 'delete from album_credit where album_id = ?', ids);
@@ -152,6 +163,7 @@ function removeTracks(db: Database, ids: string[]) {
 	deleteWhereIn(db, "delete from search where kind = 'track' and ref = ?", ids);
 }
 
+// `ratings` is the full list of rated songs: anything rated locally but absent from it was cleared.
 function updateRatings(db: Database, ratings: Map<string, number>): number {
 	const current = new Map(
 		db.selectObjects('select id, rating from track where rating != 0').map((row) => [row.id as string, row.rating as number])
@@ -191,6 +203,7 @@ function upsertArtistArt(db: Database, artists: NativeArtist[]): number {
 	return changed;
 }
 
+// Returns how many rows changed play count or star. play_date is written too but not counted.
 function updateStats(
 	db: Database,
 	table: 'album' | 'track',
@@ -226,6 +239,7 @@ function insertPlaylists(db: Database, playlists: NativePlaylist[], userId: stri
 			playlist.duration,
 			playlist.evaluatedAt || playlist.updatedAt,
 			playlist.uploadedImage,
+			// Read-only: synced from a playlist file on disk, or owned by someone else.
 			playlist.sync || playlist.ownerId !== userId ? 1 : 0,
 			''
 		])
@@ -245,6 +259,7 @@ function insertPlaylistTracks(db: Database, playlistTracks: Map<string, NativePl
 	);
 }
 
+// The artist table is derived from album credits (album artists only), not fetched.
 function rebuildArtists(db: Database) {
 	db.exec(`
 		delete from artist;
@@ -278,6 +293,7 @@ function classifyArtistPlaylists(db: Database) {
 	`);
 }
 
+// Incremental counterpart of the full search_key copy at the end of rebuildDerived.
 function syncPlaylistSearchKeys(db: Database, ids: string[]) {
 	deleteWhereIn(db, "delete from search_key where kind = 'playlist' and ref = ?", ids);
 	eachBound(
@@ -303,6 +319,8 @@ const parsedTags = (value: unknown): Tag[] | null => (typeof value === 'string' 
 
 type MbArtistRow = { tags: Tag[] | null; countries: string[] };
 
+// Maps each album artist to a MusicBrainz artist: an explicit match from enrichment if there is one,
+// otherwise the artist most often credited first on that artist's release groups.
 function musicBrainzArtists(db: Database) {
 	const artists = new Map(
 		db.selectObjects('select id, tags, countries from mb_artist').map((row) => [
@@ -327,6 +345,9 @@ function musicBrainzArtists(db: Database) {
 	return { artists, byAlbumArtist };
 }
 
+// direct = 1 for genres chosen from the evidence (file tags, MusicBrainz tags, store genre) and
+// regional variants; direct = 0 for their ancestors in the genre tree, so filtering by a parent
+// genre also finds its subgenres.
 function rebuildTrackGenres(db: Database) {
 	db.exec('delete from track_genre');
 	const resolver = createGenreResolver();
@@ -375,6 +396,8 @@ function rebuildAlbumGenres(db: Database) {
 	`);
 }
 
+// Recomputes genre playlists but only rewrites those whose name, counts or track list changed, so
+// an incremental sync touches few database pages (and few saved chunks). Returns touched ids.
 function refreshGenrePlaylists(db: Database): string[] {
 	const stored = new Map(
 		db
@@ -466,6 +489,8 @@ function refreshGenrePlaylists(db: Database): string[] {
 	return touched;
 }
 
+// Order matters: album genres and genre playlists read track_genre, and the final search_key copy
+// must come after every step that writes search rows.
 function rebuildDerived(db: Database) {
 	db.exec("update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where kind != 'genre'");
 	rebuildArtists(db);
@@ -475,6 +500,9 @@ function rebuildDerived(db: Database) {
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
+// Stored in meta. When it differs on load, refreshDerived rebuilds the derived tables without a
+// resync, so tuning changes apply to saved libraries. Bump `algorithm` when the derivation code
+// changes in a way the tuning values don't capture.
 const DERIVED_RULES = JSON.stringify({
 	algorithm: 10,
 	evidence: GENRE_EVIDENCE,
@@ -498,6 +526,7 @@ function writeMeta(db: Database, meta: Omit<LibraryMeta, 'albums' | 'artists' | 
 	return full;
 }
 
+// Copies only columns both schemas share, so kept tables survive added or removed columns.
 function carryKept(from: Database | null, to: Database) {
 	if (!from) return;
 	for (const table of KEPT_TABLES) {
@@ -514,6 +543,10 @@ function carryKept(from: Database | null, to: Database) {
 	}
 }
 
+/**
+ * Fills an empty database from a full snapshot. `previous` (the current or an outdated database)
+ * supplies KEPT_TABLES, which must be in place before rebuildDerived uses them.
+ */
 export function buildLibrary(
 	db: Database,
 	snapshot: LibrarySnapshot,
@@ -546,6 +579,11 @@ export function buildLibrary(
 	return writeMeta(db, { version: syncedAt, syncedAt, userId }, sync);
 }
 
+/**
+ * Applies an incremental sync. Must leave the database exactly as buildLibrary would from a full
+ * fetch (build.test.ts checks this) while touching as few pages as possible, since every touched
+ * page means a rewritten chunk on save. `changed` false keeps the version, so other tabs don't reload.
+ */
 export function applyChanges(
 	db: Database,
 	meta: LibraryMeta,
@@ -575,6 +613,7 @@ export function applyChanges(
 				db,
 				changes.albums.filter((album) => !album.missing)
 			);
+			// Songs can move between albums: clear them wherever they were before reinserting.
 			removeTracks(
 				db,
 				changes.albumSongs.map((song) => song.id)
@@ -592,6 +631,7 @@ export function applyChanges(
 			insertPlaylistTracks(db, changedTracks);
 		}
 		radioChanged = replaceRadioStations(db, changes.radioStations);
+		// New or changed albums can affect everything derived; otherwise do only the cheap updates below.
 		if (contentChanged) {
 			rebuildDerived(db);
 			return;
@@ -604,6 +644,7 @@ export function applyChanges(
 			classifyArtistPlaylists(db);
 			syncPlaylistSearchKeys(db, touched);
 		}
+		// Genre playlist picks depend on plays and stars.
 		if (statsChanged > 0) syncPlaylistSearchKeys(db, refreshGenrePlaylists(db));
 	});
 	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0 || artworkChanged > 0;
@@ -635,9 +676,12 @@ export function readSyncState(db: Database): SyncState | null {
 	}
 }
 
+// Compilation placeholders, not real artists, so there is nothing to look up.
 const VARIOUS_ARTISTS = new Set(['various artists', 'various', 'va']);
 const SONGS_PER_ARTIST = 5;
 
+// What the relay should look up: release groups for tags, and per artist a few most-played song
+// titles and album names. Artists none of whose albums has a release group id go to mbSearch.
 export function enrichmentRequest(db: Database): EnrichmentRequest {
 	const since = Number(db.selectValue("select value from enrichment_state where key = 'since'") ?? 0);
 	const releaseGroups = db.selectValues("select distinct release_group from album where release_group != ''") as string[];
@@ -713,6 +757,7 @@ export function applyEnrichment(db: Database, meta: LibraryMeta, sync: SyncState
 			])
 		);
 		db.exec({
+			// Never move `since` backwards when pieces arrive out of order.
 			sql: "insert or replace into enrichment_state values ('since', max(?, coalesce((select cast(value as integer) from enrichment_state where key = 'since'), 0)))",
 			bind: [enrichment.at]
 		});

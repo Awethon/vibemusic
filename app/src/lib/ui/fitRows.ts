@@ -1,3 +1,5 @@
+// Attachment for a wrapping strip whose last child is a "more" link: hides items from the end
+// until everything, including the "more" link, fits in the given number of rows. Used on phones.
 import type { Attachment } from 'svelte/attachments';
 
 export function fitRows(rows: number): Attachment<HTMLElement> {
@@ -7,6 +9,7 @@ export function fitRows(rows: number): Attachment<HTMLElement> {
 			const more = items.at(-1);
 			const names = items.slice(0, -1);
 			if (!more || !names.length) return;
+			// Unhide everything first so rows are measured from the natural wrap, not the previous fit.
 			for (const name of names) name.hidden = false;
 			const tops = [...new Set(names.map((name) => name.offsetTop))].toSorted((a, b) => a - b);
 			const lastTop = tops[rows - 1];

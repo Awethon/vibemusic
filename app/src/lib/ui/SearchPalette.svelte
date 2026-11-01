@@ -84,6 +84,7 @@
 		};
 	});
 
+	// The highlighted result also tints the background toward its album's colours.
 	$effect(() => {
 		if (!ui.searchOpen) return;
 		const result = flat[selected];
@@ -160,6 +161,8 @@
 				<p class="pal-group">{group.title}</p>
 				{#each group.results as result (result.kind + result.item.id)}
 					{@const index = flat.indexOf(result)}
+					<!-- mousemove, not mouseenter: keyboard selection scrolls rows under a still pointer, and
+					     mouseenter would then steal the selection. -->
 					<button
 						type="button"
 						class="pal-item"

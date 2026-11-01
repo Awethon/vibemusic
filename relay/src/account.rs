@@ -1,6 +1,14 @@
+//! A Navidrome account the relay signs in to itself, used by "This is" playlists
+//! (`VIBEMUSIC_NAVIDROME_USER`/`VIBEMUSIC_NAVIDROME_PASSWORD`).
+//!
+//! It speaks both of Navidrome's APIs: the native REST API (`/api`, the one Navidrome's own UI
+//! uses) for paging the library and editing playlists, and the Subsonic API (`/rest`).
+
 use serde_json::{Value, json};
 
+// Items per request when paging the native API with `_start`/`_end`.
 const PAGE_SIZE: usize = 2000;
+// Sent as the Subsonic `c` (client) parameter; Navidrome lists it under the user's players.
 const CLIENT_NAME: &str = "vibemusic-relay";
 
 #[derive(Debug)]
@@ -48,6 +56,8 @@ impl Account {
                 .map(str::to_owned)
                 .ok_or_else(|| AccountError(format!("login reply has no {key}")))
         };
+        // The login reply carries a Subsonic token and salt, so Subsonic calls can authenticate
+        // without sending the password again.
         let subsonic = vec![
             ("u", text("username")?),
             ("t", text("subsonicToken")?),
@@ -71,6 +81,8 @@ impl Account {
             .header("x-nd-authorization", format!("Bearer {}", self.token))
     }
 
+    /// Every item of a native API list, fetched page by page. Stops when `X-Total-Count` is
+    /// reached, on an empty page, or after the first page if the header is missing.
     pub async fn all(&self, path: &str) -> Result<Vec<Value>, AccountError> {
         let separator = if path.contains('?') { '&' } else { '?' };
         let mut items = Vec::new();
@@ -129,6 +141,8 @@ impl Account {
         Ok(())
     }
 
+    /// Calls a Subsonic method as a form POST. Subsonic answers errors with HTTP 200 and
+    /// `status: "failed"`, so the body status is checked too.
     pub async fn subsonic(&self, method: &str, params: &[(&str, String)]) -> Result<Value, AccountError> {
         let form: Vec<(&str, String)> = self.subsonic.iter().cloned().chain(params.iter().cloned()).collect();
         let reply: Value = self

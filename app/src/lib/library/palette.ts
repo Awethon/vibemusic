@@ -5,6 +5,7 @@ import { medianCut } from './medianCut.ts';
 import { savedPalette } from './queries.ts';
 import { COVER_PX, PALETTE } from '../tuning.ts';
 
+// Downscales the cover to a tiny bitmap before median cut; a few thousand pixels are plenty for a palette.
 async function extract(albumId: string): Promise<string[]> {
 	const response = await fetch(coverUrl(requireCredentials(), albumId, COVER_PX.paletteSample));
 	const bitmap = await createImageBitmap(await response.blob(), {
@@ -20,6 +21,10 @@ async function extract(albumId: string): Promise<string[]> {
 
 const inFlight = new Map<string, Promise<string[]>>();
 
+/**
+ * Dominant colours of an album cover, most common first. Computed once in the browser and stored
+ * in the library's palette table (shared with other tabs, kept across rebuilds).
+ */
 export function albumPalette(albumId: string): Promise<string[]> {
 	const existing = inFlight.get(albumId);
 	if (existing) return existing;

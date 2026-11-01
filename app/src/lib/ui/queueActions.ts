@@ -1,3 +1,4 @@
+// Every queue edit from the UI, each wrapped in animateQueueChange so the queue panel animates it.
 import { animateQueueChange } from '../engine/queueAnimation.ts';
 import type { Track } from '../library/queries.ts';
 import { editQueue, playQueuedAt, playSourceNow, playTracks, queueLast, queueNext, playerQueue } from '../player/player.svelte.ts';
@@ -10,6 +11,7 @@ export function playListAnimated(tracks: Track[], startIndex: number, sourceName
 
 export function playNextFromMenu(tracks: Track[], sourceName: string) {
 	if (!tracks.length) return;
+	// With nothing playing there is nothing to queue after, so just start playing.
 	if (!playerQueue().currentTrackId) {
 		playTracks(tracks, 0, sourceName, '');
 		return;
@@ -57,6 +59,7 @@ export function playSourceTrackNext(sourceIndex: number) {
 export const removeFromSource = (sourceIndex: number) => animateQueueChange(() => editQueue({ op: 'removeSource', index: sourceIndex }));
 
 export function reorderUpNextRows(fromUserQueue: boolean, fromPosition: number, toPosition: number) {
+	// Positions are relative to the visible "up next" rows; source rows start after the current track.
 	const list = fromUserQueue ? playerQueue().userQueue : playerQueue().sourceQueue;
 	const movedEntryId = list[(fromUserQueue ? 0 : playerQueue().sourceIndex + 1) + fromPosition]?.entryId;
 	animateQueueChange(() => editQueue({ op: 'reorder', fromUserQueue, from: fromPosition, to: toPosition }), { movedEntryId });

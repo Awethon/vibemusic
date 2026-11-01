@@ -15,6 +15,7 @@
 	import { ui } from './state.svelte.ts';
 	import { swipeToDismiss } from './swipeToDismiss.ts';
 
+	// The devices button here takes the #bDevice id only while full screen is open (see PhoneDock).
 	let scrubRatio = $state<number | null>(null);
 	const track = $derived(currentTrack());
 	const live = $derived(isRadio(track?.id));

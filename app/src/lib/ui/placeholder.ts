@@ -1,3 +1,6 @@
+// What a cover shows while the real image loads: the dominant colour plus a blurred preview decoded
+// from its thumbHash (a tiny image hash Navidrome provides per album/artist). Decoding costs a
+// little, and the same cover appears in many places, so results are cached per hash.
 import { thumbHashToDataURL } from 'thumbhash';
 
 const decoded = new Map<string, string | null>();

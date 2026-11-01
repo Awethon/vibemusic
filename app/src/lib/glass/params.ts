@@ -1,3 +1,6 @@
+// Tunable glass parameters, the built-in looks, the controls shown on the glass settings page,
+// and a decoder for share links from the external Liquid Glass Lab playground, so a look tuned
+// there can be pasted into the app.
 export type GlassParams = {
 	thick: number;
 	bevel: number;
@@ -32,6 +35,8 @@ export type GlassKey = keyof GlassParams;
 
 export const glassMargin = (params: GlassParams) => Math.max(60, params.shadowBlur * 1.5 + params.shadowDist + params.thick * 1.5 + 12);
 
+// Extra backdrop beyond the draw area, so blur (about 3 sigma) and refraction (up to ~2x thickness)
+// can sample outside the shape without running off the painted texture.
 export const scenePad = (params: GlassParams) => Math.ceil(3 * Math.max(params.frost, RENDER.minBlurPx) + 2 * params.thick);
 
 export const RENDER = Object.freeze({
@@ -74,6 +79,8 @@ export const BASE: GlassParams = {
 };
 
 export type GlassPreset = { id: string; name: string; values: GlassParams };
+
+// The lab's presets. Order matters: lab links store the base preset as an index into this array.
 
 export const PRESETS: GlassPreset[] = [
 	{ id: 'clear', name: 'Clear lens', values: BASE },
@@ -142,6 +149,7 @@ export const DEFAULT_LOOK: GlassPreset = {
 	}
 };
 
+// Looks offered in the app. 'css' is left out here but must stay in PRESETS, which lab links index into.
 export const LOOKS: GlassPreset[] = [DEFAULT_LOOK, ...PRESETS.filter((preset) => preset.id !== 'css')];
 
 export type GlassSlider = { key: GlassKey; label: string; min: number; max: number; step: number; unit: string; note?: string };
@@ -201,11 +209,16 @@ export const GROUPS: { title: string; controls: GlassControl[] }[] = [
 	}
 ];
 
+// Lab link format: version byte, shape byte, base preset index, then a varint bitmask of which
+// fields in LAB_ORDER are overridden, followed by one varint per overridden field counted in
+// steps from that field's min. LAB_ORDER, min and step must match the lab's encoder exactly.
 const SLIDERS = new Map(
 	GROUPS.flatMap((group) => group.controls)
 		.filter((control): control is GlassSlider => !('toggle' in control))
 		.map((control) => [control.key, { key: control.key, min: control.min, step: control.step }])
 );
+// Fields the lab encodes that have no slider here. They must be decoded to keep the bitmask
+// aligned; merge, tilt and settle have no effect in the app.
 const LAB_ONLY: Partial<Record<GlassKey, { key: GlassKey; min: number; step: number }>> = {
 	merge: { key: 'merge', min: 0, step: 1 },
 	tilt: { key: 'tilt', min: 0, step: 0.05 },
@@ -247,6 +260,7 @@ function bytesOf(text: string): Uint8Array {
 }
 
 export function decodeLabLink(link: string): { params: GlassParams; preset: string } {
+	// Accepts a full URL or just the hash; a plain key=value hash is decoded too.
 	const hash = link.includes('#') ? link.slice(link.indexOf('#') + 1) : link.trim();
 	if (!hash) return { params: { ...BASE }, preset: 'clear' };
 	if (hash.includes('=')) {

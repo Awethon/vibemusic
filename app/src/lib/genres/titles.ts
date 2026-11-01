@@ -1,3 +1,5 @@
+// Title normalisation for matching local songs and albums against Deezer/Apple charts and albums,
+// and for telling a song's original from its remixes, live takes and covers.
 const letters = (text: string) =>
 	[...text.toLowerCase().replaceAll('ё', 'е')].filter((character) => /[\p{L}\p{N}]/u.test(character)).join('');
 
@@ -6,6 +8,8 @@ const RECORDING =
 
 const FEATURING = [' feat.', ' feat ', ' ft.', ' ft ', ' featuring ', ' при уч', ' при участии', ' w/ '];
 
+// base: the title without bracketed parts, anything after " - ", and featured artists.
+// extra: the stripped parts, which is where "(Remix)" or "- Live" markers live.
 function split(title: string) {
 	let depth = 0;
 	let kept = '';
@@ -28,6 +32,8 @@ export const isOtherRecording = (title: string) => RECORDING.test(split(title).e
 
 export const isPlainTitle = (title: string) => letters(title) === titleKey(title);
 
+// Builds a lookup from a chart (title, rank). An exact title match wins; otherwise the loose title
+// key is used, but never for a remix/live/cover, so those don't inherit the original's rank.
 export function songRanks(top: [string, number][]) {
 	const exact = new Map<string, number>();
 	const loose = new Map<string, number>();

@@ -5,6 +5,7 @@
 	const progress = $derived(library.progress);
 	const share = $derived.by(() => {
 		if (!progress) return 0;
+		// Rough share of the sync time each stage takes; building the local library is the last bit.
 		if (progress.building) return 0.96;
 		const parts = [
 			[progress.tracks, progress.trackTotal, 0.7],

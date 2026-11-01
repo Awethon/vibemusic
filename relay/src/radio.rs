@@ -1,3 +1,9 @@
+//! Internet radio proxy: streams the stations configured in Navidrome through the relay and
+//! keeps track of what each one is playing.
+//!
+//! Browsers only let the Web Audio API analyse cross-origin audio when the station sends CORS
+//! headers, which most do not. Served from the relay, the stream is same-origin for the app.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -11,16 +17,21 @@ use serde_json::Value;
 
 use crate::radio_meta::{IcyStripper, NowPlaying, OggTags};
 
+// Subsonic credentials the app adds to the stream URL. The relay asks Navidrome for the station
+// list with them, so it needs no account of its own and only users Navidrome accepts can stream.
 const AUTH_PARAMS: [&str; 5] = ["u", "t", "s", "v", "c"];
+// Only connecting is time-limited: a radio stream never ends, so a total timeout would cut it.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct Radio {
     client: reqwest::Client,
     navidrome: String,
     local_proxy: Option<String>,
+    // Per station: open streams and the last song heard. The entry goes away with the last stream.
     playing: Arc<Mutex<HashMap<String, (usize, NowPlaying)>>>,
 }
 
+// One open stream of a station. Dropped with the response body, which ends its count.
 struct Listener {
     playing: Arc<Mutex<HashMap<String, (usize, NowPlaying)>>>,
     station: String,
@@ -73,6 +84,8 @@ impl Radio {
         }
     }
 
+    // The station URL comes from Navidrome, never from the request: the client only names a
+    // station id, so the relay cannot be used to fetch arbitrary URLs.
     async fn station_url(&self, id: &str, query: &HashMap<String, String>) -> Result<String, StatusCode> {
         let mut params: Vec<(&str, &str)> = AUTH_PARAMS
             .iter()
@@ -109,6 +122,9 @@ impl Radio {
             Err(status) => return status.into_response(),
         };
         let (url, host) = through_local_proxy(&url, self.local_proxy.as_deref());
+        // Ask Shoutcast/Icecast servers to interleave now-playing metadata into the stream. They
+        // answer with `icy-metaint` (audio bytes between metadata blocks), and the blocks are cut
+        // out before the audio reaches the browser, which would otherwise play them as noise.
         let mut request = self.client.get(&url).header("Icy-MetaData", "1");
         if let Some(host) = host {
             request = request.header(header::HOST, host);
@@ -134,6 +150,7 @@ impl Radio {
             .get("icy-metaint")
             .and_then(|value| value.to_str().ok()?.parse::<usize>().ok())
             .filter(|&every| every > 0);
+        // Ogg streams (Opus, Vorbis) carry the song in their comment headers instead of ICY blocks.
         let ogg = content_type.to_str().is_ok_and(|kind| kind.contains("ogg"));
         let mut stripper = every.map(IcyStripper::new);
         let mut tags = ogg.then(OggTags::default);
@@ -166,6 +183,8 @@ impl Radio {
 }
 
 impl Radio {
+    /// The last song heard on a station, empty if nobody is streaming it through the relay. Only
+    /// known while a stream is open, since the metadata is read from that stream.
     pub fn now(&self, id: &str) -> Response {
         Json(
             self.playing
@@ -179,6 +198,9 @@ impl Radio {
     }
 }
 
+/// With `RADIO_LOCAL_PROXY` set, stations on `.local` (mDNS) hosts are fetched through that
+/// proxy with the original `Host` header. A relay in a container usually cannot resolve `.local`
+/// names; a proxy on the host network can. Other URLs are returned unchanged.
 pub fn through_local_proxy(url: &str, proxy: Option<&str>) -> (String, Option<String>) {
     let (Some(proxy), Ok(parsed)) = (proxy, reqwest::Url::parse(url)) else {
         return (url.to_owned(), None);

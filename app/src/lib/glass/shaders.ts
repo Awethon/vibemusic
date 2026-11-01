@@ -1,5 +1,10 @@
+// GLSL for the glass: a separable blur pass, and the glass pass, which turns the shapes' signed
+// distance field into a height field, takes normals from its gradient and offsets the backdrop
+// lookup by refraction, then adds Fresnel reflection, specular, rim light, iridescence and a shadow.
+// MAX_SHAPES sizes the uniform arrays; the renderer ignores shapes beyond it.
 export const MAX_SHAPES = 8;
 
+// One oversized triangle covers the whole viewport; no vertex buffer needed.
 export const VERT = `#version 300 es
 const vec2 P[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
 void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }`;

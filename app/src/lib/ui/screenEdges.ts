@@ -1,3 +1,6 @@
+// On a landscape phone, tells CSS which side the camera island is on (body.island-left/right), since
+// the safe-area insets are reported equally on both sides. Only touch devices; the angle comes from
+// screen.orientation, or the legacy window.orientation where that's missing.
 const ISLAND_LEFT_ANGLE = 90;
 const ISLAND_RIGHT_ANGLES = [270, -90];
 

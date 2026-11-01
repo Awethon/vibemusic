@@ -1,3 +1,6 @@
+// Animates every queue edit (play, add, remove, reorder) as a FLIP: snapshot rows, apply the change
+// synchronously, snapshot again, then animate the difference. Removed rows are already gone from
+// the DOM by then, so they leave as fixed-position clones on document.body (.row-lift).
 import { flushSync } from 'svelte';
 import { playerQueue } from '../player/player.svelte.ts';
 import { EASING, QUEUE_MOTION } from '../tuning.ts';
@@ -18,6 +21,7 @@ function snapshotQueueRows() {
 	return rowsByKey;
 }
 
+// Clones must not duplicate ids that are still in the live DOM.
 function stripIds(element: Element) {
 	for (const node of [element, ...element.querySelectorAll('[id]')]) node.removeAttribute('id');
 }
@@ -133,6 +137,7 @@ function animateTravel(row: HTMLElement, offsetY: number) {
 	travel.addEventListener('cancel', settle);
 }
 
+// The explicitly moved row gets a lifted "travel" animation; everything else just glides.
 function animateRemainingRows(before: Map<string, RowSnapshot>, after: Map<string, RowSnapshot>, movedEntryId?: string) {
 	let travelled = false;
 	for (const [key, current] of after) {
@@ -173,6 +178,7 @@ export function animateQueueChange(applyChange: () => void, options: { movedEntr
 	const nowPlayingBlocks = captureNowPlayingBlocks();
 	applyChange();
 	flushSync();
+	// Drag leaves inline transforms on rows; clear them before measuring the new positions.
 	clearDragStyles();
 	const after = snapshotQueueRows();
 	const playedEntryId = playerQueue().currentEntryId !== entryIdBefore ? playerQueue().currentEntryId : null;

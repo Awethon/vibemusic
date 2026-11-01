@@ -1,3 +1,6 @@
+// The left navigation rail, which expands from icons-only to icons+labels. Width is driven by CSS
+// variables (--rail-w, --rail-p, --rail-l) animated with requestAnimationFrame rather than a CSS
+// transition, so a trackpad swipe can take over mid-animation and the grid relayouts every frame.
 import { RAIL } from '../tuning.ts';
 import { writePreference } from '../ui/preferences.ts';
 import { ui } from '../ui/state.svelte.ts';
@@ -20,6 +23,7 @@ export const isInRailGestureZone = (clientX: number) => clientX <= RAIL.leftInse
 
 export function applyRailProgress(progress: number) {
 	rail.progress = Math.max(0, Math.min(1, progress));
+	// Labels only start fading in once the rail is wide enough to fit them.
 	const labelReveal = Math.max(0, (rail.progress - RAIL.labelRevealStartProgress) / (1 - RAIL.labelRevealStartProgress));
 	setRootVariable('--rail-w', `${railWidthPx().toFixed(2)}px`);
 	setRootVariable('--rail-p', rail.progress.toFixed(3));
@@ -42,6 +46,7 @@ export function animateRailTo(targetProgress: number) {
 	rail.target = targetProgress;
 	stopRailAnimation();
 	const startProgress = rail.progress;
+	// requestAnimationFrame doesn't run in a hidden tab, so jump straight to the end there.
 	const durationMs =
 		prefersReducedMotion() || document.hidden
 			? 0
@@ -70,6 +75,7 @@ export function commitRailState(expanded: boolean) {
 	settleRail(expanded, true);
 }
 
+// instant is for restoring the saved state on startup, which is why it doesn't write the preference back.
 export function setRailExpanded(expanded: boolean, instant: boolean) {
 	closeAllMenus();
 	if (instant) {

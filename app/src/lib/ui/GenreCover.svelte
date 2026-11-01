@@ -13,6 +13,7 @@
 
 	let colors = $state<string[]>([]);
 	const albumIds = $derived(playlist.mosaicAlbumIds);
+	// Each row starts one album later, so the same covers don't line up in columns.
 	const tiles = $derived(
 		albumIds.length
 			? Array.from(

@@ -1,4 +1,9 @@
 <script lang="ts">
+	// Playlist blocks (genre tiles and lists) sized to fill the screen below them without scrolling.
+	// On desktop the first block is a column on the left and the rest stack on the right; each
+	// block shows as many rows as fit. The two sides are stretched to the same height when they
+	// end up close, or when the shorter side still has playlists it could show. Phones get fixed
+	// counts in one stacked column.
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import { mainScroller } from '../engine/dom.ts';
@@ -209,6 +214,8 @@
 
 	const currentLayout = (): Layout => (formFactor.phone ? { plans: stackedPlans(), aligned: false } : fittedLayout());
 
+	// Only replace the plans when they actually changed, so a refit that lands on the same
+	// layout doesn't re-render every block.
 	function refit() {
 		const next = currentLayout();
 		if (signature(next.plans) !== signature(plans)) plans = next.plans;

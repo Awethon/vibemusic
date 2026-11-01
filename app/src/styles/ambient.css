@@ -78,6 +78,7 @@ body.rest #capsule {
 	font-weight: 300;
 	font-size: clamp(18px, 1.6vw, 24px);
 	color: var(--ink-2);
+	/* Keeps the line's space when there is no lyric, so the title doesn't jump between lines. */
 	min-height: 1.3em;
 	text-shadow: var(--shadow-text);
 	transition:

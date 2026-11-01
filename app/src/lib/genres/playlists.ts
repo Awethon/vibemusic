@@ -1,3 +1,5 @@
+// Builds the automatic genre playlists: chooseGenres picks which genres get one (avoiding
+// near-duplicates of a parent or sibling), pickBest picks and orders up to songCap songs for each.
 import { GENRE_PLAYLISTS, HIDDEN_GENRE_PLAYLISTS } from '../tuning.ts';
 import { descendantCount, parentsOf, withAncestors } from './genres.ts';
 import { isOtherRecording, isPlainTitle, titleKey } from './titles.ts';
@@ -20,6 +22,8 @@ export type GenrePlaylist = { genre: string; songs: GenreSong[] };
 
 type Rules = { readonly [Key in keyof typeof GENRE_PLAYLISTS]: number };
 
+// Deterministic 0..1 noise (FNV-1a), seeded with the week number so playlists reshuffle weekly
+// but stay stable between rebuilds in the same week.
 const hash = (text: string) => {
 	let value = 2166136261;
 	for (let index = 0; index < text.length; index++) value = Math.imul(value ^ text.charCodeAt(index), 16777619);
@@ -57,6 +61,8 @@ export function chooseGenres(
 			else byGenre.set(genre, [song]);
 		}
 	}
+	// Broad genres first (fewest ancestors, then fewest descendants), so a sub-genre is only added
+	// later if it isn't mostly a copy of a playlist already chosen.
 	const candidates = [...byGenre]
 		.filter(([genre, members]) => !hidden.includes(genre) && qualifies(genre, members, rules))
 		.toSorted(
@@ -86,6 +92,9 @@ export function chooseGenres(
 	return chosen.map(({ genre, best }) => ({ genre, songs: best }));
 }
 
+// How many songs each artist gets: every artist one seat (by weight, while seats last), then
+// Sainte-Laguë-style rounds (weight / (2n + 1)) so big artists get more without crowding out the
+// rest. The per-artist cap is only relaxed when nobody under it has songs left.
 function allot(weights: Map<string, number>, available: Map<string, number>, size: number, rules: Rules) {
 	const cap = Math.max(1, Math.round(size * rules.artistShareCap));
 	const seats = new Map<string, number>();
@@ -111,9 +120,12 @@ function allot(weights: Map<string, number>, available: Map<string, number>, siz
 
 const FILLER = /(^|[^\p{L}])(skit|intro|outro|interlude|prelude|скит|интро|аутро|интерлюдия)([^\p{L}]|$)/iu;
 
+// Skits and intros are dropped, but only when no chart data says the track is actually popular.
 const isFiller = (song: GenreSong, rules: Rules) =>
 	song.popularity === null && song.rank === null && (song.duration < rules.minSongSeconds || FILLER.test(song.title));
 
+// When a song exists in several versions, prefer (in order): the original recording, the earliest
+// release, a plain title, more plays, starred, known popularity.
 const versionOrder = (song: GenreSong) => [
 	Number(isOtherRecording(song.title)),
 	song.year || Number.MAX_SAFE_INTEGER,
@@ -158,6 +170,8 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 	);
 	const week = Math.floor(now / WEEK_MS);
 	const yours = (song: GenreSong) => (1 + song.plays / rules.playsDivisor) * (song.starred ? rules.likeMultiplier : 1);
+	// With popularity data, songs are scored by it boosted by your plays and likes; without any,
+	// by your plays and likes alone. log2 keeps a few huge hits from dominating.
 	const score = knownPopularity.length
 		? (song: GenreSong) => Math.log2(1 + (song.popularity ?? fallback.get(song.artistId)!) * yours(song))
 		: (song: GenreSong) => Math.log2(1 + song.plays) + Math.log2(song.starred ? rules.likeMultiplier : 1);
@@ -173,6 +187,8 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 	const ranked = picked
 		.map((song) => ({ song, score: score(song) + rules.weeklyNoise * hash(`${song.id}:${week}`) }))
 		.toSorted((a, b) => b.score - a.score);
+	// Order by score, but keep `gap` songs between two by the same artist. An artist with many songs
+	// left becomes "urgent" once waiting longer would make the spacing impossible to keep.
 	const gap = Math.min(rules.artistGap, Math.max(1, Math.floor((seats.size - 1) / 2)));
 	const ordered: GenreSong[] = [];
 	const left = new Map([...seats].map(([artist, count]) => [artist, Math.min(count, byArtist.get(artist)!.length)]));
@@ -188,6 +204,8 @@ export function pickBest(allVersions: GenreSong[], rules: Rules = GENRE_PLAYLIST
 		left.set(song.artistId, left.get(song.artistId)! - 1);
 		ordered.push(song);
 	}
+	// The loop above only decides which artist plays at each position; each artist's slots are then
+	// filled with their songs in popularity order, so their biggest song comes first.
 	const queues = Map.groupBy(picked, (song) => song.artistId);
 	return ordered.map((song) => queues.get(song.artistId)!.shift()!);
 }

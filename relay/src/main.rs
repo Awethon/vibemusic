@@ -1,3 +1,26 @@
+//! vibemusic relay: an optional companion server for the vibemusic web app.
+//!
+//! Routes:
+//! - `GET /relay`: WebSocket for remote control between a user's tabs and devices (see
+//!   `protocol.rs`), plus enrichment requests and broadcasts (see `enrich.rs`).
+//! - `GET /radio/{id}`: streams a Navidrome internet radio station through the relay, so it is
+//!   same-origin for the app's Web Audio graph. `GET /radio/{id}/now`: its current song.
+//! - `GET /relay/share/{id}`: JSON for a public Navidrome share. `GET /relay/share/{id}/preview`:
+//!   an HTML page with Open Graph tags for link previews of that share.
+//! - `GET /health`: liveness check.
+//!
+//! Environment (all optional):
+//! - `NAVIDROME_URL` (default `http://127.0.0.1:4533`): the Navidrome the relay talks to.
+//! - `LISTEN` (default `0.0.0.0:4600`): address to bind.
+//! - `ENRICHMENT_CACHE` (default `/data/enrichment.json`): enrichment cache file; set it empty to
+//!   keep the cache in memory only.
+//! - `APPLE_PAUSE_MS`, `APPLE_STOREFRONTS`: see `apple.rs`.
+//! - `RADIO_LOCAL_PROXY`: see `radio.rs`.
+//! - `VIBEMUSIC_NAVIDROME_USER`, `VIBEMUSIC_NAVIDROME_PASSWORD`: turn on "This is" playlists;
+//!   `THIS_IS_STATE`, `THIS_IS_MIN_TRACKS`, `THIS_IS_MAX_TRACKS`, `THIS_IS_EVERY_HOURS` and
+//!   `THIS_IS_SKIP` tune them (see `this_is.rs`).
+//! - `RUST_LOG`: log filter (default `info`).
+
 mod account;
 mod apple;
 mod auth;
@@ -30,7 +53,9 @@ use enrich::Enricher;
 use hub::Hub;
 use protocol::{ClientMessage, ServerMessage};
 
+// A socket that does not authenticate in time is closed, so unauthenticated sockets cannot pile up.
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+// WebSocket pings keep reverse proxies from closing a quiet socket.
 const PING_EVERY: Duration = Duration::from_secs(25);
 const MAX_NAME_CHARS: usize = 60;
 const MAX_DEVICE_ID_CHARS: usize = 64;
@@ -116,6 +141,8 @@ async fn share_info(State(app): State<App>, Path(id): Path<String>) -> Response 
 }
 
 async fn share_preview(State(app): State<App>, Path(id): Path<String>, headers: axum::http::HeaderMap) -> Response {
+    // Open Graph URLs must be absolute and public. Behind a reverse proxy the public host is in
+    // X-Forwarded-Host; `Host` may be the relay's internal address.
     let host = headers
         .get("x-forwarded-host")
         .or_else(|| headers.get(axum::http::header::HOST))
@@ -151,7 +178,10 @@ async fn serve(app: App, mut socket: WebSocket) {
     };
     let name: String = hello.name.chars().take(MAX_NAME_CHARS).collect();
     let (outbox, mut inbox) = unbounded_channel::<String>();
+    // Enrichment replies go only to this socket, through the same outbox as hub messages.
     let replies = outbox.clone();
+    // Enrichment updates are broadcast to every connected socket, whatever the user: they hold
+    // public metadata about artists and albums, not anything private to a user.
     let mut updates = app.enricher.subscribe();
     let connection = app.hub.lock().unwrap().join(&user, &hello.device_id, &name, outbox);
     tracing::info!(user, device = hello.device_id, name, "device connected");
@@ -167,6 +197,7 @@ async fn serve(app: App, mut socket: WebSocket) {
                 _ = ping.tick() => if sink.send(Message::Ping(Default::default())).await.is_err() { break },
                 update = updates.recv() => match update {
                     Ok(text) => if sink.send(Message::Text(text.into())).await.is_err() { break },
+                    // A slow socket skips the broadcasts it missed instead of being disconnected.
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 },

@@ -1,3 +1,5 @@
+// Hovering anything with data-preview-album tints the background with that album's colours
+// (see engine/palette.ts). Disabled on album pages.
 import { isPreviewingPalette, previewPalette } from '../engine/palette.ts';
 import { ui } from './state.svelte.ts';
 

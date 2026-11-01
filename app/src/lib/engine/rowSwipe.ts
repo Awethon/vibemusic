@@ -1,3 +1,6 @@
+// Swipe-left-to-remove for queue rows (driven by gestures.ts). The row is "lifted": a fixed clone
+// on document.body is moved instead of the row, so the panel's overflow doesn't clip it, and the
+// hidden original stays in the list until the removal is applied (skipRow in queueAnimation).
 import { EASING, ROW_SWIPE } from '../tuning.ts';
 import { removeRowAfterSwipe } from '../ui/queueActions.ts';
 import { prefersReducedMotion } from './dom.ts';
@@ -14,6 +17,8 @@ export function queueRowAtEvent(event: MouseEvent): HTMLElement | null {
 	const target = event.target instanceof Element ? event.target : null;
 	const directHit = target?.closest<HTMLElement>(QUEUE_ROW_SELECTOR);
 	if (directHit) return directHit;
+	// Wheel events keep targeting the element where the gesture began, which may no longer be
+	// under the pointer; hit-test the pointer position as a fallback.
 	return document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(QUEUE_ROW_SELECTOR) ?? null;
 }
 
@@ -36,6 +41,7 @@ export function liftRowForSwipe(row: HTMLElement) {
 	});
 	document.body.append(lifted);
 	row.style.visibility = 'hidden';
+	// The clone is position: fixed at the row's old rect, so the list must not scroll away under it.
 	const scroller = row.closest<HTMLElement>('.q-scroll');
 	if (scroller) {
 		swipe.frozenScroller = scroller;
@@ -58,6 +64,7 @@ export function moveLiftedRow() {
 	const lifted = swipe.liftedRow;
 	if (!lifted) return;
 	const progress = Math.min(1, rowSwipeProgress());
+	// Swiping right (the wrong way) only gives a small rubber-band nudge.
 	const offset = swipe.offsetPx < 0 ? swipe.offsetPx : Math.min(ROW_SWIPE.rubberBandMaxPx, swipe.offsetPx * ROW_SWIPE.rubberBandFactor);
 	lifted.style.transform = prefersReducedMotion() ? '' : `translateX(${offset.toFixed(1)}px)`;
 	lifted.style.opacity = rowOpacityAt(progress).toFixed(3);

@@ -1,3 +1,6 @@
+// Reading the library from Navidrome's native API: everything for a full build (fetchLibrary), or
+// just what changed since the last sync's marks (fetchChanges).
+
 import type { z } from 'zod';
 import type { NavidromeHttp } from '../navidrome/http.ts';
 import {
@@ -22,6 +25,7 @@ export async function fetchPlaylists(http: NavidromeHttp): Promise<NativePlaylis
 
 type RadioResponse = { internetRadioStations?: { internetRadioStation?: unknown[] } };
 
+// null on failure, so a failed request never wipes the stored stations.
 async function fetchRadioStations(http: NavidromeHttp): Promise<RadioStation[] | null> {
 	try {
 		return radioStation
@@ -33,11 +37,16 @@ async function fetchRadioStations(http: NavidromeHttp): Promise<RadioStation[] |
 }
 
 async function fetchPlaylistTracks(http: NavidromeHttp, playlist: NativePlaylist): Promise<NativePlaylistTrack[]> {
-	return nativePlaylistTrack
-		.array()
-		.parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, LIBRARY_SYNC.pageSize));
+	return (
+		nativePlaylistTrack
+			.array()
+			// A playlist track's id is its position, so this is playlist order.
+			.parse(await http.nativeAll(`playlist/${playlist.id}/tracks?_sort=id&_order=ASC`, LIBRARY_SYNC.pageSize))
+	);
 }
 
+// Everything for a full build. missing=false: Navidrome keeps rows for files that disappeared from
+// disk, flagged as missing.
 export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: SyncProgress) => void = () => {}): Promise<LibrarySnapshot> {
 	const progress: SyncProgress = { albums: 0, albumTotal: 0, tracks: 0, trackTotal: 0, playlists: 0, playlistTotal: 0, building: false };
 	const report = (update: Partial<SyncProgress>) => {
@@ -99,6 +108,8 @@ export async function fetchLibrary(http: NavidromeHttp, onProgress: (progress: S
 	return { albums, songs, playlists, playlistTracks, radioStations: radioStations ?? [], artists, steps };
 }
 
+// Reads a list sorted newest-first by `stampOf` until it reaches items no newer than `mark`.
+// Usually only a handful changed, so pages start tiny and grow 4x each time.
 async function changedSince<T>(
 	http: NavidromeHttp,
 	path: string,
@@ -119,6 +130,8 @@ async function changedSince<T>(
 	}
 }
 
+// Smart playlist rule fields that depend on listening activity. A smart playlist using any of them
+// can change after a play or star, so its tracks are refetched when listening data changed.
 const LISTENING_FIELDS = new Set([
 	'loved',
 	'dateloved',
@@ -141,6 +154,8 @@ const LISTENING_FIELDS = new Set([
 	'artistdaterated'
 ]);
 
+// Matches any listed word anywhere in the rules JSON; a false positive only costs one extra
+// playlist fetch.
 export const followsListening = (rules: unknown) =>
 	(
 		JSON.stringify(rules)
@@ -201,6 +216,10 @@ async function fetchAlbumsById(http: NavidromeHttp, albumIds: string[]) {
 	return pages.flat();
 }
 
+/**
+ * Everything that changed since the marks in `sync`, or null when a full sync is the better
+ * choice (too many albums changed).
+ */
 export async function fetchChanges(
 	http: NavidromeHttp,
 	sync: SyncState,
@@ -210,12 +229,15 @@ export async function fetchChanges(
 ): Promise<LibraryChanges | null> {
 	const { marks } = sync;
 	const [imported, refreshed, albumPlays, albumStars, songPlays, songStars, rated, playlists, radioStations] = await Promise.all([
+		// No missing=false here: albums that went missing must come through so applyChanges can drop them.
 		changedSince(http, 'album?_sort=importedAt&_order=DESC', nativeAlbum, (album) => album.importedAt, marks.albumImported),
 		fetchAlbumsById(http, refreshedAlbumIds),
 		changedSince(http, 'album?_sort=playDate&_order=DESC', nativeAlbum, (album) => album.playDate, marks.albumPlayed),
 		changedSince(http, 'album?_sort=starredAt&_order=DESC', nativeAlbum, (album) => album.starredAt, marks.albumStarred),
 		changedSince(http, 'song?_sort=playDate&_order=DESC', nativeSong, (song) => song.playDate, marks.songPlayed),
 		changedSince(http, 'song?_sort=starredAt&_order=DESC', nativeSong, (song) => song.starredAt, marks.songStarred),
+		// All rated songs, not just changed ones: a cleared rating only shows up as a song missing
+		// from this list (see updateRatings).
 		http.nativeAll('song?has_rating=true&_sort=title&_order=ASC', LIBRARY_SYNC.pageSize).then((songs) => nativeSong.array().parse(songs)),
 		fetchPlaylists(http),
 		fetchRadioStations(http)
@@ -227,6 +249,7 @@ export async function fetchChanges(
 	const stale = playlists.filter(
 		(playlist) =>
 			sync.playlists[playlist.id] !== playlistSignature(playlist) ||
+			// Smart playlists may change with any new album, or with listening if their rules use it.
 			(playlist.rules && (albums.length > 0 || (listeningChanged && followsListening(playlist.rules))))
 	);
 	const [albumSongs, playlistTracks, totals, artistArt] = await Promise.all([
@@ -235,6 +258,7 @@ export async function fetchChanges(
 			albums.filter((album) => !album.missing).map((album) => album.id)
 		),
 		Promise.all(stale.map(async (playlist) => [playlist.id, await fetchPlaylistTracks(http, playlist)] as const)),
+		// Totals only matter when content changed; the worker compares them to catch missed changes.
 		albums.length ? Promise.all([fetchTotal(http, 'album?missing=false'), fetchTotal(http, 'song?missing=false')]) : null,
 		albums.length ? fetchArtistArt(http) : refreshedArtistIds.length ? fetchArtistArt(http, refreshedArtistIds) : []
 	]);
@@ -244,6 +268,7 @@ export async function fetchChanges(
 		albumSongs,
 		albumStats: latest([albumPlays, albumStars]),
 		songStats: latest([songPlays, songStars]),
+		// Imported albums are fully replaced anyway.
 		artwork: refreshed.filter((album) => !importedIds.has(album.id)),
 		artistArt,
 		ratings: new Map(rated.map((song) => [song.id, song.rating])),

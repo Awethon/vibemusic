@@ -1,3 +1,5 @@
+// The favicon is generated as an SVG data URL so the "m" can take the playing album's accent colour.
+// The paths are the logo's letter outlines.
 const V_PATH = 'M6.72-16.90L11.45-5.39L16.27-16.90L22.72-16.90L14.82 0L7.93 0L0.03-16.90L6.72-16.90Z';
 const LETTERS = 'translate(5.00 23.36) scale(1 1) translate(-0.03 17.28)';
 const M_PATH =

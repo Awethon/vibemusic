@@ -1,7 +1,12 @@
+// WebGL can't read the page's pixels, so the glass needs its own picture of what is behind it.
+// This repaints an approximation of the DOM into a 2D canvas: the background field snapshot,
+// then backgrounds, borders, images, canvases and text of every element under the glass region.
 import { fieldSnapshot } from '../visual/fieldSnapshot.ts';
 import type { Region } from './renderer.ts';
 import { paintScrim } from '../ui/scrim.ts';
 
+// Elements that sit above a given glass layer. They are skipped when painting its backdrop, and
+// changes inside them don't trigger a repaint (layer.ts).
 const ALWAYS_ABOVE = '.pop, .menu, #palette, #toast, #connection-note, .row-lift';
 export const ABOVE_RAIL_GLASS = `#glass-rail, #chrome, #chrome ~ *, ${ALWAYS_ABOVE}`;
 export const ABOVE_PLAYER_GLASS = `#glass-player, #glass-popups, #panel, #dock, ${ALWAYS_ABOVE}`;
@@ -9,10 +14,12 @@ export const ABOVE_POPUP_GLASS = `#glass-popups, ${ALWAYS_ABOVE}`;
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
+// Fill under the field snapshot; same as the theme-color in app.html (the CSS body is #0a090d).
 const PAGE_COLOR = '#08070b';
 
 const intersects = (a: Box, b: Box) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
+// Returns only the alpha of a computed rgb()/rgba() colour; used to skip transparent fills.
 function parseColor(value: string): number {
 	const match = value.match(/rgba?\(([^)]+)\)/);
 	if (!match) return 0;
@@ -62,6 +69,8 @@ function drawText(context: CanvasRenderingContext2D, node: Text, style: CSSStyle
 	if (!raw.trim()) return;
 	const range = document.createRange();
 	range.selectNodeContents(node);
+	// The browser already wrapped the text; its line boxes come from the Range. Words are then
+	// re-flowed greedily into those boxes, which is close enough behind blurred, refracting glass.
 	const lines = [...range.getClientRects()].filter((line) => line.width > 0 && line.height > 0);
 	if (!lines.length || !lines.some((line) => intersects(line, region))) return;
 	context.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
@@ -105,6 +114,8 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 		context.drawImage(fieldSnapshot.canvas, 0, 0, innerWidth, innerHeight);
 	}
 
+	// SVG icons are not painted. #field (the animated background) is already drawn above from
+	// its snapshot, since reading the live GPU canvas every frame is too slow.
 	const visit = (element: Element, opacity: number) => {
 		if (element instanceof SVGElement || element.matches(above) || element.id === 'field') return;
 		const style = getComputedStyle(element);
@@ -116,6 +127,7 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 		if (clips && !intersects(rect, box)) return;
 		context.save();
 		context.globalAlpha = alpha;
+		// The scrim is a CSS gradient, which can't be read back from computed style, so it has its own painter.
 		if (element.id === 'scrim') {
 			paintScrim(context, innerWidth, innerHeight);
 			context.restore();
@@ -135,6 +147,7 @@ export function paintBackdrop(context: CanvasRenderingContext2D, region: Region,
 				roundRect(context, rect, radius);
 				context.stroke();
 			}
+			// Lower glass layers are canvases too, so upper layers pick them up through the canvas branch.
 			if (element instanceof HTMLImageElement && element.complete && element.naturalWidth && !element.classList.contains('img-broken')) {
 				context.save();
 				roundRect(context, rect, radius);

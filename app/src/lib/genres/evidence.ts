@@ -1,3 +1,6 @@
+// Decides a track's genres by weighted vote. File tags are trusted most; Deezer's album genre adds
+// a smaller vote; MusicBrainz album tags count by their vote share, and artist tags are only
+// consulted when the file has no usable genre and album tags are thin.
 import { GENRE_EVIDENCE } from '../tuning.ts';
 import type { GenreResolver } from './genres.ts';
 
@@ -9,6 +12,8 @@ function addTags(resolver: GenreResolver, tags: Tag[], votes: Map<string, number
 		const genre = resolver.knownGenre(name);
 		return genre && count > 0 ? [[genre, count] as const] : [];
 	});
+	// Tags are scored relative to the most-voted one, and the whole set is discounted when even the
+	// top tag has few votes (one or two votes is weak evidence). Tags below minTagShare are dropped as noise.
 	const top = Math.max(0, ...resolved.map(([, count]) => count));
 	if (!top) return 0;
 	const confidence = Math.min(1, top / GENRE_EVIDENCE.confidentVotes);
@@ -30,5 +35,6 @@ export function genresFromEvidence(resolver: GenreResolver, evidence: Evidence):
 	if (!fileTagged && albumConfidence < 1 && evidence.artistTags?.length) addTags(resolver, evidence.artistTags, votes);
 	const ranked = [...votes].toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 	const chosen = ranked.filter(([, weight]) => weight >= GENRE_EVIDENCE.minWeight).map(([genre]) => genre);
+	// If nothing is strong enough on its own, still keep the single best guess.
 	return chosen.length ? chosen : ranked.slice(0, 1).map(([genre]) => genre);
 }

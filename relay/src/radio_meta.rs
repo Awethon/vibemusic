@@ -1,5 +1,9 @@
+//! Now-playing metadata from radio streams: ICY (Shoutcast/Icecast) blocks interleaved with the
+//! audio, and Vorbis comments in Ogg streams. Both parsers take the stream in arbitrary chunks.
+
 use std::collections::HashMap;
 
+// Comment packets can embed cover art; bytes beyond this cap are not collected.
 const MAX_PACKET_BYTES: usize = 4 * 1024 * 1024;
 const MAX_PENDING_BYTES: usize = 256 * 1024;
 
@@ -9,6 +13,8 @@ pub struct NowPlaying {
     pub artist: String,
 }
 
+/// Reads `StreamTitle='...';` from an ICY metadata block. By convention the title is
+/// "Artist - Title"; without the separator it is all title.
 pub fn from_icy(meta: &str) -> Option<NowPlaying> {
     let start = meta.find("StreamTitle='")? + "StreamTitle='".len();
     let rest = &meta[start..];
@@ -31,6 +37,9 @@ pub fn from_icy(meta: &str) -> Option<NowPlaying> {
     })
 }
 
+/// Splits an ICY stream into audio and metadata. After every `every` audio bytes comes one length
+/// byte (block size / 16) and then that many 16-byte units of NUL-padded text; a zero length means
+/// "no change".
 pub struct IcyStripper {
     every: usize,
     audio_left: usize,
@@ -48,6 +57,7 @@ impl IcyStripper {
         }
     }
 
+    /// Returns the audio bytes of the chunk and the last song announced in it, if any.
     pub fn feed(&mut self, mut chunk: &[u8]) -> (Vec<u8>, Option<NowPlaying>) {
         let mut audio = Vec::with_capacity(chunk.len());
         let mut found = None;
@@ -84,6 +94,8 @@ impl IcyStripper {
     }
 }
 
+/// Finds Opus and Vorbis comment packets in an Ogg stream. Stations usually start a new logical
+/// stream, with fresh comment headers, when the song changes. Audio passes through untouched.
 #[derive(Default)]
 pub struct OggTags {
     pending: Vec<u8>,
@@ -91,11 +103,16 @@ pub struct OggTags {
 }
 
 impl OggTags {
+    /// Returns the last song announced in the bytes seen so far, if any.
     pub fn feed(&mut self, chunk: &[u8]) -> Option<NowPlaying> {
         self.pending.extend_from_slice(chunk);
         let mut found = None;
         loop {
+            // An Ogg page: "OggS", version, header flags (byte 5), granule, serial number
+            // (bytes 14..18), sequence, checksum, segment count (byte 26), then one lacing value
+            // per segment: 27 bytes of header before the lacing table.
             let Some(start) = self.pending.windows(4).position(|window| window == b"OggS") else {
+                // Keep 3 bytes: the next chunk may finish an "OggS" that starts here.
                 let keep = self.pending.len().saturating_sub(3);
                 self.pending.drain(..keep);
                 break;
@@ -123,6 +140,8 @@ impl OggTags {
             let header = self.pending[5];
             let serial = u32::from_le_bytes([self.pending[14], self.pending[15], self.pending[16], self.pending[17]]);
             let page: Vec<u8> = self.pending.drain(..size).collect();
+            // Unless this page continues a packet (0x01), or if it begins a stream (0x02), any
+            // half-collected packet of this stream is stale.
             if header & 0x02 != 0 || header & 0x01 == 0 {
                 self.packets.remove(&serial);
             }
@@ -133,6 +152,7 @@ impl OggTags {
                     packet.extend_from_slice(&page[offset..offset + value]);
                 }
                 offset += value;
+                // A lacing value below 255 ends a packet.
                 if value < 255 {
                     let packet = self.packets.remove(&serial).unwrap_or_default();
                     found = comments(&packet).or(found);
@@ -143,6 +163,8 @@ impl OggTags {
     }
 }
 
+// Parses a comment header: "OpusTags" or "\x03vorbis", then a vendor string and a list of
+// KEY=value entries, all lengths little-endian u32. Keys are case-insensitive.
 fn comments(packet: &[u8]) -> Option<NowPlaying> {
     let body = packet
         .strip_prefix(b"OpusTags")

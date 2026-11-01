@@ -1,3 +1,6 @@
+// Messages between library.svelte.ts (main thread) and library.worker.ts. Errors carry flags
+// because Error subclasses don't survive postMessage.
+
 import type { Credentials } from '../navidrome/credentials.ts';
 import type { Enrichment, EnrichmentRequest, LibraryMeta } from './snapshot.ts';
 
@@ -21,6 +24,7 @@ export type WorkerRequest =
 	| { kind: 'sync'; credentials: Credentials; full: boolean; albumIds: string[]; artistIds: string[] }
 	| { kind: 'persist' }
 	| { kind: 'query'; sql: string; params: SqlParam[] }
+	// persist: whether to save afterwards. Only the leader tab saves; others just apply the change.
 	| { kind: 'run'; sql: string; params: SqlParam[]; persist: boolean }
 	| { kind: 'enrichmentRequest' }
 	| { kind: 'enrich'; enrichment: Enrichment };
@@ -41,4 +45,5 @@ export type WorkerEnvelope = { id: number; request: WorkerRequest };
 export type WorkerReply =
 	| { id: number; ok: true; value: unknown }
 	| { id: number; ok: false; error: string; expired: boolean; unreachable: boolean }
+	// Sent any number of times during a full sync, before the final reply with the same id.
 	| { id: number; progress: SyncProgress };

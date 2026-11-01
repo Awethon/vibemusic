@@ -1,3 +1,6 @@
+// Touch long-press opens the same context menus as right-click: after a hold it dispatches a
+// synthetic contextmenu event at the pressed element, because not every touch browser (iOS
+// Safari in particular) fires contextmenu on long-press.
 import { LAYOUT } from '../tuning.ts';
 
 type Press = { pointerId: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout> };
@@ -23,10 +26,12 @@ export function installLongPress(): () => void {
 			target,
 			timer: setTimeout(() => {
 				press = null;
+				// A handler that opens a menu calls preventDefault, so dispatchEvent returning false means a menu opened.
 				const opened = !target.dispatchEvent(
 					new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 })
 				);
 				if (!opened) return;
+				// Lifting the finger still produces a click, which would activate whatever is under the menu.
 				swallowClick = true;
 				navigator.vibrate?.(10);
 			}, LAYOUT.longPressMs)
@@ -49,6 +54,7 @@ export function installLongPress(): () => void {
 		event.stopPropagation();
 	};
 
+	// If the browser fires its own (trusted) contextmenu first, let that one win and don't fire a second.
 	const nativeMenu = (event: MouseEvent) => {
 		if (event.isTrusted) cancel();
 	};

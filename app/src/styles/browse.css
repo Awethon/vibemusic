@@ -186,6 +186,7 @@ body.has-az #az {
 
 #az button:hover {
 	color: var(--ink);
+	/* rotate(0.02deg) only while zoomed: see .tile .art in views.css. */
 	transform: scale(1.35) rotate(0.02deg);
 }
 

@@ -1,3 +1,8 @@
+//! "This is <artist>" playlists: public Navidrome playlists of each artist's most popular songs
+//! in the library, with a generated cover. On only when `VIBEMUSIC_NAVIDROME_USER` and
+//! `VIBEMUSIC_NAVIDROME_PASSWORD` name a dedicated Navidrome admin account, which owns the
+//! playlists. Popularity comes from Apple and Deezer (see `enrich.rs`).
+
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -13,9 +18,14 @@ use crate::deezer;
 use crate::enrich::now_ms;
 use crate::enrich::{Enricher, Fetched};
 
+// Playlists of the relay's account whose name starts with this are managed here: updated, and
+// deleted when their artist no longer qualifies. Do not use the prefix for hand-made playlists.
 const PREFIX: &str = "This is ";
+// Part of the cover signature; change it when `cover.rs` draws differently to redraw all covers.
 const COVER_VERSION: &str = "discography-3";
+// How often the worker wakes to see whether a refresh is due (and retries after a failed one).
 const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
+// Album covers fanned out on a playlist cover.
 const COVERS: usize = 5;
 
 pub struct Settings {
@@ -37,6 +47,11 @@ fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
 }
 
 impl Settings {
+    /// `None` unless both account variables are set. Tuning, all optional: `THIS_IS_MIN_TRACKS`
+    /// (default 13) songs an artist needs for a playlist, `THIS_IS_MAX_TRACKS` (50) songs per
+    /// playlist, `THIS_IS_EVERY_HOURS` (168) between refreshes, `THIS_IS_SKIP` comma-separated
+    /// artist names to leave out, `THIS_IS_STATE` (`/data/this-is.json`, empty for none) file
+    /// that remembers the last run and drawn covers across restarts.
     pub fn from_env(url: &str) -> Option<Self> {
         let username = std::env::var("VIBEMUSIC_NAVIDROME_USER")
             .ok()
@@ -63,6 +78,7 @@ impl Settings {
     }
 }
 
+// `covers` maps a playlist id to the signature of the albums its uploaded cover was drawn from.
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct State {
@@ -122,6 +138,9 @@ fn number(value: &Value, key: &str) -> i64 {
     value[key].as_i64().unwrap_or(0)
 }
 
+/// The album artists of a song or album as (id, name): every credited album artist from
+/// `participants` when Navidrome has them, else the single `albumArtistId`/`albumArtist`. A
+/// collaboration album then counts for each artist instead of a combined "A & B" artist.
 pub fn album_artists(item: &Value) -> Vec<(String, String)> {
     let credited: Vec<(String, String)> = item["participants"]["albumartist"]
         .as_array()
@@ -145,6 +164,7 @@ pub fn album_artists(item: &Value) -> Vec<(String, String)> {
     }
 }
 
+// Words in a title that mark a skit, intro or interlude, in English and Russian.
 const FILLER: [&str; 9] = [
     "skit",
     "intro",
@@ -156,6 +176,7 @@ const FILLER: [&str; 9] = [
     "аутро",
     "интерлюдия",
 ];
+// Shorter tracks are treated as filler too.
 const MIN_SONG_SECONDS: f64 = 75.0;
 
 fn is_filler(song: &Value) -> bool {
@@ -168,6 +189,9 @@ fn is_filler(song: &Value) -> bool {
             .any(|word| FILLER.contains(&word))
 }
 
+// Keeps one copy of each song across albums, compilations and re-releases (same `title_key`):
+// the original recording over remixes and live takes, then a known year over none, then the
+// earliest year, then the most played.
 fn one_edition_each(songs: Vec<&Value>) -> Vec<&Value> {
     let mut best: HashMap<String, &Value> = HashMap::new();
     let mut order: Vec<String> = Vec::new();
@@ -201,6 +225,9 @@ fn one_edition_each(songs: Vec<&Value>) -> Vec<&Value> {
     order.into_iter().filter_map(|key| best.remove(&key)).collect()
 }
 
+/// Song ids for an artist's playlist, at most `max`: ranked by Apple's top songs, then Deezer's,
+/// then play count, newest year, and album order. Filler (skits, intros, short tracks) goes last
+/// unless a service ranks it.
 pub fn choose(apple_top: &[(String, u64)], deezer_top: &[(String, u64)], songs: &[Value], max: usize) -> Vec<String> {
     let mut chosen = one_edition_each(songs.iter().collect());
     chosen.sort_by_key(|song| {
@@ -232,17 +259,21 @@ async fn cover_image(account: &Account, album_id: &str, size: u32) -> Result<Rgb
 }
 
 async fn draw_cover(account: &Account, name: &str, albums: &[&Value]) -> Result<Vec<u8>, AccountError> {
+    // The newest album's cover sets the colours; a small copy is enough to sample them.
     let newest = cover_image(account, &text(albums[0], "id"), 200).await?;
     let mut covers = Vec::new();
     for album in albums.iter().take(COVERS) {
         covers.push(cover_image(account, &text(album, "id"), 600).await?);
     }
     let name = name.to_owned();
+    // Rendering is CPU-heavy; keep it off the async runtime threads.
     tokio::task::spawn_blocking(move || cover::render(&name, &newest, &covers))
         .await
         .map_err(|error| AccountError(error.to_string()))
 }
 
+// Subsonic `createPlaylist` with a `playlistId` replaces that playlist's songs; without one it
+// creates a new playlist.
 async fn save_playlist(
     account: &Account,
     existing: Option<&Value>,
@@ -292,9 +323,11 @@ async fn run(
             albums_by_artist.entry(id).or_default().push(album);
         }
     }
+    // Newest album first: it themes the cover and leads the fan of covers.
     for list in albums_by_artist.values_mut() {
         list.sort_by_key(|album| std::cmp::Reverse((number(album, "maxYear"), text(album, "createdAt"))));
     }
+    // Apple top songs come from the enrichment cache when fresh; otherwise they are fetched here.
     let apple = Apple::from_env(client.clone());
     let mut wanted: Vec<(String, String, Vec<String>)> = Vec::new();
     let mut artists: Vec<(&String, &Vec<Value>)> = songs_by_artist.iter().collect();
@@ -329,6 +362,8 @@ async fn run(
         ));
     }
     let playlists = account.all("playlist").await?;
+    // Only playlists this account owns are touched. `sync` playlists are imported from playlist
+    // files and their tracks are managed by Navidrome, so they are left alone.
     let ours: HashMap<String, &Value> = playlists
         .iter()
         .filter(|playlist| {
@@ -356,6 +391,8 @@ async fn run(
         if artist_albums.is_empty() {
             continue;
         }
+        // The cover is redrawn only when the signature (COVER_VERSION, name, shown albums and their
+        // updatedAt) changes, or the playlist has no uploaded image.
         let signature = format!(
             "{COVER_VERSION}|{name}|{}",
             artist_albums
@@ -385,6 +422,7 @@ async fn run(
             && playlist["sync"] != true
             && name.starts_with(PREFIX)
             && !titles.contains(&name);
+        // "This is" playlists imported from files in a `_playlists` folder are removed as well.
         let legacy =
             playlist["sync"] == true && name.starts_with(PREFIX) && text(playlist, "path").contains("/_playlists/");
         if mine || legacy {

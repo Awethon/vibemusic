@@ -12,6 +12,7 @@
 	font-size: clamp(32px, 3vw, 44px);
 }
 
+/* The timeline fills the page down to the bottom edge, where the player would cover the minimap. */
 body.timeline-view #dock {
 	display: none;
 }
@@ -206,6 +207,7 @@ a.tl-label:hover b {
 }
 
 .tl-item:hover {
+	/* rotate(0.02deg) only while zoomed: see .tile .art in views.css. */
 	transform: scale(1.08) rotate(0.02deg);
 	z-index: 1;
 }
@@ -251,6 +253,7 @@ a.tl-label:hover b {
 	pointer-events: none;
 }
 
+/* Fixed and rendered outside .tl-scroll, so the scroll box doesn't clip it. */
 .tl-tip {
 	position: fixed;
 	z-index: 20;

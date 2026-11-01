@@ -1,3 +1,5 @@
+// Context-menu contents for tracks, albums, artists, playlists and queue rows, and the actions
+// behind them. Server changes go through the Subsonic API, then resync the local library copy.
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { query, resyncLibrary } from '../library/library.svelte.ts';
@@ -43,6 +45,7 @@ export const openAlbum = (id: string) => goto(resolve('/album/[id]', { id }));
 export const openArtist = (id: string) => goto(resolve('/artist/[id]', { id }));
 export const openPlaylist = (id: string) => goto(resolve('/playlist/[id]', { id }));
 
+// Subsonic's updatePlaylist happily adds duplicates, so tracks already in the playlist are filtered out first.
 async function addTracksToPlaylist(playlist: Playlist, tracks: Track[]) {
 	const existing = new Set(
 		(await query<{ trackId: string }>('select track_id as trackId from playlist_track where playlist_id = ?', [playlist.id])).map(
@@ -82,6 +85,7 @@ async function share(ids: string[], description: string) {
 		await navigator.clipboard.writeText(url);
 		showToast('Share link copied');
 	} catch {
+		// Clipboard access can be denied (permissions, insecure context); show the link instead.
 		showToast(url);
 	}
 }
@@ -129,6 +133,7 @@ export async function trackMenu(
 	playlist?: Playlist
 ): Promise<MenuItem[]> {
 	const track = tracks[index];
+	// Radio stations aren't library tracks: no album, artist, sharing or playlists.
 	if (isRadio(track.id))
 		return [
 			{ label: 'Play', run: () => playListAnimated(tracks, index, sourceName, listKey) },
@@ -156,6 +161,7 @@ export async function trackMenu(
 			label: 'Remove from this playlist',
 			run: async () => {
 				try {
+					// Subsonic removes by position, so index must be the track's position in the playlist as listed.
 					await navidrome().subsonic('updatePlaylist', { playlistId: playlist.id, songIndexToRemove: index });
 				} catch (error) {
 					reportFailure(`remove from ${playlist.name}`, error);
@@ -202,6 +208,7 @@ export function artistMenu(artist: Artist): MenuItem[] {
 export function playlistMenu(playlist: Playlist): MenuItem[] {
 	const tracks = async () =>
 		skipsDisliked(playlist) ? withoutDisliked(await playlistTracks(playlist.id)).tracks : playlistTracks(playlist.id);
+	// Genre playlists and other people's playlists are shared as their list of tracks instead of by playlist id.
 	const own = playlist.kind !== 'genre' && playlist.ownerId === requireCredentials().userId;
 	const shared = own ? () => [playlist.id] : async () => (await playlistTracks(playlist.id)).map((track) => track.id);
 	return collectionEntries(

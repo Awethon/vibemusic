@@ -1,3 +1,7 @@
+// WebSocket client for the relay server: identifies this tab as a device, keeps the device list
+// and the active device id, reconnects with backoff, and passes messages to the player.
+// Devices are grouped per Navidrome user.
+
 import { session } from '../session.svelte.ts';
 import type { Enrichment, EnrichmentRequest } from '../library/snapshot.ts';
 import { randomId } from '../randomId.ts';
@@ -74,11 +78,14 @@ export function deviceName() {
 	return [browserName(agent), systemName(agent)].filter(Boolean).join(' · ');
 }
 
+// A device id is per tab, kept in sessionStorage. A duplicated tab copies sessionStorage, so the id
+// is guarded by a Web Lock held for the tab's lifetime; a tab that can't get the lock picks a new id.
 async function lockedDeviceId(stored: string | null): Promise<string> {
 	for (const id of [...(stored ? [stored] : []), randomId()]) {
 		const held = await new Promise<boolean>((resolve) => {
 			void navigator.locks.request(`vibemusic-device-${id}`, { ifAvailable: true }, (lock) => {
 				resolve(!!lock);
+				// Never resolves, so the lock is held until the tab closes.
 				return lock ? new Promise(() => {}) : undefined;
 			});
 		});
@@ -87,6 +94,8 @@ async function lockedDeviceId(stored: string | null): Promise<string> {
 	throw new Error('No device id');
 }
 
+// Fallback without Web Locks (they need a secure context, so plain-http setups): ask the other
+// tabs over BroadcastChannel whether the stored id is taken, and answer for our own id afterwards.
 async function announcedDeviceId(stored: string | null): Promise<string> {
 	const channel = new BroadcastChannel(DEVICE_CHANNEL);
 	let taken = false;
@@ -150,6 +159,7 @@ export async function startRelay(onMessage: (message: RelayMessage) => void) {
 	listener = onMessage;
 	relay.deviceId = await claimDeviceId();
 	connect();
+	// Keeps idle connections from being closed by proxies along the way.
 	setInterval(() => sendToRelay({ type: 'ping' }), REMOTE.keepAliveMs);
 }
 

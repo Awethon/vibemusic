@@ -1,5 +1,14 @@
 /* The fixed frame: animated background, scrim, side rail with navigation, and the main scroll area. */
 
+/*
+ * Global stacking order (z-index), bottom to top:
+ *   0 field canvas, 1 scrim, 2 rail glass then #chrome (same z-index, so DOM order decides),
+ *   3 classic now playing, 4 ambient, 5 player glass then #panel, 6 dock,
+ *   7 popup glass, 8 popovers and menus, 9 search palette, 10 toast,
+ *   12 connection note, 20 timeline tooltip, 30 a lifted copy of a queue row while it animates (.row-lift).
+ * The glass canvases sit just under the surfaces they draw, and lib/glass/backdrop.ts lists
+ * what must stay above each one. Change both together.
+ */
 #fieldBox {
 	position: fixed;
 	inset: 0;
@@ -76,6 +85,8 @@ body.now-open #chrome {
 	isolation: isolate;
 }
 
+/* The rail's backing lives on ::before so it can fade with the fold progress (--rail-p) without
+   fading the icons. The glass layer reads this pseudo-element's opacity and radius (lib/glass/layer.ts). */
 #rail::before {
 	content: '';
 	position: absolute;
@@ -149,6 +160,7 @@ body.now-open #chrome {
 	display: grid;
 	flex: none;
 	filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
+	/* rotate(0.02deg): see .tile .art in views.css. Icons are vectors, so here it can stay on at rest. */
 	transform: rotate(0.02deg);
 	transition: transform 0.2s var(--ease);
 }

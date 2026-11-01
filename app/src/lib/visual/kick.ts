@@ -1,3 +1,11 @@
+// Kick-drum detector for the music-reactive background. It looks at the sub-bass band (30-65 Hz)
+// in 128-sample blocks. A block becomes a candidate when it jumps above both a slow average and
+// the last few blocks, and is above a floor of max(-24 dBFS, recent peak - 10 dB). About 20 ms
+// later the candidate is confirmed over a 30 ms window: the sub band must be loud relative to the
+// full mix and to 150-450 Hz (voice/guitar body), which rejects bass lines and low vocals.
+// All numbers were tuned by ear against real tracks; shortcuts such as "always pass if strong"
+// brought false hits back. Tests in kick.test.ts.
+
 export const KICK_TUNING = Object.freeze({
 	subLowHz: 30,
 	subHighHz: 65,
@@ -52,6 +60,8 @@ export function createKickDetector(sampleRate: number): KickDetector {
 	let lastAccepted = -1e9;
 	let hits = 0;
 
+	// Sums the confirmation window around the candidate block, which lies blocksAfter-1 blocks back.
+	// `ring * 4` only keeps the index positive before the modulo.
 	function windowEnergy(energy: Float64Array): number {
 		let sum = 0;
 		for (let offset = -blocksBefore; offset < blocksAfter; offset++) {
@@ -108,6 +118,8 @@ export function createKickDetector(sampleRate: number): KickDetector {
 					block - lastCandidate > gapBlocks &&
 					block - lastAccepted > gapBlocks
 				) {
+					// Strength is relative to the recent peak, but never to anything quieter than -12 dB,
+					// so a quiet passage doesn't make every small kick a full hit.
 					const reference = Math.max(peakDb, tuning.referenceDb);
 					pending.push({
 						block,
@@ -115,6 +127,7 @@ export function createKickDetector(sampleRate: number): KickDetector {
 					});
 					lastCandidate = block;
 				}
+				// Judge candidates once their look-ahead blocks have arrived.
 				while (pending.length && block - pending[0].block >= blocksAfter - 1) {
 					const candidate = pending.shift();
 					if (!candidate) break;
@@ -123,6 +136,7 @@ export function createKickDetector(sampleRate: number): KickDetector {
 						strongest = Math.max(strongest, candidate.strength);
 						hits++;
 					} else if (lastCandidate === candidate.block) {
+						// A rejected candidate must not block a real kick that follows within the minimum gap.
 						lastCandidate = -1e9;
 					}
 				}
@@ -136,6 +150,7 @@ export function createKickDetector(sampleRate: number): KickDetector {
 	};
 }
 
+// Two stages per side give a steeper slope than a single biquad.
 export function createBandFilter(context: BaseAudioContext, input: AudioNode, lowHz: number, highHz: number): AudioNode {
 	const stages: [BiquadFilterType, number][] = [
 		['highpass', lowHz],

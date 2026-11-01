@@ -1,3 +1,10 @@
+//! Library enrichment: genres, countries and popularity for the app's artists and albums, looked
+//! up on MusicBrainz, Deezer and Apple (iTunes) and cached on disk (`ENRICHMENT_CACHE`).
+//!
+//! The app sends `EnrichRequest`s over the relay socket. The relay answers at once from the cache
+//! and queues what it does not know; each service has its own worker so a slow or throttled one
+//! does not hold up the others. New results are broadcast to all sockets as `enrichment` messages.
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -11,24 +18,33 @@ use crate::apple::Apple;
 use crate::{deezer, musicbrainz};
 
 const MUSICBRAINZ_PAUSE: Duration = musicbrainz::PAUSE;
+// Extra wait after a failed lookup, on top of each service's own pacing.
 const FAILURE_PAUSE: Duration = Duration::from_secs(10);
+// New results are batched into one broadcast per interval instead of one message per lookup.
 const FLUSH_EVERY: Duration = Duration::from_secs(2);
+// The cache file is rewritten at most this often.
 const SAVE_EVERY: Duration = Duration::from_secs(30);
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
+// How long a cached answer is trusted before it is looked up again. A "not found" answer
+// expires after MISSING_FRESH_MS instead, so new entries on the services are picked up sooner.
 const MUSICBRAINZ_FRESH_MS: u64 = 30 * DAY_MS;
 const DEEZER_FRESH_MS: u64 = 14 * DAY_MS;
 const APPLE_FRESH_MS: u64 = 14 * DAY_MS;
 const MISSING_FRESH_MS: u64 = 7 * DAY_MS;
+// Caps on what one request may ask for, so a single message cannot queue unbounded work.
 const MAX_RELEASE_GROUPS: usize = 100_000;
 const MAX_ARTISTS: usize = 50_000;
 const MAX_SONGS: usize = 5;
 const MAX_ALBUMS: usize = 200;
 const MAX_TEXT_CHARS: usize = 200;
+// A lookup that keeps failing is dropped after this many tries; a later request queues it again.
 const ATTEMPTS: u8 = 5;
 
+/// A MusicBrainz tag (used as a genre) and its vote count.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Tag(pub String, pub u32);
 
+/// A MusicBrainz release group (an album across its editions): credited artist MBIDs and tags.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ReleaseGroup {
     pub artists: Vec<String>,
@@ -38,20 +54,27 @@ pub struct ReleaseGroup {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MbArtist {
     pub tags: Vec<Tag>,
+    // `None` marks an entry cached before countries were looked up; it is fetched again.
     #[serde(default)]
     pub countries: Option<Vec<String>>,
 }
 
+/// The artist Deezer matched: fan count, top tracks as (title, Deezer rank) and albums as
+/// (title, Deezer genre id, -1 if none).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DeezerArtist {
     pub id: u64,
     pub name: String,
     pub fans: u64,
     pub top: Vec<(String, u64)>,
+    // `None` marks an entry cached before albums were looked up; it is fetched again.
     #[serde(default)]
     pub albums: Option<Vec<(String, i64)>>,
 }
 
+/// Outcome of a lookup on an external service. `Missing` means the service answered that there
+/// is no such thing; it is cached like a result. `Failed` means the service could not be asked
+/// (network error, throttling, unexpected reply); it is retried and never cached.
 pub enum Fetched<T> {
     Found(T),
     Missing,
@@ -68,6 +91,7 @@ impl<T> Fetched<T> {
     }
 }
 
+// `at` is when the entry was stored, in Unix ms; it is also what `since` in a request compares to.
 #[derive(Serialize, Deserialize, Clone)]
 struct Entry<T> {
     at: u64,
@@ -85,6 +109,8 @@ impl<T> Entry<T> {
     }
 }
 
+// The on-disk cache. MusicBrainz entries are keyed by MBID; `artist_matches` maps a Navidrome
+// artist id to the MBID found by search; `deezer` and `apple` are keyed by Navidrome artist id.
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct Cache {
@@ -95,6 +121,8 @@ struct Cache {
     apple: HashMap<String, Entry<Vec<String>>>,
 }
 
+/// A Navidrome artist with a few of its song and album titles, used to tell same-named artists
+/// apart on Deezer and Apple.
 #[derive(Deserialize, Clone)]
 pub struct ArtistRequest {
     pub id: String,
@@ -105,6 +133,8 @@ pub struct ArtistRequest {
     pub albums: Vec<String>,
 }
 
+/// A Navidrome artist without a MusicBrainz id: searched on MusicBrainz by name and confirmed by
+/// album titles.
 #[derive(Deserialize, Clone)]
 pub struct SearchRequest {
     pub id: String,
@@ -113,6 +143,9 @@ pub struct SearchRequest {
     pub albums: Vec<String>,
 }
 
+/// What the app wants to know. `since` is the `at` of the last `enrichment` message the app has;
+/// the reply holds only entries stored after it, so the app does not get its whole library back
+/// on every request.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnrichRequest {
@@ -132,6 +165,8 @@ enum MbJob {
     Search(SearchRequest),
 }
 
+// Results stored since the last broadcast, sent as one `enrichment` message. A `None` value tells
+// the app the service has nothing for that key.
 #[derive(Default)]
 struct Changes {
     release_groups: HashMap<String, Option<ReleaseGroup>>,
@@ -161,6 +196,7 @@ struct State {
     musicbrainz: VecDeque<(MbJob, u8)>,
     deezer: VecDeque<(ArtistRequest, u8)>,
     apple: VecDeque<(ArtistRequest, u8)>,
+    // Keys of jobs waiting or running in any queue (prefixed per kind), so a job is queued once.
     queued: HashSet<String>,
     changes: Changes,
     unsaved: bool,
@@ -184,6 +220,7 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+// The id goes into a MusicBrainz URL path, so only accept the UUID shape of an MBID.
 fn valid_mbid(id: &str) -> bool {
     id.len() == 36
         && id
@@ -213,12 +250,14 @@ impl State {
         }
     }
 
+    // Apple is only asked about artists with album titles, since its match is confirmed by albums.
     fn queue_apple(&mut self, artist: ArtistRequest) {
         if !artist.albums.is_empty() && self.queued.insert(format!("ap:{}", artist.id)) {
             self.apple.push_back((artist, 0));
         }
     }
 
+    // Also true for artists cached before countries existed (see `MbArtist::countries`).
     fn needs_artist(&self, id: &str, now: u64) -> bool {
         self.cache.mb_artists.get(id).is_none_or(|entry| {
             !entry.fresh(now, MUSICBRAINZ_FRESH_MS)
@@ -249,6 +288,7 @@ impl State {
                     if !entry.fresh(now, MUSICBRAINZ_FRESH_MS) {
                         self.queue_musicbrainz(MbJob::ReleaseGroup(id.clone()));
                     }
+                    // The album's first credited artist is looked up too, for its tags and country.
                     if let Some(artist) = entry.value.as_ref().and_then(|group| group.artists.first()).cloned() {
                         self.answer_artist(&artist, request.since, now, &mut reply);
                     }
@@ -361,6 +401,7 @@ impl Enricher {
         enricher
     }
 
+    /// Deezer's top tracks for a Navidrome artist as (title, rank); empty if unknown.
     pub fn deezer_top(&self, artist_id: &str) -> Vec<(String, u64)> {
         self.state
             .lock()
@@ -373,6 +414,8 @@ impl Enricher {
             .unwrap_or_default()
     }
 
+    /// Apple's top songs for a Navidrome artist, most popular first: `None` if unknown or stale,
+    /// an empty list if Apple has nothing.
     pub fn apple_top(&self, artist_id: &str) -> Option<Vec<String>> {
         let state = self.state.lock().unwrap();
         state
@@ -387,6 +430,7 @@ impl Enricher {
         self.updates.subscribe()
     }
 
+    /// Answers a request from the cache and queues the rest. Returns the reply message text.
     pub fn request(&self, request: EnrichRequest) -> String {
         let now = now_ms();
         let (reply, musicbrainz, deezer, apple) = {
@@ -399,6 +443,7 @@ impl Enricher {
                 !state.apple.is_empty(),
             )
         };
+        // `notify_one` keeps a permit if the worker is busy, so the wake-up is not lost.
         if apple {
             self.apple_ready.notify_one();
         }
@@ -516,12 +561,15 @@ impl Enricher {
             };
             {
                 let mut state = self.state.lock().unwrap();
+                // Failed jobs go to the back of the queue, so one bad id does not block the rest.
                 if failed && attempts + 1 < ATTEMPTS {
                     state.musicbrainz.push_back((job, attempts + 1));
                 } else {
                     state.queued.remove(&key);
                 }
             }
+            // MusicBrainz allows about one request per second per client, so the worker sleeps
+            // after every job. Deezer and Apple pace inside their own modules.
             tokio::time::sleep(if failed { FAILURE_PAUSE } else { MUSICBRAINZ_PAUSE }).await;
         }
     }
@@ -611,6 +659,7 @@ impl Enricher {
             }
             if let (Some(bytes), Some(path)) = (snapshot, &self.path) {
                 last_save = tokio::time::Instant::now();
+                // Write then rename, so a crash mid-write never leaves a truncated cache.
                 let temporary = path.with_extension("tmp");
                 if let Err(error) = tokio::fs::write(&temporary, bytes)
                     .await

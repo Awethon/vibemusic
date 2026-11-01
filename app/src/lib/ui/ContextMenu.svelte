@@ -9,6 +9,8 @@
 	$effect(() => {
 		if (!menu.open || !element) return;
 		void menu.items;
+		// Measure at the top-left corner, where the menu isn't squeezed by the window edge, then
+		// clamp it inside the window on the next frame.
 		position = { left: 0, top: 0 };
 		requestAnimationFrame(() => {
 			if (!element) return;

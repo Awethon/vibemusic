@@ -1,3 +1,6 @@
+// A small, throttled copy of the background canvas for the liquid-glass layer, which draws it
+// behind glass panels. Copying the full-size GPU canvas every frame would be too costly.
+
 import { FIELD } from '../tuning.ts';
 
 let context: CanvasRenderingContext2D | null = null;

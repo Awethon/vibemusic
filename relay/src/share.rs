@@ -1,3 +1,8 @@
+//! Public Navidrome shares: their track list as JSON for the app's share page, and an HTML page
+//! with Open Graph tags so chat apps can show a link preview.
+//!
+//! Navidrome has no JSON endpoint for a public share; the data is read from its share web page.
+
 use std::time::Duration;
 
 use axum::Json;
@@ -5,8 +10,11 @@ use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 use serde_json::Value;
 
+// Navidrome's share page assigns the share to this variable in an inline script.
 const MARKER: &str = "window.__SHARE_INFO__ = ";
 const TIMEOUT: Duration = Duration::from_secs(15);
+// og:image and the warm-up request must use the same query, or the warmed image is not the one
+// that gets fetched.
 const COVER_QUERY: &str = "size=300&square=true";
 const COVER_ATTEMPTS: usize = 2;
 
@@ -45,6 +53,9 @@ impl Shares {
         }
     }
 
+    // Requests the cover once before the preview is returned. Navidrome resizes images on first
+    // request and caches the result, so the link-preview service fetching og:image right after
+    // gets a cached image instead of waiting on a resize. Failures are ignored.
     async fn warm_cover(&self, token: &str) {
         let url = format!("{}/share/img/{token}?{COVER_QUERY}", self.navidrome);
         for _ in 0..COVER_ATTEMPTS {
@@ -61,6 +72,7 @@ impl Shares {
     }
 
     async fn load(&self, id: &str) -> Result<Value, StatusCode> {
+        // The id goes into a Navidrome URL path, so only accept the characters share ids use.
         if id.is_empty()
             || !id
                 .chars()
@@ -77,6 +89,7 @@ impl Shares {
         match page.status().as_u16() {
             200 => {}
             404 => return Err(StatusCode::NOT_FOUND),
+            // Navidrome answers 410 for an expired share.
             410 => return Err(StatusCode::GONE),
             _ => return Err(StatusCode::BAD_GATEWAY),
         }
@@ -85,6 +98,8 @@ impl Shares {
     }
 }
 
+/// The share embedded in Navidrome's share page. The value is a JavaScript string literal that
+/// holds JSON, so it is decoded twice: once as a JSON string, then as the JSON inside it.
 pub fn share_info_in(html: &str) -> Option<Value> {
     let start = html.find(MARKER)? + MARKER.len();
     let line = html[start..].lines().next()?.trim().trim_end_matches(';');
@@ -99,6 +114,9 @@ fn escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// A minimal HTML page with Open Graph and Twitter card tags for a share. One track reads as a
+/// song ("Title · Artist", album or "Single", length); several read as a playlist (count, total
+/// minutes). Links assume the app is served over https on `host`.
 pub fn preview_page(info: &Value, id: &str, host: &str) -> String {
     let tracks = info["tracks"].as_array().map(Vec::as_slice).unwrap_or_default();
     let text = |value: &Value| value.as_str().unwrap_or_default().to_owned();

@@ -3,6 +3,9 @@ import { LAYOUT } from '../tuning.ts';
 
 type Drag = { pointerId: number; x: number; y: number; lastY: number; lastAt: number; speed: number; down: boolean | null };
 
+// Touch-only pull-down-to-close for phone sheets (full-screen player, side panel). The first few px
+// decide the direction; a sideways start is left to the page. Closes on distance or flick speed.
+// Controls that drag themselves never start a pull.
 const IGNORED = '.slider, input, textarea, select';
 
 export function swipeToDismiss(onDismiss: () => void, handle?: string): Attachment<HTMLElement> {

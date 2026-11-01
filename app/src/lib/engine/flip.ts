@@ -1,8 +1,12 @@
+// FLIP animation for the tiles in the main scroller: capture positions before a relayout
+// (panel open/close, rail resize, column count change), then glide each tile from where it was.
 import { EASING, MOTION } from '../tuning.ts';
 import { mainScroller, prefersReducedMotion } from './dom.ts';
 
 const FLIP_TILE_SELECTOR = '#vlist > *, .shelf > *, .bb-body > *, .grid > *';
 
+// Keyed by container as well as item id, so a tile only matches its own earlier self even when
+// the same album shows up in more than one list on the page.
 function flipKeyOf(tile: HTMLElement): string | null {
 	const itemId = tile.dataset.id || tile.dataset.album;
 	if (!itemId) return null;
@@ -37,12 +41,15 @@ function glideFromPreviousPosition(tile: HTMLElement, previous: DOMRect, current
 		Math.abs(offsetY) < MOTION.flipMinOffsetPx &&
 		Math.abs(scale - 1) < MOTION.flipMinScaleChange;
 	if (unchanged) return;
+	// Virtual grid cells are positioned with an inline translate, so the animation has to keep
+	// that transform and layer the offset on top; origin 0 0 because rects are compared by top-left.
 	const restingTransform = tile.style.transform || '';
 	tile.animate(
 		[
 			{ transform: `translate(${offsetX}px, ${offsetY}px) ${restingTransform} scale(${scale})`, transformOrigin: '0 0' },
 			{ transform: `${restingTransform || 'translate(0px, 0px)'} scale(1)`, transformOrigin: '0 0' }
 		],
+		// 'backwards' holds the old position during the stagger delay instead of flashing the new one.
 		{ duration: durationMs, delay, easing: EASING.standard, fill: 'backwards' }
 	);
 }
@@ -65,6 +72,7 @@ export function playTileFlip(previousPositions: Map<string, DOMRect>, durationMs
 		const key = flipKeyOf(tile);
 		const previous = key ? previousPositions.get(key) : undefined;
 		const delay = Math.min(MOTION.flipStaggerMaxMs, animatedCount++ * MOTION.flipStaggerStepMs);
+		// Tiles that are new, or that would slide across most of the screen, fade in instead of gliding.
 		const travelledTooFar = previous && Math.abs(previous.top - current.top) >= innerHeight * MOTION.flipMaxVerticalTravelRatio;
 		if (previous && !travelledTooFar) glideFromPreviousPosition(tile, previous, current, delay, durationMs);
 		else fadeIn(tile, delay, durationMs);

@@ -11,6 +11,7 @@ const cache = new Map<string, Promise<Lyrics | null>>();
 async function fetchLyrics(trackId: string): Promise<Lyrics | null> {
 	const response = await navidrome().subsonic<LyricsResponse>('getLyricsBySongId', { id: trackId });
 	const all = response.lyricsList?.structuredLyrics ?? [];
+	// Prefer time-synced lyrics so the current line can follow playback.
 	const chosen = all.find((lyrics) => lyrics.synced && lyrics.line?.length) ?? all.find((lyrics) => lyrics.line?.length);
 	if (!chosen?.line) return null;
 	return {
@@ -24,6 +25,7 @@ export function lyricsFor(trackId: string): Promise<Lyrics | null> {
 	let loading = cache.get(trackId);
 	if (!loading) {
 		loading = fetchLyrics(trackId).catch(() => {
+			// Forget failures so the next request tries again.
 			cache.delete(trackId);
 			return null;
 		});

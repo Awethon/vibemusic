@@ -1,3 +1,5 @@
+// Plain MD5, needed for Subsonic token auth (md5(password + salt)). WebCrypto has no MD5.
+
 const SHIFTS = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
 const CONSTANTS = Array.from({ length: 64 }, (_, index) => Math.floor(Math.abs(Math.sin(index + 1)) * 2 ** 32) >>> 0);
 

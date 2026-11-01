@@ -1,3 +1,5 @@
+// Pure layout maths for the timeline page: one lane per prolific artist (the rest share a final
+// lane), one column per year, each year as wide as its busiest lane needs. No DOM, so it's unit-tested.
 export type TimelineAlbum = { id: string; name: string; artistId: string; artist: string; year: number };
 export type Lane = { artistId: string | null; label: string; albums: TimelineAlbum[] };
 export type Bucket = { key: number; label: string; era: string; x: number; width: number; count: number; minor: boolean };
@@ -40,6 +42,7 @@ export function layoutTimeline(lanes: Lane[], metrics: TimelineMetrics): Timelin
 	if (!keys.length) return { buckets, positions, width: metrics.start + metrics.tail };
 	const step = metrics.cover + metrics.gap;
 	let x = metrics.start;
+	// Every year in the range gets a bucket (empty years are narrow), plus one spare year at each end.
 	for (let key = Math.min(...keys) - 1; key <= Math.max(...keys) + 1; key++) {
 		const counts = perLane.map((groups) => groups.get(key)?.length ?? 0);
 		const most = Math.max(...counts);
@@ -53,6 +56,8 @@ export function layoutTimeline(lanes: Lane[], metrics: TimelineMetrics): Timelin
 	return { buckets, positions, width: x + metrics.tail };
 }
 
+// Which years get an axis label: every year with albums, plus empty years divisible by 5 when
+// there is `room` px to the neighbouring labels so they don't overlap.
 export function markedBuckets(buckets: Bucket[], room: number): Bucket[] {
 	const marked: Bucket[] = [];
 	buckets.forEach((bucket, index) => {
@@ -78,5 +83,6 @@ export function laneYears(lane: Lane): string {
 	if (!years.length) return '';
 	const first = Math.min(...years);
 	const last = Math.max(...years);
+	// "1994–98" within a century, "1998–2003" across one.
 	return first === last ? String(first) : `${first}–${String(last).slice(Math.floor(first / 100) === Math.floor(last / 100) ? 2 : 0)}`;
 }

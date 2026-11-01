@@ -1,3 +1,6 @@
+// The darkening gradients between the animated background and the UI, which keep text readable.
+// Defined once as data so the same gradient can be a CSS background and be painted on a canvas
+// for the glass backdrop (glass/backdrop.ts), which can't read CSS gradients.
 import { formFactor } from './formFactor.svelte.ts';
 
 const SCRIM = Object.freeze({

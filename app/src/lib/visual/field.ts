@@ -1,8 +1,14 @@
+// The music-reactive background: a slowly drifting noise field coloured from the album palette,
+// drawn with WebGPU or WebGL2 (same shader in WGSL and GLSL; change both together). On kicks the
+// whole surface trembles: fast in, fast out, calm between hits. There are deliberately no
+// beat-synced glows or parallax; they made people dizzy.
+
 import { hexToRgb, hslToUnitRgb, relativeLuminance, rgbToHsl } from '../color.ts';
 import type { AudioFeatures } from './analysis';
 
 export type FieldRenderer = 'webgpu' | 'webgl2' | 'none';
 
+// 'kick' (default) trembles only on detected kicks; 'continuous' follows the spectrum instead.
 export type FieldStyle = 'kick' | 'continuous';
 
 export type FieldTuning = {
@@ -200,6 +206,7 @@ fn vib(x: vec2f) -> vec2f {
 }
 @fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let res = u.a.xy; let t = u.a.z; let en = u.b.x; let inten = u.b.w;
+  // WebGPU's y axis points down; flip it so the image matches the GLSL version.
   let fc = vec2f(pos.x, res.y - pos.y);
   let uv = fc / res;
   let x = (fc - 0.5 * res) / res.y;
@@ -239,6 +246,8 @@ function ease(previous: number, next: number, dt: number, up: number, down: numb
 	return previous + (next - previous) * (1 - Math.exp(-dt / (next > previous ? up : down)));
 }
 
+// Album colours are boosted in saturation but clamped in lightness and luminance, so the
+// background always stays dark enough for the UI on top of it.
 function writePaletteColor(hex: string, out: Float32Array, offset: number) {
 	const shaping = FIELD_RENDER_TUNING.palette;
 	const [hue, saturation, lightness] = rgbToHsl(hexToRgb(hex));
@@ -416,6 +425,8 @@ export async function createField(initialCanvas: HTMLCanvasElement, options: { r
 		backend = webGpu.backend;
 		renderer = 'webgpu';
 	} else {
+		// A canvas can only ever have one context type: if WebGPU got as far as the canvas, WebGL2
+		// needs a fresh one.
 		if (webGpu?.touchedCanvas) {
 			const fresh = canvas.cloneNode() as HTMLCanvasElement;
 			canvas.replaceWith(fresh);
@@ -450,6 +461,8 @@ export async function createField(initialCanvas: HTMLCanvasElement, options: { r
 		resize();
 		const blend = 1 - Math.exp(-dt * paletteRate);
 		for (let index = 0; index < 15; index++) currentColors[index] += (targetColors[index] - currentColors[index]) * blend;
+		// Uniform layout shared by both shaders: uA = size, time; uB = energy, (unused 0.5s), intensity;
+		// uC = five palette colours; uM = 8 mode amplitudes, 8 mode phases, rotation, shade.
 		uniforms[0] = width;
 		uniforms[1] = height;
 		uniforms[2] = time;

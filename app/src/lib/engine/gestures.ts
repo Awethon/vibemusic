@@ -1,3 +1,6 @@
+// Turns horizontal trackpad swipes (wheel events with deltaX) into three gestures: resizing the
+// rail, sliding the side panel, and swiping a queue row away. Browsers have no "swipe start/end"
+// for trackpads, so start and end are inferred from event timing and direction.
 import { GESTURE, PANEL, ROW_SWIPE } from '../tuning.ts';
 import { closeAllMenus } from '../ui/menu.svelte.ts';
 import { bodyHasClass, setBodyClass } from './dom.ts';
@@ -43,6 +46,8 @@ function resetAxis() {
 	axis.signedDistanceX = 0;
 }
 
+// After a gesture ends the OS keeps sending decaying inertial wheel events. Those are swallowed
+// so they don't immediately start a second gesture or scroll something sideways.
 function beginMomentumTail() {
 	gesture.momentumTail = { lastEventAt: performance.now(), lastDelta: gesture.lastDelta, risingEvents: 0 };
 	resetAxis();
@@ -109,6 +114,8 @@ function swallowedByMomentumTail(event: WheelEvent, now: number) {
 	if (!tail) return false;
 	const deltaX = event.deltaX;
 	const isHorizontal = Math.abs(deltaX) >= Math.abs(event.deltaY) && Math.abs(deltaX) > GESTURE.minimumHorizontalDeltaPx;
+	// Momentum only decays in the same direction. A pause, a direction flip, or deltas growing for a
+	// few events in a row mean the fingers are back on the trackpad.
 	let startsNewGesture = now - tail.lastEventAt >= GESTURE.tailGapForNewGestureMs;
 	if (!startsNewGesture && isHorizontal) {
 		if (tail.lastDelta && Math.sign(deltaX) !== Math.sign(tail.lastDelta)) startsNewGesture = true;
@@ -131,6 +138,8 @@ function swallowedByMomentumTail(event: WheelEvent, now: number) {
 	return true;
 }
 
+// Locks each gesture to one axis after a few pixels, so a slightly diagonal vertical scroll never
+// nudges the panel. Returns the accumulated deltaX on the deciding event so no movement is lost.
 function decideAxis(event: WheelEvent, now: number): number | null {
 	const silenceMs = gesture.active && gesture.zone === 'row' ? GESTURE.rowSilenceEndMs : GESTURE.silenceEndMs;
 	if (now - axis.lastEventAt > silenceMs) resetAxis();
@@ -146,6 +155,7 @@ function decideAxis(event: WheelEvent, now: number): number | null {
 
 function isOverHorizontalScroller(element: EventTarget | null) {
 	for (let current = element instanceof Element ? element : null; current && current !== document.body; current = current.parentElement) {
+		// +1 tolerates sub-pixel rounding that makes non-scrolling elements look 1px wider.
 		const scrollsSideways = current.scrollWidth > current.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(current).overflowX);
 		if (scrollsSideways) return true;
 	}
@@ -161,12 +171,14 @@ function startGesture(event: WheelEvent) {
 		closeAllMenus();
 		liftRowForSwipe(row);
 	} else {
+		// While the full-screen player is open, swipes never drive the rail or the panel.
 		const inRailZone = !bodyHasClass('now-open') && isInRailGestureZone(event.clientX);
 		if (!inRailZone && bodyHasClass('now-open')) return false;
 		gesture.active = true;
 		gesture.zone = inRailZone ? 'rail' : 'panel';
 		closeAllMenus();
 		if (inRailZone) stopRailAnimation();
+		// Start from where the panel is drawn right now, which may be mid-way through a CSS snap transition.
 		else applyPanelProgress(panelProgressOnScreen());
 	}
 	gesture.endReachedAt = null;
@@ -197,6 +209,8 @@ function followSidebarOrPanel(deltaX: number, now: number) {
 	if (gesture.zone === 'rail') applyRailProgress(railProgressForDelta(deltaX));
 	else applyPanelProgress(panelProgress() + deltaX / PANEL.slideDistancePx);
 	clearTimeout(gesture.silenceTimer);
+	// Once the rail/panel hits fully open or closed, finish after a short hold rather than waiting
+	// for the full silence timeout, so the UI settles while momentum is still arriving.
 	const progress = zoneProgress();
 	const pinnedAtEnd = progress <= 0 || progress >= 1;
 	if (!pinnedAtEnd) {
@@ -214,12 +228,15 @@ function followSidebarOrPanel(deltaX: number, now: number) {
 }
 
 function handleWheel(event: WheelEvent) {
+	// ctrlKey is set on trackpad pinch-zoom; shift+wheel and line/page deltaMode come from mice.
 	if (event.ctrlKey) return;
 	const now = performance.now();
 	if (swallowedByMomentumTail(event, now)) return;
 	const deltaX = decideAxis(event, now);
 	if (deltaX === null) return;
 	if (axis.direction === 'y' || event.shiftKey || event.deltaMode !== 0) return;
+	// Mouse wheels jump in large steps; trackpads report small continuous deltas. Horizontal
+	// scrollers (shelves) keep their native sideways scroll unless the pointer is on a queue row.
 	const looksLikeMouseWheel = Math.abs(deltaX) > GESTURE.mouseWheelStepThresholdPx;
 	if (!gesture.active && (looksLikeMouseWheel || (isOverHorizontalScroller(event.target) && !queueRowAtEvent(event)))) return;
 	event.preventDefault();
@@ -232,6 +249,8 @@ function handleWheel(event: WheelEvent) {
 	else followSidebarOrPanel(deltaX, now);
 }
 
+// passive: false so preventDefault works: a claimed swipe must not also scroll the page sideways
+// or trigger the browser's swipe-to-navigate.
 export function installGestureRecognizer() {
 	addEventListener('wheel', handleWheel, { passive: false });
 	return () => removeEventListener('wheel', handleWheel);

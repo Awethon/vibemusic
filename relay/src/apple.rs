@@ -1,3 +1,7 @@
+//! Apple top songs for enrichment and "This is" playlists, from the public iTunes Search API
+//! (no key). `APPLE_PAUSE_MS` sets the gap between requests (default 3200 ms) and
+//! `APPLE_STOREFRONTS` the country catalogs to search, in order (default `us,ru`).
+
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -11,6 +15,7 @@ const LOOKUP: &str = "https://itunes.apple.com/lookup";
 const CANDIDATES: usize = 3;
 const TOP_SONGS: usize = 50;
 const ATTEMPTS: usize = 3;
+// Apple answers 403 or 429 when it throttles a client; back off for this long.
 const BUSY_PAUSE: Duration = Duration::from_secs(30);
 
 pub struct Apple {
@@ -29,6 +34,8 @@ impl Apple {
     }
 
     pub fn from_env(client: reqwest::Client) -> Self {
+        // Apple documents a limit of about 20 calls per minute for the Search API; 3200 ms keeps
+        // under it.
         let pause = std::env::var("APPLE_PAUSE_MS")
             .ok()
             .and_then(|value| value.parse().ok())
@@ -80,6 +87,8 @@ impl Apple {
         Some(results(&reply, "collection", "collectionName"))
     }
 
+    // Searches artists by name and returns the first hit whose albums in this storefront include one
+    // of the library's album titles.
     async fn artist(&self, name: &str, albums: &HashSet<String>, storefront: &str) -> Fetched<u64> {
         let Some(found) = self
             .get(
@@ -114,6 +123,9 @@ impl Apple {
         Fetched::Missing
     }
 
+    /// The artist's most popular songs, most popular first. Storefronts are tried in order: an
+    /// artist missing from one country's catalog may be in another. The first storefront where
+    /// the artist is found decides.
     pub async fn top_songs(&self, name: &str, album_names: &[String]) -> Fetched<Vec<String>> {
         let albums: HashSet<String> = album_names
             .iter()
@@ -132,6 +144,7 @@ impl Apple {
                     &[
                         ("id", id.to_string()),
                         ("entity", "song".into()),
+                        // The order of this reply is the popularity order `ranked` relies on.
                         ("sort", "popular".into()),
                         ("limit", TOP_SONGS.to_string()),
                         ("country", storefront.clone()),
@@ -157,6 +170,8 @@ fn results(value: &Value, wrapper: &str, field: &str) -> Vec<String> {
         .collect()
 }
 
+/// Turns Apple's ordered titles into (title, score) pairs, highest first, so they can be ranked
+/// with `deezer::song_rank` like Deezer's top tracks.
 pub fn ranked(titles: &[String]) -> Vec<(String, u64)> {
     titles
         .iter()

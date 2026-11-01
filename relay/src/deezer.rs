@@ -1,3 +1,9 @@
+//! Deezer lookups for enrichment: finds the Deezer artist for a Navidrome artist and reads its
+//! fan count, top tracks (with Deezer's popularity rank) and albums. The API needs no key.
+//!
+//! Also holds the title normalisation (`title_key`, `song_rank`) that Apple, MusicBrainz and
+//! "This is" playlists use to compare song and album titles across services.
+
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -6,14 +12,21 @@ use serde_json::Value;
 use crate::enrich::{DeezerArtist, Fetched};
 
 const BASE: &str = "https://api.deezer.com";
+// Deezer allows about 50 requests per 5 seconds per IP. Every request waits PAUSE first; a quota
+// error (code 4) waits QUOTA_PAUSE, longer than the 5-second window.
 const PAUSE: Duration = Duration::from_millis(250);
 const QUOTA_PAUSE: Duration = Duration::from_secs(6);
 const ATTEMPTS: usize = 3;
 const SEARCHED_SONGS: usize = 5;
+// Name search hits whose top tracks are compared with the library's song titles.
 const ARTIST_CANDIDATES: usize = 3;
 const TOP_SONGS: usize = 100;
+// When no top track matches, an exact name match is trusted only for an artist this well known;
+// small artists often share names.
 const MIN_FANS_BY_NAME: u64 = 1000;
+// Deezer error code for "no data": the thing does not exist, so it is not a failure.
 const NO_DATA: i64 = 800;
+// Markers that start a featured-artist credit in a title, in English and Russian.
 const FEATURING: [&str; 8] = [
     " feat.",
     " feat ",
@@ -25,6 +38,7 @@ const FEATURING: [&str; 8] = [
     " w/ ",
 ];
 
+// Lowercase letters and digits only. `ё` is often written as `е`, so they compare equal.
 fn letters(text: &str) -> String {
     text.to_lowercase()
         .replace('ё', "е")
@@ -33,6 +47,8 @@ fn letters(text: &str) -> String {
         .collect()
 }
 
+/// A song title without bracketed extras, a ` - ` suffix ("Live at ...", "2011 Remaster") or a
+/// featured-artist credit, lowercased.
 pub fn song_name(title: &str) -> String {
     let mut depth = 0usize;
     let mut kept = String::new();
@@ -44,6 +60,7 @@ pub fn song_name(title: &str) -> String {
             _ => {}
         }
     }
+    // The trailing space lets markers such as " ft " match at the very end of the title.
     let lower = format!("{} ", kept.split(" - ").next().unwrap_or_default().to_lowercase());
     let end = FEATURING
         .iter()
@@ -53,10 +70,12 @@ pub fn song_name(title: &str) -> String {
     lower[..end].trim().to_owned()
 }
 
+/// The key titles are compared by across services: `song_name` reduced to letters and digits.
 pub fn title_key(title: &str) -> String {
     letters(&song_name(title))
 }
 
+// Words in a title's extras that mark a different recording of a song.
 const RECORDING: [&str; 20] = [
     "remix",
     "rmx",
@@ -80,6 +99,7 @@ const RECORDING: [&str; 20] = [
     "концерт",
 ];
 
+/// Whether the bracketed extras or the ` - ` suffix mark a remix, live take, cover and the like.
 pub fn is_other_recording(title: &str) -> bool {
     let mut depth = 0usize;
     let mut extra = String::new();
@@ -101,6 +121,9 @@ pub fn is_other_recording(title: &str) -> bool {
         .any(|word| RECORDING.contains(&word))
 }
 
+/// The rank of a title in a top list. An exact match wins; otherwise titles are matched by
+/// `title_key`, but never to or from another recording, so a remix does not borrow the original's
+/// popularity.
 pub fn song_rank(top: &[(String, u64)], title: &str) -> Option<u64> {
     let exact = letters(title);
     if let Some((_, rank)) = top.iter().find(|(found, _)| letters(found) == exact) {
@@ -131,6 +154,7 @@ async fn get(client: &reqwest::Client, path: &str, query: &[(&str, &str)]) -> Re
         else {
             continue;
         };
+        // Deezer reports errors in the JSON body, usually with HTTP 200, so the body is checked.
         match value["error"]["code"].as_i64() {
             None => return Ok(value),
             Some(NO_DATA) => return Ok(Value::Null),
@@ -141,6 +165,8 @@ async fn get(client: &reqwest::Client, path: &str, query: &[(&str, &str)]) -> Re
     Err(Unavailable)
 }
 
+/// The artist of the search hit whose title matches: exactly first, then by `title_key`. The
+/// exact pass keeps covers ("as made famous by ...") from winning over the original.
 pub fn artist_of_song(results: &Value, title: &str) -> Option<u64> {
     let songs = results["data"].as_array()?;
     let titled = |key: fn(&str) -> String| {
@@ -190,6 +216,8 @@ async fn top_of(client: &reqwest::Client, id: u64) -> Result<Vec<(String, u64)>,
     ))
 }
 
+// Searches "<artist> <song>" for a few of the library's songs; the Deezer artist behind most of the
+// matching hits wins. Songs identify an artist better than its name does.
 async fn by_songs(client: &reqwest::Client, name: &str, songs: &[String]) -> Result<Option<u64>, Unavailable> {
     let mut votes: HashMap<u64, usize> = HashMap::new();
     let mut unavailable = false;
@@ -214,6 +242,7 @@ async fn by_songs(client: &reqwest::Client, name: &str, songs: &[String]) -> Res
     }
 }
 
+/// The best known candidate with exactly this name, if it has at least MIN_FANS_BY_NAME fans.
 pub fn same_name(candidates: &[(u64, String, u64)], name: &str) -> Option<u64> {
     let wanted = letters(name);
     candidates
@@ -223,6 +252,8 @@ pub fn same_name(candidates: &[(u64, String, u64)], name: &str) -> Option<u64> {
         .map(|(id, _, _)| *id)
 }
 
+// Fallback when no song search matched: the most followed name hits whose top tracks overlap the
+// library's songs, then a well-known exact name match.
 async fn by_name(
     client: &reqwest::Client,
     name: &str,

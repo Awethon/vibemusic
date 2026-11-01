@@ -1,3 +1,5 @@
+// Measure functions handed to VirtualGrid: given the container width, how many columns fit and how
+// tall each row is. rowHeight includes caption and vertical gap so row offsets are a plain multiply.
 import { formFactor } from '../ui/formFactor.svelte.ts';
 import { LAYOUT } from '../tuning.ts';
 

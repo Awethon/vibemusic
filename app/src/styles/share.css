@@ -11,6 +11,7 @@
 
 .share-backdrop {
 	position: absolute;
+	/* Oversized so the blur's soft, see-through edges fall outside the screen. */
 	inset: -80px;
 	z-index: -1;
 	background-size: cover;
@@ -78,6 +79,7 @@
 }
 
 .share-cover:hover {
+	/* rotate(0.02deg) only while zoomed: see .tile .art in views.css. */
 	transform: scale(1.01) rotate(0.02deg);
 }
 

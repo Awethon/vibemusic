@@ -1,3 +1,6 @@
+// Internet radio "now playing": polls the station's current title through the relay while a
+// station plays and shows it as the track title (the station name moves next to the artist).
+
 import { isRadio, radioTracks, RADIO_PREFIX } from '../library/queries.ts';
 import { RADIO } from '../tuning.ts';
 import { player, remember, trackById } from './state.svelte.ts';
@@ -31,6 +34,7 @@ async function poll(trackId: string) {
 
 export function pollRadio(currentTrackId: string, nowMs: number) {
 	if (!isRadio(currentTrackId) || !player.playing || polling) return;
+	// Poll faster until the first title arrives, then slow down.
 	const wait = radioNow.stationId === currentTrackId && radioNow.title ? RADIO.nowPlayingPollMs : RADIO.firstTitlePollMs;
 	if (nowMs - lastPollAt < wait) return;
 	lastPollAt = nowMs;

@@ -1,3 +1,7 @@
+// Main-thread side of the library: talks to library.worker.ts, elects one leader tab per user
+// (Web Lock, or lease.ts without it) that syncs from Navidrome and saves, and keeps other tabs
+// up to date over a BroadcastChannel. UI code reads through query() and queries.ts.
+
 import { onReconnect, reportReachable, reportUnreachable } from '../connection.svelte.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
 import { renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
@@ -13,6 +17,9 @@ import type { Enrichment, LibraryMeta } from './snapshot.ts';
 
 type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
+// Between tabs of the same user and schema version. snapshot: the leader saved a new version,
+// reload it. patch: apply the same local edit to your copy. resync: ask the leader to sync.
+// need-snapshot: a new tab has nothing saved yet and asks the leader to save.
 type ChannelMessage =
 	| { kind: 'snapshot'; version: string }
 	| { kind: 'patch'; sql: string; params: SqlParam[] }
@@ -22,6 +29,7 @@ type ChannelMessage =
 export const library = $state<{
 	status: Status;
 	meta: LibraryMeta | null;
+	// Bumped on every change to the data; views re-run their queries when it changes.
 	revision: number;
 	leader: boolean;
 	error: string;
@@ -74,6 +82,8 @@ function onWorkerReply(event: MessageEvent<WorkerReply>) {
 		waiter.reject(reply.expired ? new SessionExpiredError() : reply.unreachable ? new NavidromeUnreachableError() : new Error(reply.error));
 }
 
+// Copies cover hashes and colours into the albumArt/artistArt maps that cover URLs and placeholders
+// read. Only changed entries are set, so unchanged covers don't re-render.
 async function refreshCoverStamps() {
 	const [albums, artists] = await Promise.all([
 		query<{ id: string; image_hash: string; dominant_color: string; thumb_hash: string }>(
@@ -120,14 +130,17 @@ async function syncNow(full: boolean) {
 	refreshedArtists.clear();
 	let result: WorkerResults['sync'];
 	try {
+		// $state.snapshot: Svelte state proxies can't be sent through postMessage.
 		result = await call({ kind: 'sync', credentials: $state.snapshot(requireCredentials()), full, albumIds, artistIds });
 	} catch (error) {
+		// Put the event ids back so the next attempt still refreshes them.
 		for (const id of albumIds) refreshedAlbums.add(id);
 		for (const id of artistIds) refreshedArtists.add(id);
 		throw error;
 	}
 	lastSyncAt = Date.now();
 	reportReachable();
+	// The worker's requests may have received a rotated JWT.
 	renewToken(result.token);
 	library.progress = null;
 	if (result.timings) library.timings = result.timings;
@@ -145,6 +158,7 @@ let enrichmentTimer: ReturnType<typeof setTimeout> | undefined;
 let lastEnrichmentAt = 0;
 let lastEnrichmentRequestAt = 0;
 
+// Only the leader asks the relay for enrichment, so several open tabs don't each trigger a run.
 async function requestEnrichment(force = false) {
 	if (!library.leader || !relay.connected || !library.meta) return;
 	if (!force && Date.now() - lastEnrichmentRequestAt < ENRICHMENT.requestIntervalMs) return;
@@ -156,6 +170,8 @@ async function requestEnrichment(force = false) {
 	}
 }
 
+// The relay sends enrichment in pieces as it finds it. Applying rebuilds all derived tables and
+// saves, so pieces are merged and applied at most once per ENRICHMENT.applyIntervalMs.
 function queueEnrichment(enrichment: Enrichment) {
 	if (
 		[enrichment.releaseGroups, enrichment.mbArtists, enrichment.deezer, enrichment.artistMatches ?? {}, enrichment.apple ?? {}].every(
@@ -203,6 +219,7 @@ listenToRelay((message) => {
 	}
 });
 
+// Never runs two syncs at once; callers during a sync share the running one.
 async function checkForChanges(full = false) {
 	if (syncing) return syncing;
 	syncing = (async () => {
@@ -222,6 +239,7 @@ onReconnect(() => {
 	if (library.leader) void checkForChanges();
 });
 
+// Events come in bursts (a scan, a play touching album and artist), so they are debounced into one sync.
 function queueEventSync({ albums, artists }: RefreshedIds) {
 	for (const id of albums) refreshedAlbums.add(id);
 	for (const id of artists) refreshedArtists.add(id);
@@ -233,6 +251,7 @@ function lead() {
 	library.leader = true;
 	void checkForChanges().then(() => requestEnrichment(true));
 	listenToNavidrome(() => requireCredentials().token, { changed: queueEventSync, live: (live) => (eventsLive = live) });
+	// Polling is the fallback; while the event stream is live it only runs every livePollIntervalMs.
 	setInterval(() => {
 		const due = !eventsLive || Date.now() - lastSyncAt >= LIBRARY_SYNC.livePollIntervalMs;
 		void (due ? checkForChanges() : Promise.resolve()).then(() => requestEnrichment());
@@ -255,6 +274,7 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 		await call({ kind: 'persist' });
 		channel?.postMessage({ kind: 'snapshot', version: library.meta.version } satisfies ChannelMessage);
 	} else {
+		// Keeps this tab's in-memory copy in step without waiting for the leader's next save.
 		await call({ kind: 'run', sql: message.sql, params: message.params, persist: library.leader });
 		library.revision += 1;
 	}
@@ -266,6 +286,8 @@ export async function startLibrary() {
 	library.status = 'loading';
 	worker = new LibraryWorker();
 	worker.addEventListener('message', onWorkerReply);
+	// The channel and the leader lock include the schema version, so tabs running an older app
+	// version (different database layout) never share a leader or snapshots with newer ones.
 	channel = new BroadcastChannel(`vibemusic-library-${userId}-v${SCHEMA_VERSION}`);
 	channel.addEventListener('message', onChannelMessage);
 	try {
@@ -279,14 +301,17 @@ export async function startLibrary() {
 	} catch (error) {
 		failed(error);
 	}
+	// Ask the browser not to evict the saved library under storage pressure.
 	void navigator.storage?.persist?.();
 	const leaderName = `vibemusic-library-leader-${userId}-v${SCHEMA_VERSION}`;
+	// Web Locks are missing outside secure contexts (plain http); fall back to a localStorage lease.
 	if (!navigator.locks) {
 		leadWhenFree(leaderName, lead);
 		return;
 	}
 	void navigator.locks.request(leaderName, () => {
 		lead();
+		// Never resolves on purpose: the lock is held, and this tab stays leader, until it closes.
 		return new Promise(() => {});
 	});
 }
@@ -305,6 +330,10 @@ export async function query<Row>(sql: string, params: SqlParam[] = []): Promise<
 	});
 }
 
+/**
+ * Applies a small local edit (star, play count, palette) to this tab's database and broadcasts
+ * the same SQL to other tabs. The leader also saves it; the server is updated separately.
+ */
 export async function patchLibrary(sql: string, params: SqlParam[]) {
 	await call({ kind: 'run', sql, params, persist: library.leader });
 	channel?.postMessage({ kind: 'patch', sql, params } satisfies ChannelMessage);

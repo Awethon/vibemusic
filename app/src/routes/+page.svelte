@@ -61,6 +61,7 @@
 		);
 	}, []);
 
+	// Interleave playlist kinds by HOME.playlistMixPattern so one kind doesn't fill the whole shelf.
 	const homePlaylists = $derived.by(() => {
 		const byKind: Record<string, Playlist[]> = { own: [], smart: [], genre: [], artist: [] };
 		for (const playlist of playlists.value) byKind[playlist.kind].push(playlist);
@@ -85,6 +86,8 @@
 			: ''
 	);
 
+	// After a sort or filter change deep in the grid, scroll back up to near the top of the grid
+	// so the new results start in view. Not on first render, which keeps a restored scroll position.
 	let firstRender = true;
 	$effect(() => {
 		void ui.albumSort;

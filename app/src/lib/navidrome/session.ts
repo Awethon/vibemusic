@@ -1,6 +1,10 @@
+// Logging in to Navidrome and keeping the credentials in localStorage.
+
 import { NavidromeError, reachNavidrome, type Credentials } from './credentials.ts';
 import { md5 } from './md5.ts';
 
+// Keyed by server (the page origin in production, the proxied server in development) so
+// sessions for different servers never mix.
 const STORAGE_KEY = `vibemusic.session:${NAVIDROME_TARGET}`;
 const SALT_KEY = `vibemusic.subsonic-salt:${NAVIDROME_TARGET}`;
 
@@ -31,6 +35,9 @@ export function forgetCredentials() {
 	localStorage.removeItem(STORAGE_KEY);
 }
 
+// The Subsonic token is md5(password + salt) and Navidrome accepts any salt. Keeping the salt
+// stable per user keeps the token, and therefore every cover URL, the same across logins, so
+// the browser's image cache stays valid.
 function stableSalt(username: string, fallback: string): string {
 	try {
 		const salts = JSON.parse(localStorage.getItem(SALT_KEY) ?? '{}') as Record<string, string>;
@@ -59,6 +66,7 @@ export async function logIn(username: string, password: string): Promise<Credent
 		isAdmin: body.isAdmin,
 		token: body.token,
 		subsonicSalt: salt,
+		// First login on this browser: the server's salt was just stored, so its token is right.
 		subsonicToken: salt === body.subsonicSalt ? body.subsonicToken : md5(password + salt)
 	};
 	saveCredentials(credentials);

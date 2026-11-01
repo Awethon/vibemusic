@@ -22,6 +22,7 @@
 	import { ui } from './state.svelte.ts';
 	import { COVER_PX } from '../tuning.ts';
 
+	// While the seek bar is dragged, show the scrub position but only seek on release.
 	let scrubRatio = $state<number | null>(null);
 	const track = $derived(currentTrack());
 	const live = $derived(isRadio(track?.id));

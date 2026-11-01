@@ -44,6 +44,7 @@
 }
 
 .play:hover {
+	/* rotate(0.02deg) only while zoomed: see .tile .art in views.css. */
 	transform: scale(1.06) rotate(0.02deg);
 }
 

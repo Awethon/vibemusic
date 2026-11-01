@@ -1,3 +1,6 @@
+// IndexedDB storage for library database files: a manifest per file (size, chunk size, chunk
+// hashes) plus chunks keyed [name, index]. Used only by the library worker.
+
 import { changedChunks, chunkHashes, joinChunks } from './chunks.ts';
 
 const DATABASE = 'vibemusic-library';
@@ -37,6 +40,7 @@ function store(): Promise<IDBDatabase> {
 
 const chunksOf = (name: string, from = 0) => IDBKeyRange.bound([name, from], [name, Infinity]);
 
+// Returns null when the file is missing or incomplete; callers then sync from scratch.
 export async function readFile(name: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; saved: Saved } | null> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readonly');
 	const [manifest, parts] = await Promise.all([
@@ -48,6 +52,11 @@ export async function readFile(name: string): Promise<{ bytes: Uint8Array<ArrayB
 	return { bytes, saved: { chunkSize: manifest.chunkSize, hashes: manifest.hashes } };
 }
 
+/**
+ * Saves `name`, writing only the chunks whose hash differs from `previous` (the result of the last
+ * save of this file). Everything happens in one transaction, so a crash never leaves a manifest
+ * that points at a mix of old and new chunks.
+ */
 export async function writeFile(
 	name: string,
 	snapshot: () => Uint8Array,
@@ -56,11 +65,14 @@ export async function writeFile(
 ): Promise<{ saved: Saved; size: number; written: number }> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readwrite');
 	const done = finish(transaction);
+	// Taken only after the await above and used without awaiting: the bytes may be a live view of
+	// the database's memory, which could change while another worker request runs.
 	const bytes = snapshot();
 	const hashes = chunkHashes(bytes, chunkSize);
 	const changed = changedChunks(previous?.chunkSize === chunkSize ? previous.hashes : null, hashes);
 	const chunks = transaction.objectStore(CHUNKS);
 	for (const index of changed) chunks.put(new Blob([bytes.slice(index * chunkSize, (index + 1) * chunkSize)]), [name, index]);
+	// The database may have shrunk: drop chunks past the new end.
 	chunks.delete(chunksOf(name, hashes.length));
 	transaction.objectStore(MANIFESTS).put({ name, size: bytes.length, chunkSize, hashes } satisfies Manifest);
 	await done;

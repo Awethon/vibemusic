@@ -3,6 +3,9 @@ import { SCROLL_RESTORE } from '../tuning.ts';
 
 const USER_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
+// Restores the main scroll position on back/forward navigation (SvelteKit snapshot). Content
+// renders asynchronously, so the page may not be tall enough yet: keep re-applying each frame until
+// the position holds for settleMs, the user scrolls or presses something, or giveUpMs passes.
 let active: (() => void) | null = null;
 
 export function restoreMainScroll(target: number) {

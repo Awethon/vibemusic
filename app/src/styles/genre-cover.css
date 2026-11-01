@@ -8,6 +8,7 @@
 	overflow: hidden;
 }
 .gc-canvas {
+	/* Everything is laid out on a 600-unit design grid, so the cover scales with its container. */
 	--gc-u: calc(100cqw / 600);
 	position: relative;
 	display: block;
@@ -36,6 +37,11 @@
 	object-fit: cover;
 	border-radius: calc(var(--gc-u) * 8);
 }
+/*
+ * The wall fades into the dark background through a mask, not a dark gradient laid on top.
+ * Browsers clip each layer at the rounded corners separately, so a light layer under a dark
+ * one leaks a thin light line along the edges. --gc-fade sets the opacity at the mid stop.
+ */
 .gc-fade {
 	position: absolute;
 	inset: 0;

@@ -1,3 +1,5 @@
+// WebGL2 side of the glass: uploads each shape's painted backdrop as a texture ("slot"), keeps a
+// blurred copy for frost, and draws the glass shader with a scissor per draw area.
 import { lightVector, RENDER, type GlassParams } from './params.ts';
 import { BLUR, GLASS, MAX_SHAPES, VERT } from './shaders.ts';
 
@@ -16,6 +18,8 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		premultipliedAlpha: true,
 		depth: false,
 		stencil: false,
+		// The player canvas is read back by the popup level's backdrop painter, and an unpreserved
+		// buffer reads as blank once the frame has been composited.
 		preserveDrawingBuffer: keepFrame
 	});
 	if (!gl) return null;
@@ -112,6 +116,8 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		slot.version += 1;
 	}
 
+	// Separable Gaussian (horizontal then vertical pass) on a downscaled copy, sampling mip levels
+	// so a fixed 33-tap kernel covers large radii. Cached until the frost amount or scene changes.
 	function blurred(slot: Slot, frost: number, dpr: number): WebGLTexture {
 		const sigma = frost * dpr;
 		const [sceneWidth, sceneHeight] = slot.size;
@@ -194,6 +200,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		}
 		context.uniform4f(u.uBounds, region.x * dpr, region.y * dpr, (region.x + region.width) * dpr, (region.y + region.height) * dpr);
 		const light = lightVector(params);
+		// Merging (blobby joins between nearby shapes) is a lab feature; the app's panels stay separate.
 		context.uniform1f(u.uMerge, 0);
 		context.uniform1f(u.uThick, params.thick * dpr);
 		context.uniform1f(u.uIor, params.ior);
@@ -226,6 +233,7 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 			const top = Math.round(area.y * dpr);
 			const bottom = Math.min(height, Math.round((area.y + area.height) * dpr));
 			if (right <= left || bottom <= top) continue;
+			// GL's scissor origin is bottom-left, the DOM's is top-left.
 			context.scissor(left, height - bottom, right - left, bottom - top);
 			context.drawArrays(context.TRIANGLES, 0, 3);
 		}

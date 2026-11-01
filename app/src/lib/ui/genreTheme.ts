@@ -1,3 +1,5 @@
+// Accent and dark background colours for a generated genre cover, from the hue of the most
+// colourful album colour. Saturation is clamped so dull palettes still look intentional.
 import { hexToRgb, rgbToHsl, type Rgb } from '../color.ts';
 import { GENRE_COVER } from '../tuning.ts';
 

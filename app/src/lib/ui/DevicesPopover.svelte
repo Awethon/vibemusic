@@ -35,6 +35,7 @@
 	}
 </script>
 
+<!-- Clicks on #bDevice are left to its own toggle; closing here too would reopen it on click. -->
 <svelte:window
 	onpointerdown={(event) =>
 		ui.devicesOpen &&

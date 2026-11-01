@@ -1,5 +1,7 @@
 /* Phone layout: applied on top of everything else when body has the phone class. */
 
+/* Imported after app.css (routes/+layout.svelte), so these rules win over the desktop ones. */
+
 body.phone {
 	--tabs-h: 58px;
 	--dock-h: 60px;
@@ -19,6 +21,7 @@ body.phone #main {
 body.phone a,
 body.phone button,
 body.phone img {
+	/* No iOS link/image preview on long-press: lib/engine/longPress.ts opens our context menu instead. */
 	-webkit-touch-callout: none;
 	-webkit-user-select: none;
 	user-select: none;
@@ -213,6 +216,7 @@ body.now-open #phoneDock {
 	padding: calc(var(--phone-safe-t) - 6px) 22px calc(26px + var(--phone-safe-b));
 	background: rgba(8, 7, 11, 0.55);
 	backdrop-filter: blur(40px) saturate(1.2);
+	/* Swipe-down to close is handled in JS (swipeToDismiss.ts); the browser must not scroll or zoom. */
 	touch-action: none;
 	opacity: 0;
 	pointer-events: none;
@@ -444,6 +448,7 @@ body.phone .pn-head {
 	touch-action: none;
 }
 
+/* Empty third grid cell that balances the close button, so the title stays centred. */
 body.phone .pn-head::after {
 	content: '';
 }
@@ -594,6 +599,7 @@ body.phone .trk {
 	padding: 6px 8px;
 }
 
+/* On touch screens :hover sticks after a tap, which would leave rows highlighted. */
 @media (hover: none) {
 	body.phone .icon-btn:hover,
 	body.phone .trk:hover,

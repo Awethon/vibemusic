@@ -1,3 +1,5 @@
+// Shapes of the data moving between fetch.ts, build.ts and the worker.
+
 import type { NativeAlbum, NativeArtist, NativePlaylist, NativePlaylistTrack, NativeSong, RadioStation } from '../navidrome/schemas.ts';
 
 export type LibrarySnapshot = {
@@ -10,6 +12,8 @@ export type LibrarySnapshot = {
 	steps?: Record<string, number>;
 };
 
+// Newest timestamps seen so far for each kind of change; the next incremental sync fetches only
+// items newer than these.
 export type SyncMarks = { albumImported: string; albumPlayed: string; albumStarred: string; songPlayed: string; songStarred: string };
 
 export type LibraryChanges = {
@@ -17,18 +21,23 @@ export type LibraryChanges = {
 	albums: NativeAlbum[];
 	albumSongs: NativeSong[];
 	albumStats: NativeAlbum[];
+	// Albums named by refreshResource events. Only their artwork fields are applied: a play also
+	// emits refreshResource, so a full album refetch would be wasted.
 	artwork: NativeAlbum[];
 	artistArt: NativeArtist[];
 	songStats: NativeSong[];
 	ratings: Map<string, number>;
 	playlists: NativePlaylist[];
 	playlistTracks: Map<string, NativePlaylistTrack[]>;
+	// null when the request failed, meaning "keep what we have" rather than "there are none".
 	radioStations: RadioStation[] | null;
+	// Server-side counts, checked after applying; a mismatch forces a full sync.
 	totals: { albums: number; tracks: number } | null;
 };
 
 export type SyncState = {
 	marks: SyncMarks;
+	// playlistSignature() per playlist id, to spot playlists whose tracks need refetching.
 	playlists: Record<string, string>;
 	fullSyncAt: string;
 };
@@ -43,6 +52,7 @@ export type LibraryMeta = {
 	playlists: number;
 };
 
+// Sent to the relay, which looks up genres and popularity on MusicBrainz, Deezer and Apple Music.
 export type EnrichmentRequest = {
 	since: number;
 	releaseGroups: string[];

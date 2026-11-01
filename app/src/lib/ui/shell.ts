@@ -15,10 +15,12 @@ export function setFullScreen(open: boolean) {
 	closeAllMenus();
 	wakeFromIdle();
 	if (open) {
+		// Full screen always shows the playing album's colours, never a hover preview.
 		settlePalette(true);
 		closePanelInstantly();
 		ui.fullScreen = true;
 		setBodyClass('now-open', true);
+		// Lyrics can only be centred once the new layout exists, so wait a frame.
 		requestAnimationFrame(recenterVisibleLyrics);
 		return;
 	}

@@ -1,3 +1,6 @@
+// Shared player state. The queue and the track cache are plain, non-reactive objects (libraries
+// can hold tens of thousands of tracks); readers subscribe through the revision counters instead.
+
 import { tracksByIds, type Track } from '../library/queries.ts';
 import { PLAYBACK } from '../tuning.ts';
 import * as queue from './queue.ts';
@@ -24,6 +27,7 @@ export const player = $state({
 });
 
 export function playerQueue(): Readonly<queue.QueueState> {
+	// Reading the revision makes the caller re-run when queueChanged() bumps it.
 	void player.queueRevision;
 	return queueState;
 }
@@ -44,6 +48,7 @@ export const currentTrack = (): Track | null => trackById(playerQueue().currentT
 
 export const onQueueChange = (listener: () => void) => void queueListeners.push(listener);
 
+// Must be called after every queue mutation: it is the only change signal the UI and the relay get.
 export function queueChanged() {
 	player.queueRevision += 1;
 	for (const listener of queueListeners) listener();

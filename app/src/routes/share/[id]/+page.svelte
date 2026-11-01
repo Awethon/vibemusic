@@ -1,4 +1,7 @@
 <script lang="ts">
+	// Public page for a shared album or playlist link, open to anyone without signing in. It
+	// skips the app shell and library and runs its own small <audio> player against the relay
+	// (/relay/share) and Navidrome's public share endpoints (/share/img, /share/s).
 	import { page } from '$app/state';
 	import { medianCut } from '#lib/library/medianCut.ts';
 	import { PALETTE } from '#lib/tuning.ts';
@@ -29,6 +32,7 @@
 
 	const audio = new Audio();
 	audio.preload = 'metadata';
+	// Slider position is squared into volume, as in the main player, so it feels even to the ear.
 	audio.volume = initialVolume * initialVolume;
 
 	const track = $derived(share?.tracks[index] ?? null);

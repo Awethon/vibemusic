@@ -5,8 +5,10 @@
 	--safe-r: env(safe-area-inset-right, 0px);
 	--safe-b: env(safe-area-inset-bottom, 0px);
 	--safe-l: env(safe-area-inset-left, 0px);
+	/* Side insets actually used for layout; landscape.css trims the side without the camera island. */
 	--edge-l: var(--safe-l);
 	--edge-r: var(--safe-r);
+	/* Rail width, backing opacity and label reveal: rewritten every frame while the rail folds (lib/engine/rail.ts). */
 	--rail-w: 196px;
 	--panel-w: 0px;
 	--rail-p: 1;
@@ -20,6 +22,7 @@
 	--line: rgba(255, 255, 255, 0.08);
 	--line-2: rgba(255, 255, 255, 0.14);
 	--hover: rgba(255, 255, 255, 0.07);
+	/* Starting value only: Background.svelte blends it toward the playing album's colours. */
 	--accent: #d9c8ff;
 	--ui: 'Onest', system-ui, sans-serif;
 	--display: 'Unbounded', 'Onest', system-ui, sans-serif;

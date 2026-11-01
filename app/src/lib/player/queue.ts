@@ -1,3 +1,10 @@
+// The play queue as pure functions over plain data (tests in queue.test.ts).
+// Two lists: sourceQueue is the album/playlist being played (sourceIndex points at the current
+// track); userQueue holds tracks the user added with "play next"/"add to queue" and always plays
+// before the rest of the source. Entries can also be "played now" out of order, which takes them
+// out of their list; playingOutOfOrder records that so Previous and saving behave correctly.
+
+// entryId tells apart repeated copies of the same track in the queue.
 export type Entry = { entryId: string; trackId: string };
 
 export type QueueState = {
@@ -21,6 +28,7 @@ export type QueueEdit =
 	| { op: 'moveSourceToPlayNext'; index: number }
 	| { op: 'reorder'; fromUserQueue: boolean; from: number; to: number };
 
+// Random per page load so entry ids from different tabs never collide when queues are mirrored.
 const entryPrefix = Math.random().toString(36).slice(2, 8);
 let lastEntryNumber = 0;
 
@@ -69,6 +77,7 @@ function advanceSourceTo(state: QueueState, sourceIndex: number): QueueEffect {
 
 export function playSourceNow(state: QueueState, sourceIndex: number): QueueEffect {
 	if (sourceIndex <= state.sourceIndex || !state.sourceQueue[sourceIndex]) return 'none';
+	// The very next source track with nothing queued is a normal advance, not an out-of-order play.
 	if (sourceIndex === state.sourceIndex + 1 && !state.userQueue.length) return advanceSourceTo(state, sourceIndex);
 	const [entry] = state.sourceQueue.splice(sourceIndex, 1);
 	makeCurrent(state, entry, true);
@@ -85,6 +94,8 @@ export function playNext(state: QueueState): QueueEffect {
 	return 'stop';
 }
 
+// Previous restarts the current track once it has played for a few seconds, or at the start of
+// the source. An out-of-order track has no "previous" in the source, so nothing happens.
 export function playPrevious(state: QueueState, positionSeconds: number, restartAfterSeconds: number): QueueEffect {
 	if (!state.currentEntryId || state.playingOutOfOrder) return 'none';
 	if (positionSeconds > restartAfterSeconds || state.sourceIndex <= 0) return 'restart';
@@ -136,6 +147,9 @@ export const upcomingSource = (state: QueueState) => state.sourceQueue.slice(sta
 
 export const upNextCount = (state: QueueState) => state.userQueue.length + Math.max(0, state.sourceQueue.length - state.sourceIndex - 1);
 
+// Flattens the queue into one list for Navidrome's savePlayQueue, which only stores a track list
+// and a current track. When the current track was played out of order, the source track at
+// sourceIndex has already been played too, so it goes before the current one.
 export function savedOrder(state: QueueState): { trackIds: string[]; currentIndex: number } {
 	const playedCount = state.playingOutOfOrder ? state.sourceIndex + 1 : state.sourceIndex;
 	const before = state.sourceQueue.slice(0, playedCount).map((entry) => entry.trackId);
@@ -166,6 +180,7 @@ export function replaceQueue(state: QueueState, next: QueueState) {
 	Object.assign(state, copyQueue(next));
 }
 
+// Every track id the queue references, so mirrored queues can load track details first.
 export const queuedTrackIds = (state: QueueState) => [
 	...new Set(
 		[state.currentTrackId, ...state.sourceQueue.map((entry) => entry.trackId), ...state.userQueue.map((entry) => entry.trackId)].filter(

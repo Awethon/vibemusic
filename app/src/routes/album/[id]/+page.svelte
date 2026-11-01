@@ -20,6 +20,7 @@
 		return current ? (await albumsByArtist(current.artistId)).filter((other) => other.id !== id).slice(0, ALBUM_PAGE.moreByCount) : [];
 	}, []);
 
+	// A genre link opens the home album wall with that genre as its filter.
 	function showGenre(genre: string) {
 		ui.filters = { genres: [genre], decades: [] };
 	}

@@ -17,6 +17,7 @@ export const plural = (count: number, one: string, many = `${one}s`) => `${count
 export function alphabetBucket(text: string): string {
 	const first = text.trim().charAt(0).toUpperCase();
 	if (!first) return '#';
+	// Latin and Cyrillic get their own letters (Ё filed under Е); everything else goes under '#'.
 	return /[A-ZА-ЯЁ]/.test(first) ? (first === 'Ё' ? 'Е' : first) : '#';
 }
 

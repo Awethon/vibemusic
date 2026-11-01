@@ -1,3 +1,6 @@
+// The player's public API for the UI. Everything goes through perform(), which either runs the
+// command here or sends it to the active device (remote.svelte.ts).
+
 import { rememberPlayedList } from '../history.svelte.ts';
 import { patchLibrary } from '../library/library.svelte.ts';
 import type { Track } from '../library/queries.ts';

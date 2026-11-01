@@ -8,6 +8,7 @@
 	import '@fontsource/unbounded/500.css';
 	import '@fontsource/unbounded/700.css';
 	import '../app.css';
+	// After app.css on purpose: phone.css overrides the desktop rules for body.phone.
 	import '../styles/phone.css';
 	import { untrack } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
@@ -50,6 +51,7 @@
 	let main = $state<HTMLElement | null>(null);
 	let started = false;
 	let ready = false;
+	// The share page is public: it renders on its own, without sign-in, services or the app shell.
 	const publicPage = page.route.id === '/share/[id]';
 	const signedIn = $derived(!publicPage && !!session.credentials && !session.expired);
 
@@ -87,6 +89,8 @@
 		if (main) return installPalettePreview(main);
 	});
 
+	// #main is the page scroller, not the window, so scroll is handled here: back/forward restores
+	// it through the snapshot above, any other navigation starts at the top.
 	afterNavigate(({ type }) => {
 		showView(page.route.id, page.params);
 		if (type !== 'popstate') main?.scrollTo({ top: 0 });
@@ -101,6 +105,8 @@
 {#if publicPage}
 	{@render children()}
 {:else}
+	<!-- Each GlassLayer canvas sits right under the surfaces it draws glass for. Keep this order in
+	     step with the stacking order in styles/shell.css and lib/glass/backdrop.ts. -->
 	<Background />
 	<GlassLayer level="rail" />
 	{#if !signedIn}

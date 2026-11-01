@@ -1,3 +1,6 @@
+// Tracks whether Navidrome is reachable. http.ts reports every request's outcome here; while
+// unreachable we ping on a timer, and onReconnect listeners run when the server answers again.
+
 import { NavidromeUnreachableError } from './navidrome/credentials.ts';
 import { watchReachability } from './navidrome/http.ts';
 import { navidrome } from './session.svelte.ts';
@@ -24,6 +27,8 @@ export function reportReachable() {
 export function reportUnreachable() {
 	if (connection.unreachable) return;
 	connection.unreachable = true;
+	// No need to act on the result: any request that gets through calls reportReachable via
+	// watchReachability, which clears this timer and wakes the reconnect listeners.
 	retryTimer = setInterval(() => void checkConnection(), CONNECTION.retryMs);
 }
 
@@ -32,6 +37,7 @@ export async function checkConnection(): Promise<boolean> {
 		await navidrome().subsonic('ping');
 		return true;
 	} catch (error) {
+		// Any answer from the server (even an auth error) means it is reachable.
 		return !isUnreachable(error);
 	}
 }

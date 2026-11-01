@@ -1,3 +1,6 @@
+// The right-hand side panel (queue, lyrics, ...). During a swipe it is driven by inline
+// transform + the --panel-w variable each frame; on release, snapPanel hands back to a CSS
+// transition and settles the real open/closed state.
 import { flushSync } from 'svelte';
 import { EASING, PANEL } from '../tuning.ts';
 import { ui, type PanelTab } from '../ui/state.svelte.ts';
@@ -28,6 +31,7 @@ export function showPanelTab(tab: PanelTab) {
 export function togglePanelWithLayout(open: boolean, tab?: PanelTab) {
 	if (tab) showPanelTab(tab);
 	if (open === bodyHasClass('panel-open')) return;
+	// Order matters: measure tiles, render the new panel state, relayout, then FLIP from old spots.
 	const previousPositions = captureTilePositions();
 	setPanelOpen(open);
 	flushSync();
@@ -47,12 +51,15 @@ export function applyPanelProgress(progress: number) {
 	panel.progress = Math.max(0, Math.min(1, progress));
 	const element = panelElement();
 	if (!element) return;
+	// No transition while following the finger, or the panel would lag behind it.
 	element.style.transition = 'none';
 	element.style.transform = `translateX(${((1 - panel.progress) * PANEL.slideDistancePx).toFixed(1)}px)`;
 	document.body.style.setProperty('--panel-w', `${(panel.progress * PANEL.contentInsetPx).toFixed(1)}px`);
 	scheduleLiveLayout();
 }
 
+// Reads the computed transform (m41 = translateX) so a gesture can grab a panel that is still
+// mid-way through its CSS snap transition.
 export function panelProgressOnScreen() {
 	const element = panelElement();
 	if (!element) return 0;
@@ -65,6 +72,8 @@ export function snapPanel(open: boolean) {
 	if (!element) return;
 	const distance = Math.abs((open ? 1 : 0) - panel.progress);
 	const durationMs = prefersReducedMotion() ? 0 : Math.max(PANEL.snapMinMs, PANEL.snapMs * distance);
+	// Shorter snaps for shorter remaining distance. Clearing the inline transform lets the
+	// stylesheet's open/closed position take over, animated by this one-off transition.
 	element.style.transition = `transform ${durationMs}ms ${EASING.easeOutCubic}`;
 	element.style.transform = '';
 	document.body.style.removeProperty('--panel-w');
@@ -75,6 +84,7 @@ export function snapPanel(open: boolean) {
 	}
 	panel.progress = open ? 1 : 0;
 	settleLayout();
+	// Remove the one-off transition afterwards so the stylesheet's own transition applies again.
 	clearTimeout(panel.transitionCleanupTimer);
 	panel.transitionCleanupTimer = setTimeout(() => {
 		element.style.transition = '';

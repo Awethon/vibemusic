@@ -1,3 +1,6 @@
+// Read-only queries the UI runs against the local library database, and the row types they return.
+// Writes go through patchLibrary (local edits) or the worker's sync.
+
 import type { TimelineAlbum } from '../engine/timeline.ts';
 import { normalizeForSearch } from './schema.ts';
 import { query } from './library.svelte.ts';
@@ -68,6 +71,7 @@ export type AlbumSort = 'mostPlayed' | 'recentlyAdded' | 'byArtist' | 'az' | 'ne
 export type ArtistSort = 'mostAlbums' | 'az';
 export type Filters = { genres: string[]; decades: number[] };
 
+// Row shapes as SQLite returns them: JSON columns as strings, booleans as 0/1.
 type Raw<T> = Omit<T, 'genres' | 'credits' | 'starred' | 'disliked' | 'coverAlbumIds' | 'mosaicAlbumIds' | 'readonly'> & {
 	genres?: string;
 	credits?: string;
@@ -102,9 +106,12 @@ const toAlbum = (row: Raw<Album>): Album => ({
 });
 const toTrack = (row: Raw<Track>): Track => ({ ...row, starred: row.starred === 1, disliked: row.disliked === 1 });
 
+// A one-star rating is how "dislike" is stored on the server. Generated playlists (genre, artist)
+// leave disliked tracks out; the user's own playlists play everything.
 export const skipsDisliked = (playlist: Pick<Playlist, 'kind'> | null | undefined) =>
 	playlist?.kind === 'genre' || playlist?.kind === 'artist';
 
+// Keeps the track at `index` even if disliked: the user picked it explicitly. Returns its new index.
 export function withoutDisliked(tracks: Track[], index = -1) {
 	const kept = tracks.filter((track, position) => !track.disliked || position === index);
 	return { tracks: kept, index: index < 0 ? 0 : kept.indexOf(tracks[index]) };
@@ -175,6 +182,7 @@ export function artistList(sort: ArtistSort, filters: Filters) {
 export function artistStrip(filters: Filters, limit: number) {
 	const filter = albumFilterSql(filters);
 	return artists(
+		// Counts only the albums matching the filters, not the artist's whole catalogue.
 		`select ${ARTIST_COLUMNS.replace('artist.album_count as albumCount', 'count(album.id) as albumCount')}
 		from artist join album_credit on album_credit.artist_id = artist.id join album on album.id = album_credit.album_id where ${filter.sql}
 		group by artist.id order by count(album.id) desc, artist.track_count desc, artist.name_order limit ?`,
@@ -220,6 +228,7 @@ export const playlistTracks = (playlistId: string) =>
 		[playlistId]
 	);
 
+// Stays well below SQLite's limit on bound parameters per statement.
 const ID_CHUNK = 5000;
 
 async function inChunks<T extends { id: string }>(ids: string[], load: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
@@ -265,6 +274,7 @@ export const radioStations = () =>
 
 export const radioTracks = async () => (await radioStations()).map(stationTrack);
 
+// Keeps the order (and duplicates) of `ids`; unknown ids are dropped. Radio ids become station tracks.
 export async function tracksByIds(ids: string[]) {
 	const stations = ids.some(isRadio) ? await radioTracks() : [];
 	const found = await inChunks([...new Set(ids.filter((id) => !isRadio(id)))], (chunk) =>
@@ -293,8 +303,11 @@ export const albumsByIds = (ids: string[]) =>
 export const recentlyPlayedAlbums = (limit: number) =>
 	albums(`select ${ALBUM_COLUMNS} from album where play_date != '' order by play_date desc limit ?`, [limit]);
 
+// text >= needle and text < needle + U+FFFF is a prefix match that can use the search_key index.
 const PREFIX_END = '\uffff';
 
+// Prefix matches first, then substring matches (excluding the prefix ones via instr != 1). The
+// trigram index needs at least 3 characters; shorter needles fall back to LIKE on search_key.
 async function matchingRefs(kind: string, needle: string, limit: number): Promise<string[]> {
 	const prefixed = await query<{ ref: string }>('select ref from search_key where kind = ? and text >= ? and text < ? limit ?', [
 		kind,
@@ -309,6 +322,7 @@ async function matchingRefs(kind: string, needle: string, limit: number): Promis
 	const substring = useIndex
 		? await query<{ ref: string }>('select ref from search where kind = ? and search match ? and instr(text, ?) != 1 limit ?', [
 				kind,
+				// Quoted as an FTS5 phrase so the user's text is never parsed as query syntax.
 				`"${needle.replaceAll('"', '""')}"`,
 				needle,
 				remaining

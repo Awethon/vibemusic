@@ -1,6 +1,10 @@
 <script lang="ts" module>
 	import { COVER_RETRY } from '../tuning.ts';
 
+	// Fetched by hand instead of <img src> so we can retry 429s from Navidrome's cover throttle
+	// and look at the headers. Navidrome serves its "no artist photo" placeholder without an ETag
+	// (real artwork carries one), so a response without an ETag means "no photo" and we show
+	// an album cover instead. Results are cached per URL for the session.
 	const photos = new Map<string, Promise<string | null>>();
 
 	async function loadPhoto(url: string, attempt = 0): Promise<string | null> {

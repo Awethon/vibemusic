@@ -1,3 +1,7 @@
+// Web Worker that owns the library: an in-memory SQLite (WASM) database, its sync from Navidrome
+// and its saves to IndexedDB. Every tab runs one; only the leader tab asks it to sync and save,
+// other tabs reload what the leader saved. The main-thread side is library.svelte.ts.
+
 import sqlite3InitModule, { type Database, type Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { NavidromeHttp } from '../navidrome/http.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
@@ -11,19 +15,26 @@ import { listFiles, readFile, removeFile, writeFile, type Saved } from './store.
 
 let sqlite: Sqlite3Static;
 let db: Database | null = null;
+// A database saved under an older SCHEMA_VERSION, kept until the next full build so that build can
+// carry over data that is expensive to fetch again (enrichment, palettes; see KEPT_TABLES).
 let outdated: Database | null = null;
 let userId = '';
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+// Saves run one at a time; each waits for the previous one.
 let writing: Promise<unknown> = Promise.resolve();
+// Chunk hashes from the last save of each database, so the next save writes only changed chunks.
 const savedState = new WeakMap<Database, Saved>();
 
 const ready = sqlite3InitModule().then((module) => {
 	sqlite = module;
 });
 
+// The schema version is part of the name, so a new app version never reads an incompatible file.
 const snapshotName = () => `library-${userId}-v${SCHEMA_VERSION}.sqlite`;
 const isOutdated = (name: string) => name.startsWith(`library-${userId}-v`) && name !== snapshotName();
 
+// Older versions saved the database as one file in OPFS. These "legacy" helpers read it once,
+// migrate it to IndexedDB and delete it.
 async function legacyDirectory(): Promise<FileSystemDirectoryHandle | null> {
 	try {
 		return (await navigator.storage?.getDirectory?.()) ?? null;
@@ -56,6 +67,9 @@ async function removeLegacy() {
 	}
 }
 
+// The database's bytes without copying them (NOCOPY returns a view of WASM memory). This only works
+// for databases created by sqlite3_deserialize, which is why emptyDatabase() and databaseFrom() use
+// it; otherwise it falls back to a full export. The view is only valid until the database changes.
 function liveBytes(database: Database): Uint8Array {
 	const { capi, wasm } = sqlite;
 	const sizeOut = wasm.alloc(8);
@@ -74,10 +88,13 @@ function writeSnapshot(database: Database): Promise<number> {
 		savedState.set(database, result.saved);
 		return result.size;
 	});
+	// A failed save must not block the ones after it.
 	writing = next.catch(() => {});
 	return next;
 }
 
+// Deserializing an empty buffer instead of opening a plain :memory: database, so liveBytes can use
+// SQLITE_SERIALIZE_NOCOPY on it.
 function emptyDatabase(): Database {
 	const database = new sqlite.oo1.DB();
 	const flags = sqlite.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite.capi.SQLITE_DESERIALIZE_RESIZEABLE;
@@ -127,12 +144,14 @@ async function loadSnapshot() {
 	try {
 		const database = databaseFrom(bytes);
 		const meta = readMeta(database);
+		// readMeta returns null for another schema version.
 		if (!meta || meta.userId !== userId) {
 			database.close();
 			return null;
 		}
 		if (stored) savedState.set(database, stored.saved);
 		replaceDatabase(database);
+		// Genre/playlist rules may have changed since this file was saved (see DERIVED_RULES in build.ts).
 		const refreshed = refreshDerived(database, meta);
 		if (refreshed || legacy) await writeSnapshot(database);
 		if (legacy) void removeLegacy();
@@ -152,6 +171,7 @@ function scheduleSnapshotWrite() {
 async function install(snapshot: LibrarySnapshot, fetchMs: number): Promise<{ meta: LibraryMeta; timings: SyncTimings }> {
 	const buildStarted = performance.now();
 	const database = emptyDatabase();
+	// Built into a fresh database and swapped in afterwards, so queries keep working during the build.
 	const meta = buildLibrary(database, snapshot, userId, new Date().toISOString(), db ?? outdated);
 	replaceDatabase(database);
 	if (outdated) {
@@ -181,6 +201,8 @@ async function syncChanges(
 ): Promise<{ meta: LibraryMeta; changed: boolean } | null> {
 	const meta = db && readMeta(db);
 	const sync = db && readSyncState(db);
+	// null means "do a full sync instead": no local data, the last full sync is too old, too many
+	// changes, or the totals disagree afterwards (the incremental path missed something).
 	if (!meta || !sync || Date.now() - Date.parse(sync.fullSyncAt) > LIBRARY_SYNC.fullSyncIntervalMs) return null;
 	const changes = await fetchChanges(http, sync, meta.albums, albumIds, artistIds);
 	if (!changes || !db) return null;
@@ -202,9 +224,11 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 			userId = request.userId;
 			const meta = await loadSnapshot();
 			if (meta) void removeOutdatedSnapshots();
+			// No current file: keep the outdated one in memory for the first full build to carry from.
 			else outdated = await loadOutdatedSnapshot();
 			return meta;
 		}
+		// Another tab (the leader) saved a newer snapshot.
 		case 'reload':
 			return loadSnapshot();
 		case 'sync': {
@@ -243,6 +267,7 @@ async function handle(id: number, request: WorkerRequest): Promise<WorkerResults
 		case 'run': {
 			const database = requireDatabase();
 			database.exec({ sql: request.sql, bind: request.params });
+			// Local edits (stars, plays, palettes) are batched into one save shortly after.
 			if (request.persist) scheduleSnapshotWrite();
 			return database.changes();
 		}

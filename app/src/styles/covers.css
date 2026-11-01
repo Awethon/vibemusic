@@ -1,5 +1,10 @@
 /* Placeholders shown while artist photos and covers load. */
 
+/*
+ * A pending artist photo is a <span>, not an <img> without src: browsers draw a frame (Chrome
+ * also an icon) around an <img> with no src or a failed load. Like covers, it shows only the
+ * inline placeholderStyle (dominant colour + blurred thumbHash), never a light background.
+ */
 .photo-pending {
 	display: block;
 	width: 100%;

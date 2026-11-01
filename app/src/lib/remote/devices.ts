@@ -4,6 +4,7 @@ import { relay, type Device } from './relay.svelte.ts';
 export const deviceIcon = (device: Device | null): IconName =>
 	!device ? 'speaker' : /iPhone|Android/.test(device.name) ? 'phone' : 'laptop';
 
+// Several tabs often share a name ("Chrome · Mac"), so repeats get a number.
 export function deviceLabels(): Map<string, string> {
 	const counts = new Map<string, number>();
 	const labels = new Map<string, string>();

@@ -1,3 +1,5 @@
+// Deezer genre ids mapped onto tree genres, used as a weak extra vote for an album's genre.
+// Unlisted ids are ignored.
 import { titleKey } from './titles.ts';
 
 const DEEZER_GENRES: Record<number, string> = {
@@ -24,6 +26,7 @@ const DEEZER_GENRES: Record<number, string> = {
 	81: 'World'
 };
 
+// Deezer albums are matched to the local album by normalised title, ignoring "(Deluxe)", "feat." etc.
 export function deezerAlbumGenre(albums: [string, number][] | null, albumName: string): string | null {
 	if (!albums) return null;
 	const wanted = titleKey(albumName);

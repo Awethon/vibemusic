@@ -1,5 +1,7 @@
 /* Phones in landscape: keep clear of the camera island and screen edges. */
 
+/* Landscape phones report the same safe-area inset on both sides, but only one side has the
+   camera island. Trim the other side (body.island-* is set by lib/ui/screenEdges.ts). */
 body.island-left {
 	--edge-r: min(var(--safe-r), 12px);
 }

@@ -57,6 +57,8 @@
 	--ia: 1;
 }
 
+/* A copy of a row placed on <body> (lib/engine/queueAnimation.ts, rowSwipe.ts), so it can move
+   across the panel and other layers without being clipped by them. */
 .row-lift {
 	position: fixed;
 	z-index: 30;
@@ -103,6 +105,7 @@ textarea,
 	user-select: text;
 }
 
+/* Set during drags and gestures (sliders, queue rows, swipes) so they never start a text selection. */
 body.no-select,
 body.no-select * {
 	-webkit-user-select: none !important;

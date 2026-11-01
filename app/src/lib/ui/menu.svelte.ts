@@ -5,6 +5,8 @@ export type MenuItem =
 
 export const menu = $state({ open: false, x: 0, y: 0, items: [] as MenuItem[] });
 
+// preventDefault hides the native context menu, and it is also how engine/longPress.ts tells that
+// its synthetic contextmenu opened a menu. Items may be async (they can need a library query).
 export function openMenu(event: MouseEvent, items: MenuItem[] | Promise<MenuItem[]>) {
 	event.preventDefault();
 	event.stopPropagation();

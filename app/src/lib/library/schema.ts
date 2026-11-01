@@ -1,7 +1,14 @@
+// The library database schema. Rows come from Navidrome (album, track, playlist...), from
+// enrichment (mb_*, deezer_artist, apple_artist) or are derived (artist, *_genre, genre playlists).
+
 import { TREE_VERSION } from '../genres/genres.ts';
 
+// Bump on any change to SCHEMA or to how rows are built: a new version makes every tab rebuild
+// from a full sync. The genre tree version is included because stored genres depend on it.
 export const SCHEMA_VERSION = `16.${TREE_VERSION}`;
 
+// `search` is an FTS5 trigram index for substring search. `search_key` holds the same texts in a
+// plain indexed table for prefix lookups and for needles under 3 characters, which trigrams can't match.
 export const SCHEMA = `
 create table meta (key text primary key, value text not null) without rowid;
 create table album (
@@ -89,8 +96,12 @@ create virtual table search using fts5 (kind unindexed, ref unindexed, text, tok
 create index search_key_prefix on search_key (kind, text);
 `;
 
+// Applied to both the indexed text and the user's query. Treating ё as е matches how Russian is
+// usually typed.
 export const normalizeForSearch = (text: string) => text.toLowerCase().replaceAll('ё', 'е').normalize('NFKC');
 
+// Tables copied from the previous database into a rebuilt one (see carryKept in build.ts): they
+// hold enrichment and palettes that are slow to fetch or compute again, not Navidrome data.
 export const KEPT_TABLES = [
 	'palette',
 	'mb_release_group',

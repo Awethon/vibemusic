@@ -17,6 +17,8 @@ const widestChannel = (box: Box) =>
 
 const hex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
 
+// Classic median cut: repeatedly split the most populous box along its widest channel at the
+// median. Returns hex colours ordered by how many pixels each box holds.
 export function medianCut(rgba: Uint8ClampedArray, count: number = PALETTE.coverColors): string[] {
 	const pixels: number[][] = [];
 	for (let offset = 0; offset < rgba.length; offset += 4) pixels.push([rgba[offset], rgba[offset + 1], rgba[offset + 2]]);

@@ -1,3 +1,7 @@
+//! Draws the cover of a "This is <artist>" playlist: a gradient in colours taken from the newest
+//! album, a fan of up to five album covers, "THIS IS", the artist name and the vibemusic mark.
+//! Output is a 1200 px square JPEG. The fonts are bundled (SIL Open Font License, in `fonts/`).
+
 use ab_glyph::{Font, FontVec, PxScale, ScaleFont, VariableFont, point};
 use image::codecs::jpeg::JpegEncoder;
 use image::{GrayImage, Luma, RgbImage, Rgba, RgbaImage, imageops};
@@ -5,10 +9,12 @@ use image::{GrayImage, Luma, RgbImage, Rgba, RgbaImage, imageops};
 const UNBOUNDED: &[u8] = include_bytes!("../fonts/Unbounded.ttf");
 const ONEST: &[u8] = include_bytes!("../fonts/Onest.ttf");
 
+// Layout numbers below are in a 600 px design space and multiplied by SCALE.
 const SIZE: u32 = 1200;
 const SCALE: f32 = SIZE as f32 / 600.0;
 const INK: [u8; 3] = [246, 243, 238];
 
+// Same algorithm as Python's `colorsys.rgb_to_hls`; components and results are in 0..1.
 fn rgb_to_hls(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
@@ -56,6 +62,7 @@ fn hls_to_rgb(h: f32, l: f32, s: f32) -> [u8; 3] {
     [v(h + 1.0 / 3.0), v(h), v(h - 1.0 / 3.0)].map(|c| (c * 255.0).round() as u8)
 }
 
+// Median-cut quantisation: the `count` main colours of the pixels, most common first.
 fn median_cut(pixels: Vec<[f32; 3]>, count: usize) -> Vec<[f32; 3]> {
     let spread = |b: &[[f32; 3]], c: usize| {
         b.iter().map(|p| p[c]).fold(f32::MIN, f32::max) - b.iter().map(|p| p[c]).fold(f32::MAX, f32::min)
@@ -97,6 +104,8 @@ struct Theme {
     deep: [u8; 3],
 }
 
+// Picks the most colourful of the cover's main colours (saturated, not too dark or light) and
+// derives the palette from its hue at fixed lightness, so every cover reads well under light text.
 fn theme_of(image: &RgbImage) -> Theme {
     let sample = imageops::resize(image, 48, 48, imageops::FilterType::CatmullRom);
     let colors = median_cut(
@@ -130,6 +139,7 @@ fn mix(a: [u8; 3], b: [u8; 3], t: f32) -> [f32; 3] {
     [0, 1, 2].map(|i| a[i] as f32 + (b[i] as f32 - a[i] as f32) * t)
 }
 
+// A dark diagonal gradient (20 degrees) with a soft accent glow towards the bottom right.
 fn background(theme: &Theme) -> RgbaImage {
     let (sin, cos) = 20f32.to_radians().sin_cos();
     let half = SIZE as f32 / 2.0;
@@ -157,6 +167,7 @@ fn inside_rounded(x: f32, y: f32, left: f32, top: f32, right: f32, bottom: f32, 
     (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius
 }
 
+// How much of the pixel centred at (x, y) lies inside the rounded rectangle: anti-aliased corners.
 fn corner_coverage(x: f32, y: f32, width: f32, height: f32, radius: f32) -> f32 {
     let cx = x.clamp(radius, width - radius);
     let cy = y.clamp(radius, height - radius);
@@ -176,6 +187,8 @@ fn rounded(image: &RgbImage, radius: f32) -> RgbaImage {
     })
 }
 
+// Rotates with bilinear sampling into a canvas big enough for the rotated image. Colours are
+// weighted by alpha (premultiplied), so transparent corners do not bleed dark fringes into edges.
 fn rotate_expand(image: &RgbaImage, degrees: f32) -> RgbaImage {
     let (sin, cos) = degrees.to_radians().sin_cos();
     let (w, h) = (image.width() as f32, image.height() as f32);
@@ -243,6 +256,8 @@ fn blend(canvas: &mut RgbaImage, x: i64, y: i64, color: [f32; 3], alpha: f32) {
     }
 }
 
+// Draws a tile rotated by `angle` degrees about its centre, over a blurred drop shadow offset
+// down and to the left.
 fn place(canvas: &mut RgbaImage, tile: &RgbaImage, left: f32, top: f32, angle: f32) {
     let rotated = rotate_expand(tile, angle);
     let center_x = left + tile.width() as f32 / 2.0;
@@ -288,10 +303,13 @@ struct Face {
 }
 
 impl Face {
+    // `weight` sets the variable font's `wght` axis.
     fn new(bytes: &[u8], size: f32, weight: f32) -> Self {
         let mut font = FontVec::try_from_vec(bytes.to_vec()).expect("bundled font");
         font.set_variation(b"wght", weight);
         let size = size.round();
+        // `size` is a CSS-style font size (the em). ab_glyph's PxScale is the ascent-to-descent
+        // height instead, so convert.
         let px = size * font.height_unscaled() / font.units_per_em().expect("bundled font has units per em");
         Face {
             font,
@@ -324,6 +342,8 @@ impl Face {
         self.font.as_scaled(self.scale).ascent()
     }
 
+    // Where the drawn glyph starts and ends vertically, for aligning text by its ink rather than
+    // the font's line box.
     fn ink_top(&self, sample: char) -> f32 {
         let glyph = self
             .font
@@ -375,6 +395,8 @@ impl Face {
     }
 }
 
+// The largest title size (78 down to 34 design px) at which the name fits in `max_width`, counting
+// the -3% letter spacing it is drawn with. Longer names than that overflow at the smallest size.
 fn fit_name(name: &str, max_width: f32) -> Face {
     for size in (34..=78).rev() {
         let face = Face::new(UNBOUNDED, size as f32 * SCALE, 700.0);
@@ -385,6 +407,7 @@ fn fit_name(name: &str, max_width: f32) -> Face {
     Face::new(UNBOUNDED, 34.0 * SCALE, 700.0)
 }
 
+// (left, top, size, rotation in degrees) of each cover, front one first, in design px.
 fn fan_layout(count: usize) -> Vec<(f32, f32, f32, f32)> {
     match count {
         1 => vec![(214.0, 200.0, 340.0, -2.0)],
@@ -410,6 +433,7 @@ pub fn render(name: &str, newest: &RgbImage, covers: &[RgbImage]) -> Vec<u8> {
     let theme = theme_of(newest);
     let mut canvas = background(&theme);
     let layout = fan_layout(covers.len().clamp(1, 5));
+    // Drawn back to front, so the newest album ends up on top.
     for (index, &(left, top, size, angle)) in layout.iter().enumerate().rev() {
         let Some(cover) = covers.get(index) else { continue };
         let tile_size = (size * SCALE).round() as u32;

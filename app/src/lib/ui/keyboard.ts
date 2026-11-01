@@ -6,6 +6,7 @@ import { anyMenuOpen, closeAllMenus } from './menu.svelte.ts';
 import { setFullScreen, toggleFullScreen, togglePanel, togglePanelTab } from './shell.ts';
 import { ui } from './state.svelte.ts';
 
+// Escape peels off one layer at a time, top layer first.
 function closeTopmost() {
 	if (ui.searchOpen) {
 		ui.searchOpen = false;
@@ -29,6 +30,7 @@ function closeTopmost() {
 
 function onKeydown(event: KeyboardEvent) {
 	if (event.key === 'Escape' && closeTopmost()) return;
+	// Leave typing and the browser's own Cmd/Ctrl shortcuts alone.
 	if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen)
 		return;
 	if (event.key === '/') ui.searchOpen = true;

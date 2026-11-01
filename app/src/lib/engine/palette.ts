@@ -1,3 +1,6 @@
+// Decides which album's colours the animated background shows. Priority: a hovered album
+// (preview), then an album page opened from that preview, then the playing track's album.
+// Previews revert after a delay so moving the pointer across gaps between tiles doesn't flicker.
 import { albumPalette } from '../library/palette.ts';
 import { PALETTE } from '../tuning.ts';
 import type { Field, FieldPaletteOptions } from '../visual/field.ts';
@@ -20,6 +23,8 @@ export function attachField(attached: Field | null) {
 
 function showAlbum(albumId: string | null, options: FieldPaletteOptions) {
 	if (!albumId) return;
+	// Palettes load asynchronously; only the most recent request may apply, or a slow earlier
+	// album could land after a newer one.
 	const request = ++requestNumber;
 	void albumPalette(albumId)
 		.then((colors) => {
@@ -65,6 +70,8 @@ export function followTrackPalette(albumId: string) {
 	if (!preview.albumId && !preview.pageAlbumId) showAlbum(albumId, firstTrack ? { instant: true } : { rate: PALETTE.trackChangeRate });
 }
 
+// Called on navigation. Clicking through to an album you were hovering keeps its colours
+// ("holds" the page) instead of reverting to the playing track and back again.
 export function updatePalettePageHold(view: string, viewId: string) {
 	const previousPageAlbumId = preview.pageAlbumId;
 	const openingPreviewedAlbum = view === 'album' && preview.albumId === viewId;

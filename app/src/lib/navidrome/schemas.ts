@@ -1,3 +1,6 @@
+// Zod schemas for the parts of Navidrome's native API responses we store. Missing or null fields
+// become "", 0 or false so the database columns can stay NOT NULL.
+
 import { z } from 'zod';
 
 const optionalNumber = z
@@ -8,6 +11,7 @@ const optionalString = z
 	.string()
 	.nullish()
 	.transform((value) => value ?? '');
+// Navidrome sends Go's zero time (0001-01-01...) for dates that were never set; treat it as empty.
 const optionalDate = z
 	.string()
 	.nullish()
@@ -42,6 +46,7 @@ export const nativeAlbum = z.object({
 		.boolean()
 		.nullish()
 		.transform((value) => value ?? false),
+	// Used to look up genre tags on MusicBrainz via the relay (enrichment).
 	mbzReleaseGroupId: optionalString,
 	imageHash: optionalString,
 	dominantColor: optionalString,
@@ -113,6 +118,7 @@ export const nativeArtist = z.object({
 
 export const nativePlaylistTrack = z.object({
 	id: z.string(),
+	// `id` is the track's position in the playlist; mediaFileId is the song id.
 	mediaFileId: z.string()
 });
 

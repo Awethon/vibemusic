@@ -130,6 +130,12 @@
 	transition: opacity var(--focus-leave) var(--ease);
 }
 
+/*
+ * Hover zooms use rotate(0.02deg). Firefox snaps an axis-aligned scale animation to whole pixels,
+ * so the zoom wobbles on 1x screens; the tiny rotation forces subpixel rendering. The resting
+ * state stays at rotate(0deg) because a rotated bitmap is resampled and covers look softer.
+ * The same pattern is used on every hover zoom in these styles.
+ */
 .tile .art {
 	display: block;
 	position: relative;
@@ -160,6 +166,8 @@
 	transition-delay: 0s;
 }
 
+/* With the pointer in the gap between tiles (grid hovered, no tile hovered), wait --focus-return
+   before un-dimming, so moving from one tile to the next doesn't flash the whole grid. */
 .grid:hover .tile,
 .vgrid:hover .tile,
 .pl-grid:hover .pl-card,
@@ -312,6 +320,7 @@
 }
 
 .btn:hover {
+	/* rotate(0.02deg): see .tile .art. */
 	transform: scale(1.03) rotate(0.02deg);
 }
 
@@ -452,6 +461,7 @@
 }
 
 .trk.playing .n {
+	/* Hide the number but keep its width, so the equalizer bars take its place without a shift. */
 	color: transparent;
 	position: relative;
 }

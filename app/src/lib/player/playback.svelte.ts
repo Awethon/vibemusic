@@ -1,3 +1,7 @@
+// Local playback: runs commands against the queue and the audio engine, keeps `player` state in
+// sync, saves the queue to Navidrome, scrobbles, and handles failures and autoplay blocks.
+// While this tab only mirrors another device (remote.svelte.ts), it leaves `player` alone.
+
 import { checkConnection, onReconnect } from '../connection.svelte.ts';
 import { isRadio, tracksByIds } from '../library/queries.ts';
 import { streamUrl } from '../navidrome/credentials.ts';
@@ -13,6 +17,7 @@ import { fetchSavedQueue, saveIsDue, saveQueue } from './savedQueue.ts';
 import { announceNowPlaying, listened, resetListening, sendPendingScrobbles } from './scrobbles.ts';
 import { currentTrack, player, queueChanged, queueState, remember, setStarred, storedVolume, VOLUME_KEY } from './state.svelte.ts';
 
+// Hooks that remote.svelte.ts installs, so this module doesn't import it (that would be circular).
 export type RemoteHooks = { mirroring(): boolean; refreshed(force: boolean): void; ticked(nowMs: number): void };
 
 let remote: RemoteHooks = { mirroring: () => false, refreshed: () => {}, ticked: () => {} };
@@ -52,6 +57,7 @@ async function recoverFromFailure(message: string) {
 		return;
 	}
 	failedInRow += 1;
+	// Several broken tracks in a row usually mean a bigger problem: stop instead of skipping through the queue.
 	if (failedInRow >= CONNECTION.skipFailedTracksInRow) {
 		failedInRow = 0;
 		engine.pause();
@@ -74,6 +80,7 @@ export function refreshPlayback(force = false) {
 	remote.refreshed(force);
 }
 
+// Squared so the volume slider feels closer to perceived loudness.
 function applyLevel() {
 	engine.setLevel(player.muted ? 0 : player.volume * player.volume);
 }
@@ -138,6 +145,8 @@ async function resumeEngine() {
 function onGesture(event: Event) {
 	if (remote.mirroring()) return;
 	engine.wake();
+	// Any tap resumes a blocked start, except taps on the player controls: those run their own
+	// command, and resuming here as well would toggle twice.
 	if (!player.waitingForTap || (event.target as Element | null)?.closest?.('.cap-ctrl')) return;
 	player.waitingForTap = false;
 	void resumeEngine();
@@ -182,6 +191,8 @@ export const pauseLocal = () => engine.pause();
 
 export const localPosition = () => engine.position;
 
+// Called when this tab stops mirroring. The position is remembered so that pressing play
+// continues where the other device was, even though the engine may not have the track loaded.
 export function returnToLocal(position: number) {
 	resumeAt = { trackId: queueState.currentTrackId, position };
 	if (engine.trackId === resumeAt.trackId) engine.seek(position);
@@ -198,6 +209,7 @@ export async function restoreSavedQueue() {
 		const saved = await fetchSavedQueue();
 		if (!saved) return;
 		const tracks = await tracksByIds(saved.trackIds);
+		// The user may have started something, or another device may have become active, while this loaded.
 		if (!tracks.length || queueState.currentTrackId || remote.mirroring()) return;
 		remember(tracks);
 		const known = tracks.map((track) => track.id);
@@ -217,6 +229,8 @@ export function startPlayback(media: MediaHandlers) {
 	});
 	void sendPendingScrobbles();
 	setInterval(tick, PLAYBACK.tickMs);
+	// Browsers block audio until the page has had a user gesture (e.g. playback handed over to an
+	// untouched tab). These three event types are ones iOS counts as a gesture; pointerdown is not.
 	for (const type of ['click', 'touchend', 'keydown']) addEventListener(type, onGesture, { capture: true });
 	installMediaSession(media);
 }

@@ -1,3 +1,4 @@
+// The user's glass settings (on/off, chosen look, tuned parameters), persisted in localStorage.
 import { BASE, DEFAULT_LOOK, LOOKS, type GlassParams } from './params.ts';
 import { formFactor } from '../ui/formFactor.svelte.ts';
 
@@ -9,6 +10,7 @@ type Stored = { enabled: boolean; preset: string; params: GlassParams };
 function load(): Stored {
 	try {
 		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<Stored> | null;
+		// Stored params are spread over BASE so parameters added in later versions get a default.
 		if (stored)
 			return {
 				enabled: !!stored.enabled,
@@ -25,6 +27,7 @@ export const glass = $state(load());
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
+// Debounced so dragging a slider doesn't write localStorage on every step.
 function save() {
 	clearTimeout(saveTimer);
 	saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify($state.snapshot(glass))), 200);
@@ -39,6 +42,7 @@ export function setGlassEnabled(enabled: boolean) {
 
 export function setGlassParam(key: keyof GlassParams, value: number) {
 	glass.params[key] = value;
+	// The look picker shows a preset only while the values still match it exactly; '' means custom.
 	glass.preset =
 		LOOKS.find((preset) =>
 			Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6)

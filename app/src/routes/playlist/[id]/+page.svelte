@@ -19,6 +19,7 @@
 	const playlist = live(() => playlistById(id), null);
 	const tracks = live(() => playlistTracks(id), []);
 	const playable = $derived(skipsDisliked(playlist.value) ? withoutDisliked(tracks.value).tracks : tracks.value);
+	// Keyed by position, not track id: a playlist can hold the same track more than once.
 	const rows = $derived(tracks.value.map((track, index) => ({ track, index })));
 	const duration = $derived(tracks.value.reduce((total, track) => total + track.duration, 0));
 	const updateLine = $derived.by(() => {

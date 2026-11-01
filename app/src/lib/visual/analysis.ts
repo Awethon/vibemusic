@@ -1,7 +1,13 @@
+// Audio analysis for the background: reads the engine's undelayed input through AnalyserNodes and
+// turns it into smoothed features (loudness, relative intensity, kick onsets, band levels,
+// spectrum). The audible output is delayed by OUTPUT_DELAY_SECONDS so these features, especially
+// kicks, are ready by the time the listener hears the sound.
+
 import { createBandFilter, createKickDetector, createKickFilter, KICK_TUNING } from './kick';
 
 export const ANALYSIS_TUNING = Object.freeze({
 	fftSize: 2048,
+	// Covers the kick detector's ~20 ms look-ahead plus a frame, and is too short to notice.
 	outputDelaySeconds: 0.035,
 	kick: KICK_TUNING,
 	bands: 32,
@@ -70,6 +76,7 @@ export function createIdleFeatures(): AudioFeatures {
 	};
 }
 
+// Frame-rate independent smoothing with separate rise and fall times.
 function smooth(previous: number, next: number, dt: number, attack: number, release: number): number {
 	const tau = next > previous ? attack : release;
 	return previous + (next - previous) * (1 - Math.exp(-dt / tau));
@@ -147,6 +154,7 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 			bandEnvelope[band] = smooth(bandEnvelope[band], raw, dt, tuning.bandAttackSeconds, tuning.bandReleaseSeconds);
 			if (bandEnvelope[band] > frameMax) frameMax = bandEnvelope[band];
 		}
+		// Auto-gain: normalise to the recent loudest band so quiet tracks still move the visuals.
 		spectrumReference = Math.max(
 			tuning.spectrumReferenceFloor,
 			frameMax,
@@ -170,6 +178,8 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 		let impulse = 0;
 		if (playing) {
 			kickAnalyser.getFloatTimeDomainData(kickWave);
+			// The analyser returns its whole buffer; only the samples new since the last frame go to
+			// the detector so no block is counted twice.
 			const fresh = Math.min(kickWave.length, Math.round(context.sampleRate * dt));
 			const hitsBefore = kickDetector.hits;
 			analyser.getFloatTimeDomainData(wave);
@@ -179,6 +189,8 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 		}
 
 		const gate = Math.min(1, Math.max(0, (level - tuning.gateFloor) / tuning.gateRange));
+		// Intensity is short-term vs long-term power: loud and quiet parts within a track, whatever
+		// its mastering level.
 		let relative = 0;
 		if (playing) {
 			const power = rms * rms;
@@ -209,6 +221,7 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 	return {
 		features,
 		sample,
+		// On track change, so the new track isn't measured against the previous one.
 		reset() {
 			longPower = 0;
 			kickDetector.reset();

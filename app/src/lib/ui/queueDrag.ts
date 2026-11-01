@@ -14,6 +14,9 @@ type Drag = {
 	rowPitch: number;
 };
 
+// Pointer-driven reordering of the queue's "up next" rows. A press that never moves past
+// startDistancePx counts as a tap and plays the row. Rows move by inline transform during the
+// drag; animateQueueChange clears those once the reorder is applied.
 let drag: Drag | null = null;
 
 export function beginPress(event: PointerEvent) {
@@ -21,10 +24,12 @@ export function beginPress(event: PointerEvent) {
 	const row = (event.target as Element).closest<HTMLElement>('li');
 	if (!row || event.button !== 0 || !list.contains(row)) return;
 	const rows = Array.from(list.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.tagName === 'LI');
+	// Distance between row tops, so any gap between rows is included.
 	const rowPitch = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : row.offsetHeight;
 	const startIndex = rows.indexOf(row);
 	drag = { list, row, startY: event.clientY, dragging: false, rows, fromIndex: startIndex, toIndex: startIndex, rowPitch };
 	ui.queuePressed = true;
+	// Keep receiving moves and the release even when the pointer leaves the list.
 	list.setPointerCapture(event.pointerId);
 }
 

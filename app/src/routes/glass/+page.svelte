@@ -11,6 +11,7 @@
 
 	const LAB_URL = 'https://awethon.com/liquid-glass-lab/';
 
+	// A wall of covers behind the controls, so there is something to look at through the glass.
 	const covers = live(async () => (await albumWall('mostPlayed', { genres: [], decades: [] })).slice(0, GLASS_TUNER.wallCovers), []);
 	let link = $state('');
 	let linkNote = $state('');
@@ -35,6 +36,7 @@
 		}
 	}
 
+	// Items do nothing: the menu only previews how glass looks on a menu.
 	function sampleMenu(event: MouseEvent) {
 		const noop = () => {};
 		openMenu(event, [
@@ -76,6 +78,7 @@
 			<p class="pop-title">{group.title}</p>
 			<div class="gt-group">
 				{#each group.controls as control (control.key)}
+					<!-- Toggles are shader signs (±1); -1 means on. -->
 					{#if 'toggle' in control}
 						<button
 							type="button"

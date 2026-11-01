@@ -1,3 +1,6 @@
+// Idle mode: after a while with no input during playback, the 'idle' body class fades the UI out
+// (CSS shows the ambient now-playing view instead) and the background returns to the playing
+// album's colours. In the minimal full-screen player the equivalent is 'rest'. Never on phones.
 import { player, playerQueue } from '../player/player.svelte.ts';
 import { IDLE } from '../tuning.ts';
 import { formFactor } from '../ui/formFactor.svelte.ts';
@@ -49,6 +52,7 @@ function checkIdle() {
 	enterIdleOrRest();
 }
 
+// scroll doesn't bubble, so it is caught in the capture phase and filtered to the browse chrome.
 const wakeOnBrowseScroll = (event: Event) => {
 	if (event.target instanceof Element && event.target.closest('#chrome')) wakeFromIdle();
 };

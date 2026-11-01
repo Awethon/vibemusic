@@ -31,6 +31,8 @@
 	let tabs = $state<HTMLElement | null>(null);
 	let ink = $state('');
 
+	// The ink is sized from the active tab's real width, which changes with the up-next count.
+	// Measure a frame later, once the DOM has the new label.
 	$effect(() => {
 		void ui.panelTab;
 		void ui.panelOpen;

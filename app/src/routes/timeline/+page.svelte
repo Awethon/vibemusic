@@ -87,6 +87,8 @@
 		return () => observer.disconnect();
 	});
 
+	// When every lane fits vertically, a plain mouse wheel scrolls through time instead.
+	// deltaMode 1 is line-based scrolling (e.g. Firefox with a mouse wheel), so scale it to pixels.
 	function onWheel(event: WheelEvent) {
 		const element = scroller;
 		if (!element || event.ctrlKey) return;
@@ -99,6 +101,7 @@
 	let drag: { x: number; y: number; left: number; top: number; moved: boolean; pointer: number } | null = null;
 	let suppressClick = false;
 
+	// Drag-to-pan for mouse and pen; touch already pans natively.
 	function onPointerDown(event: PointerEvent) {
 		if (event.button !== 0 || event.pointerType === 'touch' || !scroller) return;
 		drag = {
@@ -127,6 +130,7 @@
 
 	function onPointerUp() {
 		if (drag?.moved) {
+			// The click that follows a drag must not open the album under the pointer.
 			suppressClick = true;
 			setTimeout(() => (suppressClick = false), 0);
 		}

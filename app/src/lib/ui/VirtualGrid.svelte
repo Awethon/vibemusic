@@ -1,4 +1,7 @@
 <script lang="ts" generics="T">
+	// Scrolls with the page (#main), not in its own box: only rows near the viewport are rendered,
+	// each cell is placed with a transform, and the container keeps the full height so the
+	// scrollbar stays true.
 	import { untrack, type Snippet } from 'svelte';
 	import { mainScroller } from '../engine/dom.ts';
 	import type { Geometry, Measure } from '../engine/geometry.ts';
@@ -33,6 +36,7 @@
 		return container!.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
 	}
 
+	// The sticky toolbar covers the top of the scroller, so the A–Z probe and jumps look below it.
 	const stickyHeight = (scroller: HTMLElement) => scroller.querySelector<HTMLElement>('.toolbar')?.offsetHeight ?? 0;
 
 	function updateRange() {

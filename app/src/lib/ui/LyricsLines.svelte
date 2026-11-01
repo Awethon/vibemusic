@@ -34,6 +34,8 @@
 		requestAnimationFrame(recenter);
 	});
 
+	// A new track starts at the top without gliding there from the old song's position; the
+	// transition comes back on the next frame.
 	$effect(() => {
 		void lyricsState.trackId;
 		if (!lines) return;

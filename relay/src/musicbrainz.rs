@@ -1,3 +1,9 @@
+//! MusicBrainz lookups for enrichment: album and artist tags (genres), artist countries, and a
+//! search that finds an MBID for an artist Navidrome has none for.
+//!
+//! MusicBrainz asks clients to send at most one request per second on average and a descriptive
+//! User-Agent; clients that ignore either get throttled or blocked.
+
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -7,13 +13,17 @@ use crate::deezer::title_key;
 use crate::enrich::{Fetched, MbArtist, ReleaseGroup, Tag};
 
 const BASE: &str = "https://musicbrainz.org/ws/2";
+// Required by MusicBrainz: application name, version and a way to identify it.
 const USER_AGENT: &str = concat!(
     "vibemusic-relay/",
     env!("CARGO_PKG_VERSION"),
     " ( self-hosted music player )"
 );
 
+// Gap between requests: the one-per-second limit with some margin, since the limit is enforced
+// per client IP and throttled requests fail with 503.
 pub const PAUSE: Duration = Duration::from_millis(1500);
+// How many search hits are checked against the album titles before giving up.
 const SEARCH_CANDIDATES: usize = 3;
 
 async fn get(client: &reqwest::Client, path: &str) -> Fetched<Value> {
@@ -45,6 +55,8 @@ async fn get_with(client: &reqwest::Client, path: &str, query: &[(&str, &str)]) 
             Some(value) => Fetched::Found(value),
             None => Fetched::Failed,
         },
+        // 400 is MusicBrainz's answer to an id it cannot parse, 404 to one it does not know:
+        // either way, asking again will not help.
         400 | 404 => Fetched::Missing,
         status => {
             tracing::warn!(status, path, "musicbrainz lookup failed");
@@ -53,6 +65,7 @@ async fn get_with(client: &reqwest::Client, path: &str, query: &[(&str, &str)]) 
     }
 }
 
+/// Tags with a positive vote count, strongest first. Tags can be voted down below zero.
 pub fn tags_in(value: &Value) -> Vec<Tag> {
     let mut tags: Vec<Tag> = value["tags"]
         .as_array()
@@ -88,6 +101,9 @@ pub async fn release_group(client: &reqwest::Client, id: &str) -> Fetched<Releas
         })
 }
 
+/// ISO country codes for an artist: `country`, then the codes of `area` (where the artist is
+/// based) and `begin-area` (where they were born or formed). Subdivision codes such as `RU-SPE`
+/// are cut to the country.
 pub fn countries_in(value: &Value) -> Vec<String> {
     let mut codes: Vec<String> = Vec::new();
     let mut add = |code: &str| {
@@ -123,12 +139,15 @@ pub async fn artist(client: &reqwest::Client, id: &str) -> Fetched<MbArtist> {
         })
 }
 
+/// Searches artists by name or alias and returns the first of the top hits that has a release
+/// group with one of the given album titles. A name alone is not enough: many artists share one.
 pub async fn find_artist(client: &reqwest::Client, name: &str, albums: &[String]) -> Fetched<String> {
     let wanted: HashSet<String> = albums
         .iter()
         .map(|album| title_key(album))
         .filter(|key| !key.is_empty())
         .collect();
+    // Lucene query syntax: quotes in the name would end the phrase, so they are dropped.
     let query = format!("artist:\"{0}\" OR alias:\"{0}\"", name.replace('"', ""));
     let found = match get_with(client, "artist", &[("query", &query), ("limit", "5"), ("fmt", "json")]).await {
         Fetched::Found(found) => found,
@@ -143,6 +162,7 @@ pub async fn find_artist(client: &reqwest::Client, name: &str, albums: &[String]
         .take(SEARCH_CANDIDATES)
         .collect();
     for id in candidates {
+        // One job makes several requests here, so it paces itself between them.
         tokio::time::sleep(PAUSE).await;
         let groups = match get_with(
             client,

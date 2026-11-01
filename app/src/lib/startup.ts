@@ -1,3 +1,6 @@
+// App start-up, split by what each step depends on: signed-in credentials, the DOM shell,
+// or a loaded library.
+
 import { watchConnection } from './connection.svelte.ts';
 import { installGestureRecognizer } from './engine/gestures.ts';
 import { installIdleTracking } from './engine/idle.svelte.ts';
@@ -16,6 +19,7 @@ import { installScreenEdges } from './ui/screenEdges.ts';
 import { applyFullScreenStyleClass } from './ui/shell.ts';
 import { ui } from './ui/state.svelte.ts';
 
+// Background services that only need credentials: run once after sign-in.
 export function startServices() {
 	watchConnection();
 	installBrokenImageRetry();
@@ -23,6 +27,7 @@ export function startServices() {
 	void startLibrary();
 }
 
+// Global DOM listeners for the app shell. Returns a cleanup for the layout's teardown.
 export function installShell(): () => void {
 	setRailExpanded(ui.railExpanded, true);
 	applyFullScreenStyleClass();
@@ -38,8 +43,10 @@ export function installShell(): () => void {
 	return () => cleanups.forEach((cleanup) => cleanup());
 }
 
+// Work that reads the local library database, so it waits until the first snapshot is loaded.
 export function libraryReady() {
 	void restoreSavedQueue();
 	startRemoteControl();
+	// First run on this browser: fill "jump back in" from the server's play history.
 	if (!history.items.length) void recentlyPlayedAlbums(HISTORY.maxLength).then((albums) => seedHistory(albums.map((album) => album.id)));
 }
