@@ -24,6 +24,7 @@
 	--ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 	--focus-fade: 0.45s;
 	--focus-return: 0.25s;
+	--focus-leave: 0.2s;
 	--shadow-text: 0 1px 18px rgba(0, 0, 0, 0.35);
 	color-scheme: dark;
 }
@@ -270,7 +271,7 @@ body.panel-open { --panel-w: 376px; }
 	gap: 30px 22px;
 }
 
-.tile { display: block; width: 100%; min-width: 0; text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
+.tile { display: block; width: 100%; min-width: 0; text-align: left; transition: opacity var(--focus-leave) var(--ease); }
 
 .tile .art {
 	display: block;
@@ -289,7 +290,9 @@ body.panel-open { --panel-w: 376px; }
 
 .grid:has(.tile:hover) .tile:not(:hover), .vgrid:has(.tile:hover) .tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
-.tile:hover, .pl-card:hover, .pl-tile:hover, .g-tile:hover { transition-delay: 0s; }
+.grid:hover .tile, .vgrid:hover .tile, .pl-grid:hover .pl-card, .shelf:hover .pl-tile, .bb-body.tiles:hover .g-tile { transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
+
+.grid:hover .tile:hover, .vgrid:hover .tile:hover, .pl-grid:hover .pl-card:hover, .shelf:hover .pl-tile:hover, .bb-body.tiles:hover .g-tile:hover { transition-delay: 0s; }
 
 .tile .t {
 	display: block;
@@ -437,7 +440,7 @@ body.is-playing .trk.playing .n::after { animation-play-state: running; }
 
 .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 28px; }
 
-.pl-card { text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
+.pl-card { text-align: left; transition: opacity var(--focus-leave) var(--ease); }
 
 .pl-grid:has(.pl-card:hover) .pl-card:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
@@ -1053,7 +1056,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 
 
-.pl-tile { display: block; min-width: 0; text-align: left; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
+.pl-tile { display: block; min-width: 0; text-align: left; transition: opacity var(--focus-leave) var(--ease); }
 
 .shelf:has(.pl-tile:hover) .pl-tile:not(:hover) { opacity: 0.5; transition-delay: 0s; }
 
@@ -1117,7 +1120,7 @@ body.now-open.fs-classic.idle #classic { opacity: 0; }
 
 .bb-body .pl-row .mini-mosaic { width: calc(var(--row-h, 64px) - 8px); height: calc(var(--row-h, 64px) - 8px); }
 
-.g-tile { display: block; width: 100%; height: 100%; transition: opacity var(--focus-fade) var(--ease) var(--focus-return); }
+.g-tile { display: block; width: 100%; height: 100%; transition: opacity var(--focus-leave) var(--ease); }
 
 .g-tile .mosaic { border-radius: 12px; box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.8); }
 
