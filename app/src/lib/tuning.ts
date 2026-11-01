@@ -362,7 +362,7 @@ export const LEADER_LEASE = Object.freeze({
 });
 
 export const LIBRARY_STORE = Object.freeze({
-	chunkBytes: 4 * 1024 * 1024
+	chunkBytes: 1024 * 1024
 });
 
 export const COVER_RETRY = Object.freeze({
