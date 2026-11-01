@@ -2,8 +2,8 @@
 // floor, focusing into caustic lines and knots, tinted by the album's accents. It's physically
 // based: a grid of light rays is refracted by the surface's slope and each triangle lands with
 // brightness = source area / landed area. Drawn once per RGB channel with slightly different
-// refraction, which gives the colour fringes (dispersion). Kicks shake the light for a moment;
-// brightness never follows the beat. WebGL2 only (needs float render targets).
+// refraction, which gives the colour fringes (dispersion). It doesn't react to the music: the
+// surface keeps its own slow motion. WebGL2 only (needs float render targets).
 //
 // Frame pipeline: surface slope (one texel per grid point) → light mesh, 3 passes, 4x MSAA →
 // floor and tint noise at quarter resolution → composite.
@@ -29,12 +29,6 @@ export const AMBER_TUNING = Object.freeze({
 	// The surface is already well developed at this time; earlier it looks too regular.
 	startSeconds: 120,
 	defaultPaletteRate: 1.2,
-	// Kick envelope: fast in, fast out. Drives displacement only.
-	kickAttackSeconds: 0.006,
-	kickDecaySeconds: 0.07,
-	kickGain: 1.35,
-	// A kick is a rise in the analyser's onset value (which decays between kicks) of at least this.
-	kickRise: 0.05,
 	maxFrameSeconds: 0.1
 });
 
@@ -167,8 +161,6 @@ const LIGHT_VERTEX =
 	GRID_POINT +
 	`
 uniform vec2 u_res;
-uniform float u_ktime;
-uniform float u_kick;
 uniform float u_dispersion;
 uniform ivec2 u_grid;
 uniform sampler2D u_slope;
@@ -177,8 +169,7 @@ void main(){
   ivec2 g=ivec2(gl_VertexID%(u_grid.x+1),gl_VertexID/(u_grid.x+1));
   vec2 p=gridToSurface(vec2(g),u_grid,u_res);
   vec2 slope=texelFetch(u_slope,g,0).xy;
-  vec2 shake=u_kick*.005*vec2(sin(u_ktime*97.)+.6*sin(u_ktime*163.),cos(u_ktime*89.)+.6*sin(u_ktime*149.));
-  vec2 landed=p-u_dispersion*slope+shake;
+  vec2 landed=p-u_dispersion*slope;
   v_source=p;
   gl_Position=vec4(landed/vec2(u_res.x/u_res.y,1.)*2.,0.,1.);
 }`;
@@ -359,9 +350,6 @@ export async function createAmber(canvas: HTMLCanvasElement): Promise<Background
 	let target: Oklab[] = shown.map((lab) => [...lab] as Oklab);
 	let paletteRate: number = tune.defaultPaletteRate;
 	const labUniform = new Float32Array(15);
-	let lastOnset = 0;
-	let kickAt = -Infinity;
-	let kickStrength = 0;
 
 	function resize() {
 		const ratio = Math.min(devicePixelRatio || 1, tune.maxPixelRatio);
@@ -382,17 +370,7 @@ export async function createAmber(canvas: HTMLCanvasElement): Promise<Background
 	}
 	resize();
 
-	function kickEnvelope(nowMs: number) {
-		const since = (nowMs - kickAt) / 1000;
-		if (since < 0 || since > 0.6) return 0;
-		return Math.min(
-			1,
-			kickStrength * tune.kickGain * (1 - Math.exp(-since / tune.kickAttackSeconds)) * Math.exp(-since / tune.kickDecaySeconds)
-		);
-	}
-
 	function draw(nowMs: number) {
-		const kick = kickEnvelope(nowMs);
 		const ktime = (nowMs / 1000) % 1000;
 		const rows = Math.max(tune.minRows, Math.min(tune.maxRows, Math.round(height / tune.rowPx)));
 		const columns = Math.round((rows * width) / height);
@@ -416,8 +394,6 @@ export async function createAmber(canvas: HTMLCanvasElement): Promise<Background
 		gl.clear(gl.COLOR_BUFFER_BIT);
 		gl.useProgram(lightProgram.program);
 		gl.uniform2f(lightProgram.at('u_res'), width, height);
-		gl.uniform1f(lightProgram.at('u_ktime'), ktime);
-		gl.uniform1f(lightProgram.at('u_kick'), kick);
 		gl.uniform2i(lightProgram.at('u_grid'), columns, rows);
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, slope.texture);
@@ -471,21 +447,12 @@ export async function createAmber(canvas: HTMLCanvasElement): Promise<Background
 			paletteRate = options.rate ?? tune.defaultPaletteRate;
 			if (options.instant) target.forEach((lab, role) => (shown[role] = [...lab] as Oklab));
 		},
-		kick(strength = 1) {
-			kickAt = performance.now();
-			kickStrength = strength;
-		},
-		frame(nowMs: number, features: FieldFeatures | null, _options: FieldFrameOptions) {
+		// Music doesn't move the caustics.
+		kick() {},
+		frame(nowMs: number, _features: FieldFeatures | null, _options: FieldFrameOptions) {
 			const dt = lastFrameAt ? Math.min(tune.maxFrameSeconds, Math.max(0, (nowMs - lastFrameAt) / 1000)) : 0;
 			lastFrameAt = nowMs;
 			time += dt;
-			// The analyser's onset jumps on a kick and decays between kicks.
-			const onset = features ? Math.min(1, features.onset || 0) : 0;
-			if (onset > lastOnset + tune.kickRise) {
-				kickAt = nowMs;
-				kickStrength = onset;
-			}
-			lastOnset = onset;
 			const blend = 1 - Math.exp(-dt * paletteRate);
 			shown.forEach((lab, role) => lab.forEach((value, k) => (lab[k] = value + (target[role][k] - value) * blend)));
 			draw(nowMs);
