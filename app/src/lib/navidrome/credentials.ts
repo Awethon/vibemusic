@@ -1,3 +1,5 @@
+import { COVER_TIERS } from '../tuning.ts';
+
 export type Credentials = {
 	userId: string;
 	username: string;
@@ -64,12 +66,14 @@ export const subsonicUrl = (credentials: Credentials, method: string, params: Su
 export const streamUrl = (credentials: Credentials, trackId: string) =>
 	trackId.startsWith('radio:') ? `/radio/${encodeURIComponent(trackId.slice('radio:'.length))}?${subsonicAuthParams(credentials)}` : subsonicUrl(credentials, 'stream', { id: trackId, format: 'raw' });
 
+const coverTier = (size: number) => COVER_TIERS.find((tier) => tier >= size) ?? COVER_TIERS[COVER_TIERS.length - 1];
+
 export const coverAlbumOverrides = new Map<string, string>();
 
 export const coverUrl = (credentials: Credentials, albumId: string, size: number) =>
-	subsonicUrl(credentials, 'getCoverArt', { id: `al-${coverAlbumOverrides.get(albumId) ?? albumId}`, size });
+	subsonicUrl(credentials, 'getCoverArt', { id: `al-${coverAlbumOverrides.get(albumId) ?? albumId}`, size: coverTier(size) });
 
-export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size });
+export const artistPhotoUrl = (credentials: Credentials, artistId: string, size: number) => subsonicUrl(credentials, 'getCoverArt', { id: `ar-${artistId}`, size: coverTier(size) });
 
 export const playlistCoverUrl = (credentials: Credentials, playlistId: string, image: string, size: number) =>
-	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}`, size, v: image });
+	subsonicUrl(credentials, 'getCoverArt', { id: `pl-${playlistId}`, size: coverTier(size), v: image });

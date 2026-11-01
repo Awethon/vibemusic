@@ -151,22 +151,27 @@ export const TIMELINE = Object.freeze({
 	markRoomPx: 72
 });
 
+export const COVER_TIERS = Object.freeze([120, 300, 600, 1200] as const);
+
+const [SMALL, MEDIUM, LARGE, FULL] = COVER_TIERS;
+
 export const COVER_PX = Object.freeze({
-	fallback: 300,
-	row: 80,
-	card: 120,
-	panel: 160,
-	tile: 400,
-	tileQuarter: 200,
-	mosaicMini: 60,
-	ambient: 600,
-	albumPage: 700,
-	nowPhone: 800,
-	nowClassic: 900,
-	mediaSession: 512,
-	playlistPage: 440,
-	artistPlaylist: 260,
-	glassWall: 240
+	fallback: MEDIUM,
+	row: SMALL,
+	card: SMALL,
+	panel: MEDIUM,
+	tile: LARGE,
+	tileQuarter: MEDIUM,
+	mosaicMini: SMALL,
+	ambient: LARGE,
+	albumPage: FULL,
+	nowPhone: FULL,
+	nowClassic: FULL,
+	mediaSession: LARGE,
+	playlistPage: LARGE,
+	artistPlaylist: MEDIUM,
+	glassWall: MEDIUM,
+	paletteSample: SMALL
 });
 
 export const GENRE_COVER = Object.freeze({
