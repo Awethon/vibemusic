@@ -1,5 +1,9 @@
 //! Library enrichment: genres, countries and popularity for the app's artists and albums, looked
 //! up on MusicBrainz, Deezer and Apple (iTunes) and cached on disk (`ENRICHMENT_CACHE`).
+//! `ENRICHMENT_SOURCES` lists the services the relay may ask, comma-separated (default
+//! `musicbrainz,deezer,apple`; empty for none). Answers cached before a service was turned off
+//! are still served; nothing new is looked up there. Navidrome's own lookups (artist photos,
+//! biographies, similar artists through its agents and plugins) are set in Navidrome (`ND_AGENTS`).
 //!
 //! The app sends `EnrichRequest`s over the relay socket. The relay answers at once from the cache
 //! and queues what it does not know; each service has its own worker so a slow or throttled one
@@ -39,6 +43,54 @@ const MAX_ALBUMS: usize = 200;
 const MAX_TEXT_CHARS: usize = 200;
 // A lookup that keeps failing is dropped after this many tries; a later request queues it again.
 const ATTEMPTS: u8 = 5;
+
+/// Which outside services the relay may ask (`ENRICHMENT_SOURCES`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sources {
+    pub musicbrainz: bool,
+    pub deezer: bool,
+    pub apple: bool,
+}
+
+impl Default for Sources {
+    fn default() -> Self {
+        Self {
+            musicbrainz: true,
+            deezer: true,
+            apple: true,
+        }
+    }
+}
+
+impl Sources {
+    pub fn from_env() -> Self {
+        Self::parse(std::env::var("ENRICHMENT_SOURCES").ok().as_deref())
+    }
+
+    fn parse(value: Option<&str>) -> Self {
+        let Some(value) = value else {
+            return Self::default();
+        };
+        let mut sources = Self {
+            musicbrainz: false,
+            deezer: false,
+            apple: false,
+        };
+        for name in value
+            .split(',')
+            .map(|name| name.trim().to_lowercase())
+            .filter(|name| !name.is_empty())
+        {
+            match name.as_str() {
+                "musicbrainz" => sources.musicbrainz = true,
+                "deezer" => sources.deezer = true,
+                "apple" => sources.apple = true,
+                _ => tracing::warn!(name, "ENRICHMENT_SOURCES: unknown service, ignored"),
+            }
+        }
+        sources
+    }
+}
 
 /// A MusicBrainz tag (used as a genre) and its vote count.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -193,6 +245,7 @@ impl Changes {
 #[derive(Default)]
 struct State {
     cache: Cache,
+    sources: Sources,
     musicbrainz: VecDeque<(MbJob, u8)>,
     deezer: VecDeque<(ArtistRequest, u8)>,
     apple: VecDeque<(ArtistRequest, u8)>,
@@ -234,6 +287,9 @@ fn clip(text: &str) -> String {
 
 impl State {
     fn queue_musicbrainz(&mut self, job: MbJob) {
+        if !self.sources.musicbrainz {
+            return;
+        }
         let key = match &job {
             MbJob::ReleaseGroup(id) => format!("rg:{id}"),
             MbJob::Artist(id) => format!("ar:{id}"),
@@ -245,14 +301,14 @@ impl State {
     }
 
     fn queue_deezer(&mut self, artist: ArtistRequest) {
-        if self.queued.insert(format!("dz:{}", artist.id)) {
+        if self.sources.deezer && self.queued.insert(format!("dz:{}", artist.id)) {
             self.deezer.push_back((artist, 0));
         }
     }
 
     // Apple is only asked about artists with album titles, since its match is confirmed by albums.
     fn queue_apple(&mut self, artist: ArtistRequest) {
-        if !artist.albums.is_empty() && self.queued.insert(format!("ap:{}", artist.id)) {
+        if self.sources.apple && !artist.albums.is_empty() && self.queued.insert(format!("ap:{}", artist.id)) {
             self.apple.push_back((artist, 0));
         }
     }
@@ -371,7 +427,7 @@ impl State {
 }
 
 impl Enricher {
-    pub fn new(path: Option<PathBuf>, apple: Apple) -> Arc<Self> {
+    pub fn new(path: Option<PathBuf>, apple: Apple, sources: Sources) -> Arc<Self> {
         let cache = path
             .as_ref()
             .and_then(|path| std::fs::read(path).ok())
@@ -381,6 +437,7 @@ impl Enricher {
         let enricher = Arc::new(Self {
             state: Mutex::new(State {
                 cache,
+                sources,
                 ..State::default()
             }),
             musicbrainz_ready: Notify::new(),
@@ -412,6 +469,10 @@ impl Enricher {
             .and_then(|entry| entry.value.as_ref())
             .map(|artist| artist.top.clone())
             .unwrap_or_default()
+    }
+
+    pub fn asks_apple(&self) -> bool {
+        self.state.lock().unwrap().sources.apple
     }
 
     /// Apple's top songs for a Navidrome artist, most popular first: `None` if unknown or stale,
@@ -691,6 +752,43 @@ mod tests {
                 albums: vec!["Second Wind".into()],
             }],
         }
+    }
+
+    #[test]
+    fn reads_the_services_to_ask() {
+        assert_eq!(Sources::parse(None), Sources::default());
+        assert_eq!(
+            Sources::parse(Some(" MusicBrainz, apple ,nope")),
+            Sources {
+                musicbrainz: true,
+                deezer: false,
+                apple: true
+            }
+        );
+        assert_eq!(
+            Sources::parse(Some("")),
+            Sources {
+                musicbrainz: false,
+                deezer: false,
+                apple: false
+            }
+        );
+    }
+
+    #[test]
+    fn never_queues_for_a_service_that_is_off() {
+        let mut state = State {
+            sources: Sources {
+                musicbrainz: false,
+                deezer: true,
+                apple: false,
+            },
+            ..State::default()
+        };
+        state.answer(request(0), 1_000);
+        assert!(state.musicbrainz.is_empty());
+        assert!(state.apple.is_empty());
+        assert_eq!(state.deezer.len(), 1);
     }
 
     #[test]

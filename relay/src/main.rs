@@ -14,6 +14,8 @@
 //! - `LISTEN` (default `0.0.0.0:4600`): address to bind.
 //! - `ENRICHMENT_CACHE` (default `/data/enrichment.json`): enrichment cache file; set it empty to
 //!   keep the cache in memory only.
+//! - `ENRICHMENT_SOURCES` (default `musicbrainz,deezer,apple`): the outside services enrichment and
+//!   "This is" playlists may ask; set it empty to ask none (see `enrich.rs`).
 //! - `APPLE_PAUSE_MS`, `APPLE_STOREFRONTS`: see `apple.rs`.
 //! - `RADIO_LOCAL_PROXY`: see `radio.rs`.
 //! - `VIBEMUSIC_RELAY_NAVIDROME_USER`, `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD`: turn on "This is" playlists;
@@ -84,6 +86,13 @@ async fn main() {
     let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:4600".into());
     let cache = std::env::var("ENRICHMENT_CACHE").unwrap_or_else(|_| "/data/enrichment.json".into());
     let cache = (!cache.is_empty()).then(|| std::path::PathBuf::from(cache));
+    let sources = enrich::Sources::from_env();
+    tracing::info!(
+        musicbrainz = sources.musicbrainz,
+        deezer = sources.deezer,
+        apple = sources.apple,
+        "enrichment sources"
+    );
     let enricher = Enricher::new(
         cache,
         apple::Apple::from_env(
@@ -92,6 +101,7 @@ async fn main() {
                 .build()
                 .expect("http client"),
         ),
+        sources,
     );
     match this_is::Settings::from_env(&navidrome_url) {
         Some(settings) => this_is::start(settings, enricher.clone()),

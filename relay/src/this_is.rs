@@ -329,7 +329,8 @@ async fn run(
     for list in albums_by_artist.values_mut() {
         list.sort_by_key(|album| std::cmp::Reverse((number(album, "maxYear"), text(album, "createdAt"))));
     }
-    // Apple top songs come from the enrichment cache when fresh; otherwise they are fetched here.
+    // Apple top songs come from the enrichment cache when fresh; otherwise they are fetched here,
+    // unless Apple is off (ENRICHMENT_SOURCES).
     let apple = Apple::from_env(client.clone());
     let mut wanted: Vec<(String, String, Vec<String>)> = Vec::new();
     let mut artists: Vec<(&String, &Vec<Value>)> = songs_by_artist.iter().collect();
@@ -346,10 +347,11 @@ async fn run(
             .unwrap_or_default();
         let top = match enricher.apple_top(id) {
             Some(top) => top,
-            None => match apple.top_songs(name, &album_names).await {
+            None if enricher.asks_apple() => match apple.top_songs(name, &album_names).await {
                 Fetched::Found(top) => top,
                 Fetched::Missing | Fetched::Failed => Vec::new(),
             },
+            None => Vec::new(),
         };
         tracing::debug!(name, top = top.len(), "apple top songs");
         wanted.push((
