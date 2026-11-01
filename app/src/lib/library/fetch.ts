@@ -82,6 +82,10 @@ async function changedSince<T>(http: NavidromeHttp, path: string, schema: z.ZodT
 	}
 }
 
+const LISTENING_FIELDS = new Set(['loved', 'dateloved', 'lastplayed', 'daterated', 'playcount', 'rating', 'averagerating', 'albumrating', 'albumloved', 'albumplaycount', 'albumlastplayed', 'albumdateloved', 'albumdaterated', 'artistrating', 'artistloved', 'artistplaycount', 'artistlastplayed', 'artistdateloved', 'artistdaterated']);
+
+export const followsListening = (rules: unknown) => (JSON.stringify(rules).toLowerCase().match(/[a-z_]+/g) ?? []).some((word) => LISTENING_FIELDS.has(word));
+
 async function fetchTotal(http: NavidromeHttp, path: string): Promise<number> {
 	return (await http.nativePage(path, 0, 1)).total;
 }
@@ -113,10 +117,11 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		fetchPlaylists(http),
 		fetchRadioStations(http)
 	]);
-	const albums = [...new Map([...refreshed, ...imported].map((album) => [album.id, album])).values()];
+	const albums = imported;
+	const importedIds = new Set(imported.map((album) => album.id));
 	if (albums.length > Math.max(LIBRARY_SYNC.fullSyncChangedAlbumMin, localAlbums * LIBRARY_SYNC.fullSyncChangedAlbumShare)) return null;
-	const libraryChanged = albums.length + albumPlays.length + albumStars.length + songPlays.length + songStars.length > 0;
-	const stale = playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || (playlist.rules && libraryChanged));
+	const listeningChanged = albumPlays.length + albumStars.length + songPlays.length + songStars.length > 0;
+	const stale = playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || (playlist.rules && (albums.length > 0 || (listeningChanged && followsListening(playlist.rules)))));
 	const [albumSongs, playlistTracks, totals] = await Promise.all([
 		fetchAlbumSongs(http, albums.filter((album) => !album.missing).map((album) => album.id)),
 		Promise.all(stale.map(async (playlist) => [playlist.id, await fetchPlaylistTracks(http, playlist)] as const)),
@@ -128,6 +133,7 @@ export async function fetchChanges(http: NavidromeHttp, sync: SyncState, localAl
 		albumSongs,
 		albumStats: latest([albumPlays, albumStars]),
 		songStats: latest([songPlays, songStars]),
+		artwork: refreshed.filter((album) => !importedIds.has(album.id)),
 		ratings: new Map(rated.map((song) => [song.id, song.rating])),
 		marks: {
 			albumImported: newest([marks.albumImported, ...albums.map((album) => album.importedAt)]),

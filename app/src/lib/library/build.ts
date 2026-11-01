@@ -91,6 +91,17 @@ function updateRatings(db: Database, ratings: Map<string, number>): number {
 	return changed.length;
 }
 
+function updateArtwork(db: Database, albums: NativeAlbum[]): number {
+	const update = db.prepare('update album set image_hash = ?, dominant_color = ? where id = ? and (image_hash != ? or dominant_color != ?)');
+	let changed = 0;
+	for (const album of albums) {
+		update.bind([album.imageHash, album.dominantColor, album.id, album.imageHash, album.dominantColor]).stepReset();
+		changed += db.changes();
+	}
+	update.finalize();
+	return changed;
+}
+
 function updateStats(db: Database, table: 'album' | 'track', rows: { id: string; playCount: number; playDate: string; starred: boolean }[]): number {
 	if (!rows.length) return 0;
 	const counted = db.prepare(`update ${table} set play_count = ?, starred = ? where id = ? and (play_count != ? or starred != ?)`);
@@ -129,13 +140,32 @@ function rebuildArtists(db: Database) {
 	`);
 	const artists = db.selectArrays('select id, name from artist') as [string, string][];
 	eachBound(db, 'insert into search values (?,?,?)', artists.map(([id, name]) => ['artist', id, normalizeForSearch(name)]));
+	classifyArtistPlaylists(db);
+}
+
+function classifyArtistPlaylists(db: Database) {
 	db.exec(`
-		update playlist set kind = 'own', artist_id = '' where kind = 'artist';
-		update playlist set artist_id = coalesce((select artist.id from artist where artist.name = substr(playlist.name, ${ARTIST_PLAYLIST_PREFIX.length + 1}) collate nocase limit 1), '')
-			where kind = 'own' and readonly = 1 and substr(name, 1, ${ARTIST_PLAYLIST_PREFIX.length}) = '${ARTIST_PLAYLIST_PREFIX}';
-		update playlist set kind = 'artist' where artist_id != '';
+		update playlist set artist_id = desired.artist_id, kind = case when desired.artist_id != '' then 'artist' else 'own' end
+		from (
+			select candidate.id, case when candidate.readonly = 1 and substr(candidate.name, 1, ${ARTIST_PLAYLIST_PREFIX.length}) = '${ARTIST_PLAYLIST_PREFIX}'
+				then coalesce((select artist.id from artist where artist.name = substr(candidate.name, ${ARTIST_PLAYLIST_PREFIX.length + 1}) collate nocase limit 1), '')
+				else '' end as artist_id
+			from playlist candidate where candidate.kind in ('own', 'artist')
+		) desired
+		where playlist.id = desired.id and (playlist.artist_id != desired.artist_id or playlist.kind != case when desired.artist_id != '' then 'artist' else 'own' end);
 	`);
 }
+
+function syncPlaylistSearchKeys(db: Database, ids: string[]) {
+	deleteWhereIn(db, "delete from search_key where kind = 'playlist' and ref = ?", ids);
+	eachBound(db, "insert into search_key select kind, text, ref from search where kind = 'playlist' and ref = ?", ids.map((id) => [id]));
+}
+
+function updateSongCounts(db: Database, ids: string[]) {
+	eachBound(db, 'update playlist set song_count = (select count(*) from playlist_track where playlist_id = playlist.id) where id = ?', ids.map((id) => [id]));
+}
+
+const storedTrackIds = (db: Database, playlistId: string) => (db.selectValue("select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = ?", [playlistId]) as string | undefined) ?? '';
 
 const parsedTags = (value: unknown): Tag[] | null => (typeof value === 'string' ? (JSON.parse(value) as Tag[]) : null);
 
@@ -193,11 +223,12 @@ function rebuildAlbumGenres(db: Database) {
 	`);
 }
 
-function rebuildGenrePlaylists(db: Database) {
-	const genreIds = db.selectValues("select id from playlist where kind = 'genre'") as string[];
-	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', genreIds);
-	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", genreIds);
-	db.exec("delete from playlist where kind = 'genre'");
+function refreshGenrePlaylists(db: Database): string[] {
+	const stored = new Map(
+		db
+			.selectArrays("select id, json_array(name, album_count, song_count, duration), (select group_concat(track_id, ',' order by position) from playlist_track where playlist_id = playlist.id) from playlist where kind = 'genre'")
+			.map(([id, shape, tracks]) => [id as string, `${shape as string}|${(tracks as string | null) ?? ''}`])
+	);
 	const rows = db.selectObjects(`select track.id, track.title, track.album_id as albumId, album.artist_id as artistId, album.year, track.play_count as plays,
 		track.starred, track.duration, (select json_group_array(genre) from track_genre where track_genre.track_id = track.id) as genres
 		from track join album on album.id = track.album_id where exists (select 1 from track_genre where track_genre.track_id = track.id)`);
@@ -229,20 +260,21 @@ function rebuildGenrePlaylists(db: Database) {
 			rank: apple.get(row.artistId as string)?.(row.title as string) ?? null
 		};
 	});
-	const insertPlaylist = db.prepare('insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)');
-	const insertPlaylistTrack = db.prepare('insert into playlist_track values (?,?,?)');
-	const insertSearch = db.prepare('insert into search values (?,?,?)');
-	for (const { genre, songs: picked } of chooseGenres(songs)) {
-		const id = genrePlaylistId(genre);
+	const wanted = chooseGenres(songs).map(({ genre, songs: picked }) => {
 		const albumCount = new Set(picked.map((song) => song.albumId)).size;
 		const duration = picked.reduce((total, song) => total + (durations.get(song.id) ?? 0), 0);
-		insertPlaylist.bind([id, genre, 'genre', '', genre, albumCount, picked.length, duration, '', '', 1, '']).stepReset();
-		insertSearch.bind(['playlist', id, normalizeForSearch(genre)]).stepReset();
-		picked.forEach((song, position) => insertPlaylistTrack.bind([id, position, song.id]).stepReset());
-	}
-	insertPlaylist.finalize();
-	insertPlaylistTrack.finalize();
-	insertSearch.finalize();
+		return { id: genrePlaylistId(genre), genre, albumCount, duration, picked, shape: `${JSON.stringify([genre, albumCount, picked.length, duration])}|${picked.map((song) => song.id).join(',')}` };
+	});
+	const changed = wanted.filter((playlist) => stored.get(playlist.id) !== playlist.shape);
+	const kept = new Set(wanted.map((playlist) => playlist.id));
+	const touched = [...changed.map((playlist) => playlist.id), ...[...stored.keys()].filter((id) => !kept.has(id))];
+	deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', touched);
+	deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", touched);
+	deleteWhereIn(db, 'delete from playlist where id = ?', touched);
+	eachBound(db, 'insert into playlist values (?,?,?,?,?,?,?,?,?,?,?,?)', changed.map((playlist) => [playlist.id, playlist.genre, 'genre', '', playlist.genre, playlist.albumCount, playlist.picked.length, playlist.duration, '', '', 1, '']));
+	eachBound(db, 'insert into search values (?,?,?)', changed.map((playlist) => ['playlist', playlist.id, normalizeForSearch(playlist.genre)]));
+	eachBound(db, 'insert into playlist_track values (?,?,?)', changed.flatMap((playlist) => playlist.picked.map((song, position) => [playlist.id, position, song.id])));
+	return touched;
 }
 
 function rebuildDerived(db: Database) {
@@ -250,7 +282,7 @@ function rebuildDerived(db: Database) {
 	rebuildArtists(db);
 	rebuildTrackGenres(db);
 	rebuildAlbumGenres(db);
-	rebuildGenrePlaylists(db);
+	refreshGenrePlaylists(db);
 	db.exec('delete from search_key; insert into search_key select kind, text, ref from search');
 }
 
@@ -304,9 +336,15 @@ export function buildLibrary(db: Database, snapshot: LibrarySnapshot, userId: st
 
 export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, changes: LibraryChanges, syncedAt: string): { meta: LibraryMeta; changed: boolean } {
 	const contentChanged = changes.albums.length > 0;
-	const playlistsChanged = changes.playlistTracks.size > 0 || changes.playlists.length !== Object.keys(sync.playlists).length || changes.playlists.some((playlist) => !(playlist.id in sync.playlists));
+	const current = new Set(changes.playlists.map((playlist) => playlist.id));
+	const removed = (db.selectValues("select id from playlist where kind != 'genre'") as string[]).filter((id) => !current.has(id));
+	const changedTracks = new Map([...changes.playlistTracks].filter(([id, tracks]) => storedTrackIds(db, id) !== tracks.map((track) => track.mediaFileId).join(',')));
+	const replaced = changes.playlists.filter((playlist) => sync.playlists[playlist.id] !== playlistSignature(playlist) || changedTracks.has(playlist.id));
+	const touched = [...removed, ...replaced.map((playlist) => playlist.id)];
+	const playlistsChanged = touched.length > 0;
 	let statsChanged = 0;
 	let radioChanged = false;
+	let artworkChanged = 0;
 	db.transaction(() => {
 		if (contentChanged) {
 			const ids = changes.albums.map((album) => album.id);
@@ -316,19 +354,27 @@ export function applyChanges(db: Database, meta: LibraryMeta, sync: SyncState, c
 			insertTracks(db, changes.albumSongs);
 		}
 		statsChanged = updateStats(db, 'album', changes.albumStats) + updateStats(db, 'track', changes.songStats) + updateRatings(db, changes.ratings);
+		artworkChanged = updateArtwork(db, changes.artwork);
 		if (playlistsChanged) {
-			const ids = db.selectValues("select id from playlist where kind != 'genre'") as string[];
-			deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", ids);
-			db.exec("delete from playlist where kind != 'genre'");
-			const current = new Set(changes.playlists.map((playlist) => playlist.id));
-			deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', [...ids.filter((id) => !current.has(id)), ...changes.playlistTracks.keys()]);
-			insertPlaylists(db, changes.playlists, meta.userId);
-			insertPlaylistTracks(db, changes.playlistTracks);
+			deleteWhereIn(db, "delete from search where kind = 'playlist' and ref = ?", touched);
+			deleteWhereIn(db, 'delete from playlist where id = ?', touched);
+			deleteWhereIn(db, 'delete from playlist_track where playlist_id = ?', [...removed, ...changedTracks.keys()]);
+			insertPlaylists(db, replaced, meta.userId);
+			insertPlaylistTracks(db, changedTracks);
 		}
 		radioChanged = replaceRadioStations(db, changes.radioStations);
-		if (contentChanged || playlistsChanged) rebuildDerived(db);
+		if (contentChanged) {
+			rebuildDerived(db);
+			return;
+		}
+		if (playlistsChanged) {
+			updateSongCounts(db, replaced.map((playlist) => playlist.id));
+			classifyArtistPlaylists(db);
+			syncPlaylistSearchKeys(db, touched);
+		}
+		if (statsChanged > 0) syncPlaylistSearchKeys(db, refreshGenrePlaylists(db));
 	});
-	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0;
+	const changed = contentChanged || playlistsChanged || radioChanged || statsChanged > 0 || artworkChanged > 0;
 	const next: SyncState = {
 		marks: changes.marks,
 		playlists: Object.fromEntries(changes.playlists.map((playlist) => [playlist.id, playlistSignature(playlist)])),
