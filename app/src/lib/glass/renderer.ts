@@ -205,7 +205,9 @@ export function createGlassRenderer(canvas: HTMLCanvasElement, keepFrame: boolea
 		context.uniform1f(u.uThick, params.thick * dpr);
 		context.uniform1f(u.uIor, params.ior);
 		context.uniform1f(u.uDisp, params.disp);
-		context.uniform1f(u.uFrost, params.frost > 0.25 ? 1 : 0);
+		// The blurred copy is never weaker than RENDER.minBlurPx, so smaller frost amounts fade that
+		// blur in over the sharp backdrop instead of jumping straight to it.
+		context.uniform1f(u.uFrost, Math.min(1, params.frost / RENDER.minBlurPx));
 		context.uniform1f(u.uBevel, params.bevel * dpr);
 		context.uniform1f(u.uLens, params.lens);
 		context.uniform1f(u.uCurve, params.curve);
