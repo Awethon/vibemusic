@@ -1,43 +1,86 @@
-// The user's glass settings (on/off, chosen look, tuned parameters), persisted in localStorage.
-import { BASE, DEFAULT_LOOK, LOOKS, type GlassParams } from './params.ts';
+// The user's glass settings, persisted in localStorage. On/off and the look (chosen preset plus
+// tuned parameters) are stored apart, so turning glass on doesn't pin the look: a visitor who never
+// tuned it follows the instance's default look.
+import { BASE, DEFAULT_LOOK, LOOKS, lookFromCode, type GlassKey, type GlassParams } from './params.ts';
+import { instanceSetting, readPreference, writePreference } from '../ui/preferences.ts';
 import { formFactor } from '../ui/formFactor.svelte.ts';
 
-const STORAGE_KEY = 'vibemusic.glass';
-const DEFAULT_PRESET = DEFAULT_LOOK;
+const LOOK_KEY = 'vibemusic.glass.look';
+// Before on/off and the look were split, both lived in one entry under this key.
+const COMBINED_KEY = 'vibemusic.glass';
 
-type Stored = { enabled: boolean; preset: string; params: GlassParams };
+type Look = { preset: string; params: GlassParams };
 
-function load(): Stored {
+function splitCombined() {
 	try {
-		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<Stored> | null;
-		// Stored params are spread over BASE so parameters added in later versions get a default.
-		if (stored)
-			return {
-				enabled: !!stored.enabled,
-				preset: stored.params ? (stored.preset ?? '') : DEFAULT_PRESET.id,
-				params: { ...(stored.params ? BASE : DEFAULT_PRESET.values), ...stored.params }
-			};
+		const combined = localStorage.getItem(COMBINED_KEY);
+		if (combined === null) return;
+		localStorage.removeItem(COMBINED_KEY);
+		const stored = JSON.parse(combined) as { enabled?: boolean; preset?: string; params?: GlassParams } | null;
+		if (!stored) return;
+		writePreference('glass.enabled', stored.enabled ? 'on' : 'off');
+		if (stored.params) localStorage.setItem(LOOK_KEY, JSON.stringify({ preset: stored.preset ?? '', params: stored.params }));
 	} catch {
-		localStorage.removeItem(STORAGE_KEY);
+		return;
 	}
-	return { enabled: false, preset: DEFAULT_PRESET.id, params: { ...DEFAULT_PRESET.values } };
+}
+
+// The instance's default look is a look name or a look code; anything else means the built-in one.
+function defaultLook(): Look {
+	const setting = instanceSetting('glass.look');
+	const named = LOOKS.find((candidate) => candidate.id === setting);
+	if (named) return { preset: named.id, params: { ...named.values } };
+	if (setting)
+		try {
+			return lookFromCode(setting);
+		} catch {
+			// Not a valid code either.
+		}
+	return { preset: DEFAULT_LOOK.id, params: { ...DEFAULT_LOOK.values } };
+}
+
+function loadLook(): Look {
+	try {
+		const stored = JSON.parse(localStorage.getItem(LOOK_KEY) ?? 'null') as Partial<Look> | null;
+		// Stored params are spread over BASE so parameters added in later versions get a default.
+		if (stored?.params) return { preset: stored.preset ?? '', params: { ...BASE, ...stored.params } };
+	} catch {
+		localStorage.removeItem(LOOK_KEY);
+	}
+	return defaultLook();
+}
+
+function load() {
+	splitCombined();
+	return { enabled: readPreference('glass.enabled', ['on', 'off'] as const, 'off') === 'on', ...loadLook() };
 }
 
 export const glass = $state(load());
 
+// Re-reads the settings once the instance defaults are known (routes/+layout.ts).
+export function reloadGlass() {
+	Object.assign(glass, load());
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Debounced so dragging a slider doesn't write localStorage on every step.
-function save() {
+function saveLook() {
 	clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify($state.snapshot(glass))), 200);
+	saveTimer = setTimeout(() => {
+		try {
+			localStorage.setItem(LOOK_KEY, JSON.stringify({ preset: glass.preset, params: $state.snapshot(glass.params) }));
+		} catch {
+			return;
+		}
+	}, 200);
 }
 
 export const glassActive = () => glass.enabled && !formFactor.phone;
 
 export function setGlassEnabled(enabled: boolean) {
 	glass.enabled = enabled;
-	save();
+	writePreference('glass.enabled', enabled ? 'on' : 'off');
 }
 
 export function setGlassParam(key: keyof GlassParams, value: number) {
@@ -47,7 +90,7 @@ export function setGlassParam(key: keyof GlassParams, value: number) {
 		LOOKS.find((preset) =>
 			Object.entries(preset.values).every(([name, target]) => Math.abs(glass.params[name as keyof GlassParams] - target) < 1e-6)
 		)?.id ?? '';
-	save();
+	saveLook();
 }
 
 export function applyGlassPreset(id: string) {
@@ -55,7 +98,7 @@ export function applyGlassPreset(id: string) {
 	if (!preset) return;
 	glass.params = { ...preset.values };
 	glass.preset = id;
-	save();
+	saveLook();
 }
 
 export function applyGlassParams(params: GlassParams, preset: string) {
@@ -67,5 +110,21 @@ export function applyGlassParams(params: GlassParams, preset: string) {
 	)
 		? preset
 		: '';
-	save();
+	saveLook();
+}
+
+export function glassLookIsDefault() {
+	const { params } = defaultLook();
+	return (Object.keys(params) as GlassKey[]).every((key) => Math.abs(glass.params[key] - params[key]) < 1e-6);
+}
+
+// Forgets the visitor's look, so it follows the instance default again. On/off is left alone.
+export function resetGlassLook() {
+	clearTimeout(saveTimer);
+	try {
+		localStorage.removeItem(LOOK_KEY);
+	} catch {
+		// Storage unavailable: nothing was saved.
+	}
+	Object.assign(glass, defaultLook());
 }

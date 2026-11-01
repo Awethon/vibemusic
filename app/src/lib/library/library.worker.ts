@@ -16,7 +16,7 @@ import {
 	readSyncState,
 	refreshDerived
 } from './build.ts';
-import { loadServerConfig } from '../serverConfig.ts';
+import type { GenrePlaylistConfig } from '../serverConfig.ts';
 import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
@@ -35,11 +35,20 @@ let writing: Promise<unknown> = Promise.resolve();
 // Chunk hashes from the last save of each database, so the next save writes only changed chunks.
 const savedState = new WeakMap<Database, Saved>();
 
+// The page sends the instance config (/config.json) as its first request; nothing else runs before it.
+let configure: (config: GenrePlaylistConfig) => void = () => {};
+const configured = new Promise<void>((resolve) => {
+	configure = (config) => {
+		configureGenrePlaylists(config);
+		resolve();
+	};
+});
+
 const ready = Promise.all([
 	sqlite3InitModule().then((module) => {
 		sqlite = module;
 	}),
-	loadServerConfig().then((config) => configureGenrePlaylists(config.genrePlaylists))
+	configured
 ]);
 
 // The schema version is part of the name, so a new app version never reads an incompatible file.
@@ -231,6 +240,10 @@ function requireDatabase(): Database {
 }
 
 async function handle(id: number, request: WorkerRequest): Promise<WorkerResults[keyof WorkerResults]> {
+	if (request.kind === 'configure') {
+		configure(request.genrePlaylists);
+		return null;
+	}
 	await ready;
 	switch (request.kind) {
 		case 'open': {

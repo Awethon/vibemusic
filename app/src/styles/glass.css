@@ -91,6 +91,17 @@ body.glass-on #rail::before {
 .gt-link input:focus {
 	border-color: var(--accent);
 }
+.gt-link input.gt-code {
+	color: var(--ink-2);
+	font:
+		500 12.5px ui-monospace,
+		'SF Mono',
+		Menlo,
+		monospace;
+}
+.gt-paste {
+	margin-top: 10px;
+}
 .gt-note {
 	margin: 8px 0 0;
 	font-size: 12.5px;
@@ -103,6 +114,13 @@ body.glass-on #rail::before {
 }
 .gt-menu {
 	margin-top: 18px;
+}
+.gt-reset {
+	margin-top: 10px;
+}
+.gt-reset:disabled {
+	opacity: 0.4;
+	pointer-events: none;
 }
 .gt-wall {
 	position: sticky;

@@ -1,11 +1,21 @@
 <script lang="ts">
-	import { GROUPS, LOOKS, decodeLabLink, type GlassSlider } from '#lib/glass/params.ts';
-	import { applyGlassParams, applyGlassPreset, glass, setGlassEnabled, setGlassParam } from '#lib/glass/settings.svelte.ts';
+	import { GROUPS, LOOKS, encodeLookCode, lookFromCode, type GlassSlider } from '#lib/glass/params.ts';
+	import {
+		applyGlassParams,
+		applyGlassPreset,
+		glass,
+		glassLookIsDefault,
+		resetGlassLook,
+		setGlassEnabled,
+		setGlassParam
+	} from '#lib/glass/settings.svelte.ts';
 	import { albumWall } from '#lib/library/queries.ts';
+	import { copyText } from '#lib/ui/clipboard.ts';
 	import Cover from '#lib/ui/Cover.svelte';
 	import { live } from '#lib/ui/live.svelte.ts';
 	import { openMenu } from '#lib/ui/menu.svelte.ts';
 	import Slider from '#lib/ui/Slider.svelte';
+	import { showToast } from '#lib/ui/state.svelte.ts';
 	import { viewEnter } from '#lib/ui/viewEnter.ts';
 	import { COVER_PX, GLASS_TUNER } from '#lib/tuning.ts';
 
@@ -13,8 +23,10 @@
 
 	// A wall of covers behind the controls, so there is something to look at through the glass.
 	const covers = live(async () => (await albumWall('mostPlayed', { genres: [], decades: [] })).slice(0, GLASS_TUNER.wallCovers), []);
-	let link = $state('');
-	let linkNote = $state('');
+	let pasted = $state('');
+	let codeNote = $state('');
+	let codeField = $state<HTMLInputElement>();
+	const code = $derived(encodeLookCode(glass.params));
 
 	const ratioOf = (control: GlassSlider) => (glass.params[control.key] - control.min) / (control.max - control.min);
 	const decimals = (step: number) => Math.max(0, -Math.floor(Math.log10(step)));
@@ -24,16 +36,26 @@
 	};
 	const shown = (control: GlassSlider) => `${glass.params[control.key].toFixed(decimals(control.step))}${control.unit}`;
 
-	function importLink() {
+	function applyCode() {
 		try {
-			const { params, preset } = decodeLabLink(link);
+			const { params, preset } = lookFromCode(pasted);
 			applyGlassParams(params, preset);
 			if (!glass.enabled) setGlassEnabled(true);
-			linkNote = 'Imported from the lab.';
-			link = '';
-		} catch (error) {
-			linkNote = error instanceof Error ? error.message : 'That doesn’t look like a lab link.';
+			codeNote = 'Look applied.';
+			pasted = '';
+		} catch {
+			codeNote = 'That isn’t a look code or a lab link.';
 		}
+	}
+
+	async function copyCode() {
+		if (await copyText(code)) {
+			codeNote = '';
+			showToast('Look code copied');
+			return;
+		}
+		codeField?.select();
+		codeNote = navigator.platform.startsWith('Mac') ? 'Press ⌘C to copy' : 'Press Ctrl+C to copy';
 	}
 
 	// Items do nothing: the menu only previews how glass looks on a menu.
@@ -73,6 +95,7 @@
 				>
 			{/each}
 		</div>
+		<button type="button" class="ghost gt-reset" disabled={glassLookIsDefault()} onclick={resetGlassLook}>Reset to default look</button>
 
 		{#each GROUPS as group (group.title)}
 			<p class="pop-title">{group.title}</p>
@@ -99,19 +122,31 @@
 			</div>
 		{/each}
 
-		<p class="pop-title">From the lab</p>
+		<p class="pop-title">Look code</p>
+		<div class="gt-link">
+			<input
+				class="gt-code"
+				bind:this={codeField}
+				value={code}
+				readonly
+				spellcheck="false"
+				aria-label="This look’s code"
+				onfocus={(event) => event.currentTarget.select()}
+			/>
+			<button class="ghost" type="button" onclick={copyCode}>Copy</button>
+		</div>
 		<form
-			class="gt-link"
+			class="gt-link gt-paste"
 			onsubmit={(event) => {
 				event.preventDefault();
-				importLink();
+				applyCode();
 			}}
 		>
-			<input bind:value={link} placeholder="Paste a liquid glass lab link" spellcheck="false" />
-			<button class="ghost" type="submit" disabled={!link.trim()}>Import</button>
+			<input bind:value={pasted} placeholder="Paste a look code" spellcheck="false" />
+			<button class="ghost" type="submit" disabled={!pasted.trim()}>Apply</button>
 		</form>
 		<p class="gt-note">
-			{linkNote || 'Tune a look in the lab, copy its link, and paste it here.'}
+			{codeNote || 'A code carries every setting above. Links from the liquid glass lab work too.'}
 			<a href={LAB_URL} target="_blank" rel="noreferrer">Open the lab</a>
 		</p>
 		<button type="button" class="ghost gt-menu" onclick={sampleMenu}>Open a sample menu</button>

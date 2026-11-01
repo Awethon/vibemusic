@@ -10,17 +10,23 @@ export type FilterKind = 'genre' | 'decade';
 export const BACKGROUNDS = ['field', 'amber'] as const;
 export type BackgroundStyle = (typeof BACKGROUNDS)[number];
 
+function readPreferences() {
+	return {
+		fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'minimal'),
+		background: readPreference('background', BACKGROUNDS, 'field'),
+		ripples: readPreference('ripples', ['on', 'off'] as const, 'off') === 'on',
+		railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
+		artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
+		showTimeline: readPreference('nav.timeline', ['on', 'off'] as const, 'on') === 'on',
+		showRadio: readPreference('nav.radio', ['on', 'off'] as const, 'on') === 'on'
+	};
+}
+
 export const ui = $state({
 	panelOpen: false,
 	panelTab: 'queue' as PanelTab,
 	fullScreen: false,
-	fullScreenStyle: readPreference('fs', FULL_SCREEN_STYLES, 'minimal'),
-	background: readPreference('background', BACKGROUNDS, 'field'),
-	ripples: readPreference('ripples', ['on', 'off'] as const, 'off') === 'on',
-	railExpanded: readPreference('rail', ['open', 'mini'] as const, 'mini') === 'open',
-	artistView: readPreference('artistView', ['list', 'grid'] as const, 'list'),
-	showTimeline: readPreference('nav.timeline', ['on', 'off'] as const, 'on') === 'on',
-	showRadio: readPreference('nav.radio', ['on', 'off'] as const, 'on') === 'on',
+	...readPreferences(),
 	searchOpen: false,
 	settingsOpen: false,
 	devicesOpen: false,
@@ -36,6 +42,11 @@ export const ui = $state({
 	fieldRenderer: '',
 	view: { name: 'home', id: '' }
 });
+
+// Re-reads the preferences once the instance defaults are known (routes/+layout.ts).
+export function reloadPreferences() {
+	Object.assign(ui, readPreferences());
+}
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 

@@ -4,6 +4,7 @@
 
 import { onReconnect, reportReachable, reportUnreachable } from '../connection.svelte.ts';
 import { NavidromeUnreachableError, SessionExpiredError } from '../navidrome/credentials.ts';
+import { serverConfig } from '../serverConfig.ts';
 import { renewToken, requireCredentials, sessionExpired } from '../session.svelte.ts';
 import { listenToRelay, relay, sendToRelay } from '../remote/relay.svelte.ts';
 import { ENRICHMENT, LIBRARY_SYNC } from '../tuning.ts';
@@ -286,6 +287,8 @@ export async function startLibrary() {
 	library.status = 'loading';
 	worker = new LibraryWorker();
 	worker.addEventListener('message', onWorkerReply);
+	// The worker waits for this before handling anything else (see library.worker.ts).
+	void serverConfig().then((config) => call({ kind: 'configure', genrePlaylists: config.genrePlaylists }));
 	// The channel and the leader lock include the schema version, so tabs running an older app
 	// version (different database layout) never share a leader or snapshots with newer ones.
 	channel = new BroadcastChannel(`vibemusic-library-${userId}-v${SCHEMA_VERSION}`);

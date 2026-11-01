@@ -2,6 +2,7 @@
 // because Error subclasses don't survive postMessage.
 
 import type { Credentials } from '../navidrome/credentials.ts';
+import type { GenrePlaylistConfig } from '../serverConfig.ts';
 import type { Enrichment, EnrichmentRequest, LibraryMeta } from './snapshot.ts';
 
 export type SqlParam = string | number | null;
@@ -19,6 +20,7 @@ export type SyncProgress = {
 export type SyncTimings = { fetchMs: number; buildMs: number; writeMs: number; snapshotBytes: number; steps: Record<string, number> };
 
 export type WorkerRequest =
+	| { kind: 'configure'; genrePlaylists: GenrePlaylistConfig }
 	| { kind: 'open'; userId: string }
 	| { kind: 'reload' }
 	| { kind: 'sync'; credentials: Credentials; full: boolean; albumIds: string[]; artistIds: string[] }
@@ -30,6 +32,7 @@ export type WorkerRequest =
 	| { kind: 'enrich'; enrichment: Enrichment };
 
 export type WorkerResults = {
+	configure: null;
 	open: LibraryMeta | null;
 	reload: LibraryMeta | null;
 	sync: { meta: LibraryMeta; token: string; timings: SyncTimings | null; changed: boolean };

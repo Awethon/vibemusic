@@ -15,7 +15,8 @@ describe('parseServerConfig', () => {
 				songCap: undefined,
 				minSongs: 20,
 				minArtists: undefined
-			}
+			},
+			settings: {}
 		});
 	});
 
@@ -32,6 +33,13 @@ describe('parseServerConfig', () => {
 			maxPlaylists: undefined,
 			songCap: undefined,
 			minSongs: undefined
+		});
+	});
+
+	it('keeps settings defaults Caddy filled in and drops the unset ones', () => {
+		expect(parseServerConfig({ settings: { background: ' amber ', ripples: '', glass: 'on', glassLook: 3 } }).settings).toEqual({
+			background: 'amber',
+			glass: 'on'
 		});
 	});
 

@@ -309,6 +309,38 @@ export function decodeLabLink(link: string): { params: GlassParams; preset: stri
 	return { params, preset: base.id };
 }
 
+// The look code: a lab link's part after '#', which the glass page shows and accepts. Like the
+// lab's encoder, it starts from whichever lab preset leaves the fewest fields to override.
+export function encodeLookCode(params: GlassParams): string {
+	const stepsOf = (field: (typeof LAB_FIELDS)[number], value: number) => Math.max(0, Math.round((value - field.min) / field.step));
+	const fixedKeys = (Object.keys(BASE) as GlassKey[]).filter((key) => !LAB_ORDER.includes(key));
+	let best = { index: 0, overridden: LAB_FIELDS };
+	PRESETS.forEach((preset, index) => {
+		if (fixedKeys.some((key) => Math.abs(preset.values[key] - params[key]) > 1e-6)) return;
+		const overridden = LAB_FIELDS.filter((field) => stepsOf(field, params[field.key]) !== stepsOf(field, preset.values[field.key]));
+		if (overridden.length < best.overridden.length) best = { index, overridden };
+	});
+	const bytes = [LAB_LINK_VERSION, 0, best.index];
+	const varint = (value: number) => {
+		for (; value >= 128; value = Math.floor(value / 128)) bytes.push((value % 128) + 128);
+		bytes.push(value);
+	};
+	varint(LAB_FIELDS.reduce((mask, field, index) => (best.overridden.includes(field) ? mask + 2 ** index : mask), 0));
+	for (const field of best.overridden) varint(stepsOf(field, params[field.key]));
+	return btoa(String.fromCharCode(...bytes))
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '');
+}
+
+const sameParams = (a: GlassParams, b: GlassParams) => (Object.keys(BASE) as GlassKey[]).every((key) => Math.abs(a[key] - b[key]) < 1e-6);
+
+// A look code (or a whole lab link) as the app's look, named after the look it matches exactly.
+export function lookFromCode(code: string): { params: GlassParams; preset: string } {
+	const { params } = decodeLabLink(code);
+	return { params, preset: LOOKS.find((look) => sameParams(look.values, params))?.id ?? '' };
+}
+
 export function lightVector(params: GlassParams): [number, number, number, number, number] {
 	const angle = (params.light * Math.PI) / 180;
 	const elevation = (params.elev * Math.PI) / 180;
