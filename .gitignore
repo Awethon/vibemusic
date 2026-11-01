@@ -4,8 +4,8 @@ node_modules/
 .DS_Store
 dev/samples/
 
-# Private notes and design work, kept out of the published repo
-/PLAN.md
-/docs-internal/
-/mockups/
-/scripts/
+# Private notes, design work and scripts live in their own repo
+/extras/
+
+# Local preview configuration
+/.claude/
