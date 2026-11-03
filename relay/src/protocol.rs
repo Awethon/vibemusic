@@ -46,7 +46,9 @@ pub enum ClientMessage {
         #[serde(default)]
         command: Value,
     },
-    /// Asks for playback to move to device `to`.
+    /// Asks for playback to move to device `to`. If the active device doesn't answer the
+    /// `Release` with a `Handoff` within `hub::HANDOFF_TIMEOUT`, playback moves with the room's
+    /// last stored state.
     Transfer { to: String },
     /// The active device's answer to a `Release` with `handoff: true`: its final queue and
     /// playback, so `to` can continue from the same position.

@@ -38,7 +38,7 @@ mod share;
 mod this_is;
 
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use std::collections::HashMap;
@@ -59,6 +59,10 @@ use protocol::{ClientMessage, ServerMessage};
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
 // WebSocket pings keep reverse proxies from closing a quiet socket.
 const PING_EVERY: Duration = Duration::from_secs(25);
+// A device that sends nothing for this long is gone, even if its socket still looks open: a laptop
+// that went to sleep never closes it. Browsers answer the pings above even in a throttled
+// background tab, and the app sends its own every 25 seconds, so a live device is never this quiet.
+const SILENCE_LIMIT: Duration = Duration::from_secs(70);
 const MAX_NAME_CHARS: usize = 60;
 const MAX_DEVICE_ID_CHARS: usize = 64;
 
@@ -116,6 +120,14 @@ async fn main() {
         radio: Arc::new(radio::Radio::from_env(&navidrome_url)),
         shares: Arc::new(share::Shares::new(&navidrome_url)),
     };
+    let hub = app.hub.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            tick.tick().await;
+            hub.lock().unwrap().expire_handoffs(Instant::now());
+        }
+    });
     let router = Router::new()
         .route("/relay", get(upgrade))
         .route("/radio/{id}", get(radio_stream))
@@ -214,7 +226,12 @@ async fn serve(app: App, mut socket: WebSocket) {
             }
         }
     });
-    while let Some(Ok(message)) = stream.next().await {
+    let reason = loop {
+        let message = match tokio::time::timeout(SILENCE_LIMIT, stream.next()).await {
+            Ok(Some(Ok(message))) => message,
+            Ok(_) => break "closed",
+            Err(_) => break "silent",
+        };
         let Message::Text(text) = message else { continue };
         match serde_json::from_str::<ClientMessage>(&text) {
             Ok(ClientMessage::Enrich(request)) => {
@@ -223,8 +240,8 @@ async fn serve(app: App, mut socket: WebSocket) {
             Ok(message) => app.hub.lock().unwrap().receive(&user, &hello.device_id, message),
             Err(error) => tracing::debug!(%error, "ignored a message the relay does not understand"),
         }
-    }
+    };
     app.hub.lock().unwrap().leave(&user, &hello.device_id, connection);
     writer.abort();
-    tracing::info!(user, device = hello.device_id, "device disconnected");
+    tracing::info!(user, device = hello.device_id, reason, "device disconnected");
 }

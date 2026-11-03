@@ -1,7 +1,7 @@
 //! Rooms of devices for remote control. See `protocol.rs` for the message flow.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tokio::sync::mpsc::UnboundedSender;
@@ -9,6 +9,11 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::protocol::{ClientMessage, DeviceInfo, ServerMessage};
 
 pub type Outbox = UnboundedSender<String>;
+
+/// How long the active device gets to answer a `Release` with its `Handoff`. A device that went to
+/// sleep can look connected for minutes, so after this the move goes ahead with the room's last
+/// stored state instead of waiting for it.
+pub const HANDOFF_TIMEOUT: Duration = Duration::from_secs(4);
 
 /// One socket. A reload opens a new socket for the same device before the old one closes, so
 /// each connection gets an id and only the current one may remove the device.
@@ -30,6 +35,8 @@ struct Room {
     active: Option<String>,
     queue: Option<Value>,
     playback: Option<(Value, Instant)>,
+    /// A move the active device was asked to hand over: the target, and when it was asked.
+    handoff: Option<(String, Instant)>,
 }
 
 impl Room {
@@ -93,6 +100,7 @@ impl Room {
     }
 
     fn take_over(&mut self, to: &str) {
+        self.handoff = None;
         self.active = Some(to.to_owned());
         let (playback, age_ms) = self.playback_now();
         let queue = self.queue.clone().unwrap_or(Value::Null);
@@ -194,6 +202,7 @@ impl Hub {
                 }
             }
             ClientMessage::Claim if !is_active => {
+                room.handoff = None;
                 let previous = room.active.replace(device_id.to_owned());
                 if let Some(previous) = previous {
                     let to = device_id.to_owned();
@@ -208,12 +217,14 @@ impl Hub {
                 match room.active.clone() {
                     Some(active) if active == to => {}
                     Some(active) if room.online(&active) => {
+                        room.handoff = Some((to.clone(), Instant::now()));
                         room.send(&active, &ServerMessage::Release { to, handoff: true })
                     }
                     _ => room.take_over(&to),
                 }
             }
             ClientMessage::Handoff { to, queue, playback } if is_active => {
+                room.handoff = None;
                 room.queue = Some(queue);
                 room.playback = Some((playback, Instant::now()));
                 match to.filter(|to| room.online(to)) {
@@ -222,6 +233,35 @@ impl Hub {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Moves playback for every handover the active device left unanswered past
+    /// `HANDOFF_TIMEOUT`, using the room's last stored queue and playback. The silent device is
+    /// told it was released, so it doesn't keep playing if it wakes up. Called about once a second.
+    pub fn expire_handoffs(&mut self, now: Instant) {
+        for room in self.rooms.values_mut() {
+            let Some((to, asked)) = room.handoff.clone() else {
+                continue;
+            };
+            if now.duration_since(asked) < HANDOFF_TIMEOUT {
+                continue;
+            }
+            room.handoff = None;
+            if !room.online(&to) {
+                continue;
+            }
+            if let Some(previous) = room.active.clone().filter(|previous| *previous != to) {
+                tracing::info!(device = previous, "handoff not answered, moving playback without it");
+                room.send(
+                    &previous,
+                    &ServerMessage::Release {
+                        to: to.clone(),
+                        handoff: false,
+                    },
+                );
+            }
+            room.take_over(&to);
         }
     }
 }
@@ -348,6 +388,76 @@ mod tests {
         assert_eq!(types(&received), ["takeover", "devices"]);
         assert_eq!(received[0]["playback"]["position"], 42);
         assert_eq!(received[1]["active"], "target");
+    }
+
+    #[test]
+    fn an_unanswered_handoff_moves_playback_with_the_last_state() {
+        let mut hub = Hub::default();
+        let (_, mut player) = connect(&mut hub, "u", "player");
+        let (_, mut target) = connect(&mut hub, "u", "target");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "player", message(json!({ "type": "queue", "queue": ["q"] })));
+        hub.receive(
+            "u",
+            "player",
+            message(json!({ "type": "playback", "playback": { "position": 7 } })),
+        );
+        drain(&mut player);
+        drain(&mut target);
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        drain(&mut player);
+        hub.expire_handoffs(Instant::now());
+        assert!(drain(&mut target).is_empty());
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        let received = drain(&mut target);
+        assert_eq!(types(&received), ["takeover", "devices"]);
+        assert_eq!(received[0]["queue"], json!(["q"]));
+        assert_eq!(received[0]["playback"]["position"], 7);
+        assert_eq!(received[1]["active"], "target");
+        let released = drain(&mut player);
+        assert_eq!(released[0]["type"], "release");
+        assert_eq!(released[0]["handoff"], false);
+    }
+
+    #[test]
+    fn a_handoff_in_time_leaves_nothing_to_expire() {
+        let mut hub = Hub::default();
+        let (_, mut player) = connect(&mut hub, "u", "player");
+        let (_, mut target) = connect(&mut hub, "u", "target");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        hub.receive(
+            "u",
+            "player",
+            message(json!({ "type": "handoff", "to": "target", "queue": [], "playback": { "position": 1 } })),
+        );
+        drain(&mut player);
+        drain(&mut target);
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        assert!(drain(&mut player).is_empty());
+        assert!(drain(&mut target).is_empty());
+    }
+
+    #[test]
+    fn a_late_handoff_from_the_replaced_player_is_ignored() {
+        let mut hub = Hub::default();
+        let (_, mut player) = connect(&mut hub, "u", "player");
+        let (_, mut target) = connect(&mut hub, "u", "target");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        drain(&mut player);
+        drain(&mut target);
+        hub.receive(
+            "u",
+            "player",
+            message(json!({ "type": "handoff", "to": "gone", "queue": [], "playback": { "position": 99 } })),
+        );
+        assert!(drain(&mut target).is_empty());
+        let (_, mut later) = connect(&mut hub, "u", "later");
+        let welcome = drain(&mut later);
+        assert_eq!(welcome[0]["active"], "target");
+        assert_ne!(welcome[0]["playback"]["position"], 99);
     }
 
     #[test]

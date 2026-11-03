@@ -82,6 +82,10 @@ case, since both already had their own music going.
 
 When a remote closes or loses its connection, it simply leaves the list.
 
+A device that goes to sleep, like a laptop with its lid closed, often can't close its connection
+first. The relay treats a device it hasn't heard from for over a minute as gone, the same as one
+that closed.
+
 When the playing device closes or loses its connection, the relay keeps its last queue and
 position, and the other devices don't lose anything. Each of them takes over that queue and
 position on its own, paused: nobody asked them to play. The next device where you press play
@@ -136,8 +140,9 @@ Becoming the playing device happens in two ways:
 - **Taking over** ("Play there" or "Play here"). The relay asks the playing device to step down
   and hand over. It pauses, sends its final queue and position, and switches to being a remote.
   The relay stores that state and passes it to the new device, which becomes the playing one.
-  If the playing device is offline and can't answer, the relay hands the new device the last
-  state it stored.
+  If the playing device is offline, or doesn't answer within four seconds (it may be asleep
+  without the relay knowing yet), the relay hands the new device the last state it stored, and
+  tells the silent one it's no longer playing in case it wakes up.
 - **Claiming.** A device that starts playing while no one else is playing tells the relay "I'm
   playing now". The relay makes it the playing device at once and tells the previous one, if
   any, to stop, without a handover.
@@ -161,8 +166,10 @@ that passed since.
 ### Staying connected
 
 Both sides send a small keep-alive message every 25 seconds, so proxies along the way don't
-close a quiet connection. When the connection does close, the tab reconnects after one second,
-then waits twice as long after each failed try, up to 30 seconds.
+close a quiet connection. Browsers answer the relay's keep-alives even in a background tab, so
+the relay only hears nothing from a device that has stopped running, like a sleeping laptop. After
+70 seconds of silence it closes that connection. When a connection closes, the tab reconnects
+after one second, then waits twice as long after each failed try, up to 30 seconds.
 
 When a playing tab reloads, its new connection may arrive before the old one has closed. The
 relay goes by the newest connection, so the late close of the old one doesn't remove the device.
