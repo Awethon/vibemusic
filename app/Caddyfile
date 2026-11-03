@@ -29,6 +29,11 @@
 	# Navidrome's APIs and its public share files.
 	@navidrome path /auth/* /api/* /rest/* /share/s/* /share/img/* /share/d/* /share/*/m3u
 	handle @navidrome {
+		# Stream addresses never change, and Navidrome sends no Cache-Control, so browsers would
+		# guess a lifetime and keep playing a file after it was replaced. no-cache keeps the copy
+		# but checks it first; Navidrome answers 304 when the file is unchanged.
+		@stream path /rest/stream /rest/stream.view
+		header @stream Cache-Control no-cache
 		reverse_proxy {$NAVIDROME_URL:http://navidrome:4533}
 	}
 	# Only the page of Navidrome's web UI, and only for scripts, not for a browser opening it: it
