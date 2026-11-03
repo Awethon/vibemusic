@@ -26,7 +26,7 @@
 		const current = playlist.value;
 		if (current?.kind === 'smart') return `Updates automatically${current.updated ? ` · refreshed ${relativeTime(current.updated)}` : ''}`;
 		if (current?.kind === 'genre') return `Your top ${current.genre} tracks, a few from each artist · updates automatically`;
-		if (current?.kind === 'artist') return 'Their most popular tracks you own · updated weekly';
+		if (current?.kind === 'artist') return 'Their most popular tracks you own · updates automatically';
 		return '';
 	});
 </script>

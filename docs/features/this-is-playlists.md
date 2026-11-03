@@ -3,7 +3,8 @@
 The relay can keep one playlist per artist, called "This is" and the artist's name, with that
 artist's best-known tracks that are in your library. Tracks are ordered by how popular they are
 on Apple and Deezer. Each playlist gets a cover drawn in the colours of
-the artist's newest album, and everything is refreshed once a week.
+the artist's newest album. Playlists follow your library: new albums and tracks show up within
+about an hour, and a playlist is only rewritten when it actually changes.
 
 [All features](README.md)
 
@@ -30,7 +31,7 @@ library can take a while, mostly because Apple has to be asked slowly.
 |---|---|---|
 | `THIS_IS_MIN_TRACKS` | `13` | Tracks an artist needs in your library to get a playlist |
 | `THIS_IS_MAX_TRACKS` | `50` | Most tracks in one playlist |
-| `THIS_IS_EVERY_HOURS` | `168` | Hours between refreshes (168 is a week) |
+| `THIS_IS_EVERY_HOURS` | `168` | Hours between full refreshes of every artist (168 is a week) |
 | `THIS_IS_SKIP` | none | Artists that never get one, comma-separated, any capitalisation |
 | `ENRICHMENT_SOURCES` | `musicbrainz,deezer,apple` | Which outside services may be asked |
 | `APPLE_STOREFRONTS` | `us` | Apple country catalogs to search, in order |
@@ -83,13 +84,30 @@ Tracks you've disliked are still in the playlist, but vibemusic skips them when 
 
 ## How often they refresh
 
-The relay checks every hour whether a refresh is due, and refreshes when `THIS_IS_EVERY_HOURS`
-have passed since the last successful one. A refresh rebuilds every playlist from scratch, so new
-albums, new plays and changes in popularity show up then. If a refresh fails, for example because
+**Every hour** the relay reads your list of albums, which takes a request or two even for a big
+library, and looks again only at the artists where something changed since last time:
+
+- an album was added, removed or changed (new or edited tracks, or a new cover image);
+- the artist was renamed;
+- Deezer or Apple has new information about which of their tracks are popular, for example for an
+  artist you just added.
+
+Plays and likes don't count, since they don't affect these playlists. When nothing changed, the
+check ends there. For the artists that did change, the relay reads only their tracks and works out
+their playlist again. If the result is the same as before, nothing is written, so a small change
+such as a fixed tag doesn't make every app reload the playlist.
+
+**Every `THIS_IS_EVERY_HOURS`** (a week by default) it looks at every artist again, as a safety
+net for anything the hourly check can't see. Changing `THIS_IS_MIN_TRACKS`, `THIS_IS_MAX_TRACKS` or
+`THIS_IS_SKIP` has the same effect at the next check. If a run fails, for example because
 Navidrome is down, the relay tries again an hour later.
 
+New music shows up after Navidrome has scanned it, and within the hour after that. A new artist's
+first playlist may be ordered without Deezer's ranking at first; it's updated once the relay has
+looked them up.
+
 When an artist no longer qualifies (you removed albums, raised the minimum, or added them to
-`THIS_IS_SKIP`), their playlist is deleted at the next refresh. If an artist is renamed, the old
+`THIS_IS_SKIP`), their playlist is deleted at the next check. If an artist is renamed, the old
 playlist is deleted and one with the new name is created.
 
 ## Where you see them
@@ -101,8 +119,8 @@ your own list of playlists, so a large library doesn't bury the ones you made.
 
 They're ordinary Navidrome playlists, public and owned by the relay's account. Every user of your
 Navidrome can see and play them, in vibemusic and in any other app that talks to Navidrome. Nobody
-but the relay's account can edit them, and any changes made there by hand are replaced at the next
-refresh.
+but the relay's account can edit them, and any changes made there by hand are replaced the next
+time that artist's playlist changes, or at the weekly refresh.
 
 ## The cover
 
@@ -127,15 +145,20 @@ always readable, whether the album cover is bright, dark or muted.
 the relay under the SIL Open Font License, so the cover looks the same on every install.
 
 **When it's redrawn.** Only when something on it would change: the artist's name, which albums are
-the five newest, or one of those albums being updated in Navidrome (a new cover image, for
-example). A cover is also drawn when the playlist has none, for instance after someone removed it.
-Otherwise the existing cover is kept, so a weekly refresh usually redraws few or none.
+the five newest, or one of those albums getting a new cover image. Editing an album's tags
+doesn't redraw it, except on older Navidrome versions that don't report image changes, where any
+change to one of those albums does. A cover is also drawn when the playlist has none, for
+instance after someone removed it. Otherwise the existing cover is kept, so most checks redraw
+none.
 
 ## How it works
 
-**Signing in.** At each refresh the relay signs in to Navidrome with its own account and reads
-the whole library: every track and album, with album artists, years, play counts and lengths.
-The play counts are that account's own, which are usually zero.
+**Signing in.** At each check the relay signs in to Navidrome with its own account and reads
+every album, with its album artists, track count, change times and cover. For each artist it
+keeps a short fingerprint of their albums and popularity in its state file (`THIS_IS_STATE`), and
+compares it with the last one to find who changed. For those artists it then reads their tracks,
+with years, play counts and lengths. The play counts are that account's own, which are usually
+zero. When many artists changed, or at the weekly refresh, it reads the whole library at once.
 
 **Grouping.** Tracks are grouped by album artist. Artists below the minimum, "Various Artists" and
 skipped names are dropped. For the rest, the artist's albums are sorted newest first, by release
@@ -165,9 +188,10 @@ the Apple and Deezer lists, and the tracks are sorted as described above. The to
 ignoring case), then loosely without extras and credits, skipping remixes and other versions.
 
 **Saving.** For each artist the relay looks for a playlist of its own named "This is" and the
-artist's name. If there is one, its tracks are replaced; otherwise a new one is created. The
-playlist is then made public and given a description such as "27 Mira Vale tracks you own, most
-popular first · updated weekly · made by vibemusic".
+artist's name. If there is one and its tracks are the ones it was given last time, it's left as it
+is. Otherwise its tracks are replaced, or a new playlist is created. The playlist is then made
+public and given a description such as "27 Mira Vale tracks you own, most popular first · updated
+automatically · made by vibemusic".
 
 **Cleaning up.** After that, any other playlist owned by the relay's account whose name starts with
 "This is " is deleted, since its artist no longer qualifies. Don't keep your own playlists with

@@ -1,7 +1,9 @@
 //! "This is <artist>" playlists: public Navidrome playlists of each artist's most popular songs
-//! in the library, with a generated cover. On only when `VIBEMUSIC_RELAY_NAVIDROME_USER` and
-//! `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` name a dedicated Navidrome account, which owns the
-//! playlists. A regular user is enough; it needs admin rights only when it lacks access to some
+//! in the library, with a generated cover. An hourly check reads only the album list and looks
+//! again at the artists whose albums or popularity changed; every `THIS_IS_EVERY_HOURS` all of
+//! them are looked at. A playlist is written only when its tracks, name or cover really change.
+//! On only when `VIBEMUSIC_RELAY_NAVIDROME_USER` and `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` name a
+//! dedicated Navidrome account, which owns the playlists. A regular user is enough; it needs admin rights only when it lacks access to some
 //! libraries, or when Navidrome's `EnableArtworkUpload` is off (covers are uploaded images).
 //! Popularity comes from Apple and Deezer (see `enrich.rs`).
 
@@ -25,7 +27,7 @@ use crate::enrich::{Enricher, Fetched};
 const PREFIX: &str = "This is ";
 // Part of the cover signature; change it when `cover.rs` draws differently to redraw all covers.
 const COVER_VERSION: &str = "discography-3";
-// How often the worker wakes to see whether a refresh is due (and retries after a failed one).
+// How often the worker checks the library for changes (and retries after a failed run).
 const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
 // Album covers fanned out on a playlist cover.
 const COVERS: usize = 5;
@@ -51,9 +53,9 @@ fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
 impl Settings {
     /// `None` unless both account variables are set. Tuning, all optional: `THIS_IS_MIN_TRACKS`
     /// (default 13) songs an artist needs for a playlist, `THIS_IS_MAX_TRACKS` (50) songs per
-    /// playlist, `THIS_IS_EVERY_HOURS` (168) between refreshes, `THIS_IS_SKIP` comma-separated
-    /// artist names to leave out, `THIS_IS_STATE` (`/data/this-is.json`, empty for none) file
-    /// that remembers the last run and drawn covers across restarts.
+    /// playlist, `THIS_IS_EVERY_HOURS` (168) between looks at every artist, `THIS_IS_SKIP`
+    /// comma-separated artist names to leave out, `THIS_IS_STATE` (`/data/this-is.json`, empty for
+    /// none) file that remembers each artist's playlist and drawn covers across restarts.
     pub fn from_env(url: &str) -> Option<Self> {
         let username = std::env::var("VIBEMUSIC_RELAY_NAVIDROME_USER")
             .ok()
@@ -78,14 +80,36 @@ impl Settings {
             state: (!state.is_empty()).then(|| PathBuf::from(state)),
         })
     }
+
+    // Everything that decides which artists qualify and how covers look; a change means looking at
+    // every artist again.
+    fn rules(&self) -> String {
+        let mut skip: Vec<&String> = self.skip.iter().collect();
+        skip.sort();
+        format!("{COVER_VERSION}|{}|{}|{skip:?}", self.min_tracks, self.max_tracks)
+    }
 }
 
-// `covers` maps a playlist id to the signature of the albums its uploaded cover was drawn from.
+// `last_run` is when every artist was last looked at, under `rules`. `covers` maps a playlist id
+// to the signature of the albums its uploaded cover was drawn from. `artists` holds what each
+// artist with enough tracks on their albums was last given, keyed by artist id.
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 struct State {
     last_run: u64,
+    rules: String,
     covers: HashMap<String, String>,
+    artists: HashMap<String, Picked>,
+}
+
+// `inputs` fingerprints what the playlist was built from (see `inputs`); `songs` is empty when the
+// artist turned out not to qualify.
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Picked {
+    inputs: String,
+    title: String,
+    songs: Vec<String>,
 }
 
 impl State {
@@ -117,16 +141,22 @@ pub fn start(settings: Settings, enricher: std::sync::Arc<Enricher>) {
             .expect("http client");
         loop {
             let mut state = State::load(&settings);
-            if now_ms().saturating_sub(state.last_run) >= settings.every_ms {
-                match run(&client, &settings, &enricher, &mut state).await {
-                    Ok(summary) => {
-                        state.last_run = now_ms();
-                        tracing::info!(%summary, "This is playlists refreshed");
+            let started = now_ms();
+            let every = started.saturating_sub(state.last_run) >= settings.every_ms || state.rules != settings.rules();
+            match run(&client, &settings, &enricher, &mut state, every).await {
+                Ok(summary) => {
+                    if every {
+                        state.last_run = started;
+                        state.rules = settings.rules();
                     }
-                    Err(error) => tracing::warn!(%error, "This is playlists failed, retrying in an hour"),
+                    match summary {
+                        Some(summary) => tracing::info!(%summary, every, "This is playlists updated"),
+                        None => tracing::debug!("no library changes for This is playlists"),
+                    }
                 }
-                state.save(&settings);
+                Err(error) => tracing::warn!(%error, "This is playlists failed, retrying in an hour"),
             }
+            state.save(&settings);
             tokio::time::sleep(CHECK_EVERY).await;
         }
     });
@@ -250,7 +280,48 @@ pub fn choose(apple_top: &[(String, u64)], deezer_top: &[(String, u64)], songs: 
 }
 
 pub fn comment(name: &str, count: usize) -> String {
-    format!("{count} {name} tracks you own, most popular first · updated weekly · made by vibemusic")
+    format!("{count} {name} tracks you own, most popular first · updated automatically · made by vibemusic")
+}
+
+/// What a cover is drawn from: the name and the shown albums with their images. Navidrome's
+/// `imageHash` changes only with the image; versions without it fall back to the album's
+/// `updatedAt`, which also changes with its tags.
+pub fn cover_signature(name: &str, albums: &[&Value]) -> String {
+    let shown: Vec<String> = albums
+        .iter()
+        .take(COVERS)
+        .map(|album| {
+            let image = Some(text(album, "imageHash"))
+                .filter(|hash| !hash.is_empty())
+                .unwrap_or_else(|| text(album, "updatedAt"));
+            format!("{}@{image}", text(album, "id"))
+        })
+        .collect();
+    format!("{COVER_VERSION}|{name}|{}", shown.join(","))
+}
+
+// 64-bit FNV-1a: a short, stable fingerprint for the state file.
+fn fingerprint(text: &str) -> String {
+    let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    });
+    format!("{hash:016x}")
+}
+
+/// Fingerprints everything an artist's playlist and cover are built from: their name, each album's
+/// id, track count, change times and cover image, and what Deezer and Apple say about them. Plays
+/// and likes are left out: the relay's account barely plays anything.
+pub fn inputs(name: &str, albums: &[&Value], popularity: &str) -> String {
+    let mut parts: Vec<String> = albums
+        .iter()
+        .map(|album| {
+            ["id", "songCount", "updatedAt", "importedAt", "imageHash"]
+                .map(|key| album[key].to_string())
+                .join("@")
+        })
+        .collect();
+    parts.sort();
+    fingerprint(&format!("{name}|{}|{popularity}", parts.join(",")))
 }
 
 async fn cover_image(account: &Account, album_id: &str, size: u32) -> Result<RgbImage, AccountError> {
@@ -302,26 +373,41 @@ async fn save_playlist(
     }
 }
 
+// Album ids per songs request when fetching only some albums' songs.
+const ALBUMS_PER_REQUEST: usize = 100;
+
+async fn songs_of(account: &Account, album_ids: &[String]) -> Result<Vec<Value>, AccountError> {
+    let mut songs = Vec::new();
+    for chunk in album_ids.chunks(ALBUMS_PER_REQUEST) {
+        let filter: Vec<String> = chunk.iter().map(|id| format!("album_id={id}")).collect();
+        songs.extend(
+            account
+                .all(&format!(
+                    "song?missing=false&{}&_sort=album&_order=ASC",
+                    filter.join("&")
+                ))
+                .await?,
+        );
+    }
+    Ok(songs)
+}
+
+/// Looks at the artists whose inputs changed since they were last looked at, or at all of them when
+/// `every` is set, and writes the playlists that come out different. `None` when nothing changed.
 async fn run(
     client: &reqwest::Client,
     settings: &Settings,
     enricher: &Enricher,
     state: &mut State,
-) -> Result<String, AccountError> {
+    every: bool,
+) -> Result<Option<String>, AccountError> {
     let account = Account::sign_in(client.clone(), &settings.url, &settings.username, &settings.password).await?;
-    let songs = account.all("song?_sort=album&_order=ASC").await?;
-    let albums = account.all("album?_sort=name&_order=ASC").await?;
+    let albums = account.all("album?missing=false&_sort=name&_order=ASC").await?;
     let mut names: HashMap<String, String> = HashMap::new();
-    let mut songs_by_artist: HashMap<String, Vec<Value>> = HashMap::new();
-    for song in songs.into_iter().filter(|song| song["missing"] != true) {
-        for (id, name) in album_artists(&song) {
-            names.insert(id.clone(), name);
-            songs_by_artist.entry(id).or_default().push(song.clone());
-        }
-    }
     let mut albums_by_artist: HashMap<String, Vec<&Value>> = HashMap::new();
     for album in &albums {
-        for (id, _) in album_artists(album) {
+        for (id, name) in album_artists(album) {
+            names.insert(id.clone(), name);
             albums_by_artist.entry(id).or_default().push(album);
         }
     }
@@ -329,42 +415,109 @@ async fn run(
     for list in albums_by_artist.values_mut() {
         list.sort_by_key(|album| std::cmp::Reverse((number(album, "maxYear"), text(album, "createdAt"))));
     }
-    // Apple top songs come from the enrichment cache when fresh; otherwise they are fetched here,
-    // unless Apple is off (ENRICHMENT_SOURCES).
-    let apple = Apple::from_env(client.clone());
-    let mut wanted: Vec<(String, String, Vec<String>)> = Vec::new();
-    let mut artists: Vec<(&String, &Vec<Value>)> = songs_by_artist.iter().collect();
-    artists.sort_by_key(|(id, _)| names[*id].to_lowercase());
-    for (id, artist_songs) in artists {
-        let name = &names[id];
-        let lower = name.to_lowercase();
-        if artist_songs.len() < settings.min_tracks || settings.skip.contains(&lower) || lower == "various artists" {
-            continue;
+    // An artist's songs all sit on their albums, so the albums' track counts tell who can qualify
+    // without fetching any songs.
+    let candidates: HashMap<&String, String> = albums_by_artist
+        .iter()
+        .filter(|(id, list)| {
+            let lower = names[*id].to_lowercase();
+            list.iter().map(|album| number(album, "songCount")).sum::<i64>() >= settings.min_tracks as i64
+                && !settings.skip.contains(&lower)
+                && lower != "various artists"
+        })
+        .map(|(id, list)| (id, inputs(&names[id], list, &enricher.popularity(id))))
+        .collect();
+    let mut changed: Vec<&String> = candidates
+        .iter()
+        .filter(|(id, inputs)| {
+            every
+                || state
+                    .artists
+                    .get(id.as_str())
+                    .is_none_or(|picked| &picked.inputs != *inputs)
+        })
+        .map(|(id, _)| *id)
+        .collect();
+    changed.sort_by_key(|id| names[*id].to_lowercase());
+    let gone: Vec<String> = state
+        .artists
+        .keys()
+        .filter(|id| !candidates.contains_key(id))
+        .cloned()
+        .collect();
+    if !every && changed.is_empty() && gone.is_empty() {
+        return Ok(None);
+    }
+
+    let album_ids: Vec<String> = changed
+        .iter()
+        .flat_map(|id| albums_by_artist[*id].iter().map(|album| text(album, "id")))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    // Past a quarter of the library, one pass over all songs is cheaper than asking album by album.
+    let songs = if every || album_ids.len() * 4 > albums.len() {
+        account.all("song?missing=false&_sort=album&_order=ASC").await?
+    } else {
+        songs_of(&account, &album_ids).await?
+    };
+    let wanted: HashSet<&String> = changed.iter().copied().collect();
+    let mut songs_by_artist: HashMap<String, Vec<Value>> = HashMap::new();
+    for song in songs.into_iter().filter(|song| song["missing"] != true) {
+        for (id, _) in album_artists(&song) {
+            if wanted.contains(&id) {
+                songs_by_artist.entry(id).or_default().push(song.clone());
+            }
         }
-        let album_names: Vec<String> = albums_by_artist
-            .get(id)
-            .map(|list| list.iter().map(|album| text(album, "name")).collect())
-            .unwrap_or_default();
-        let top = match enricher.apple_top(id) {
-            Some(top) => top,
-            None if enricher.asks_apple() => match apple.top_songs(name, &album_names).await {
-                Fetched::Found(top) => top,
-                Fetched::Missing | Fetched::Failed => Vec::new(),
-            },
-            None => Vec::new(),
-        };
-        tracing::debug!(name, top = top.len(), "apple top songs");
-        wanted.push((
-            id.clone(),
-            name.clone(),
+    }
+
+    // Apple top songs come from the enrichment cache when fresh; otherwise they are fetched here and
+    // stored, unless Apple is off (ENRICHMENT_SOURCES).
+    let apple = Apple::from_env(client.clone());
+    let mut picks: Vec<(String, Picked)> = Vec::new();
+    for id in changed {
+        let name = &names[id];
+        let artist_albums = &albums_by_artist[id];
+        let artist_songs = songs_by_artist.get(id).map(Vec::as_slice).unwrap_or_default();
+        let songs = if artist_songs.len() < settings.min_tracks {
+            Vec::new()
+        } else {
+            let album_names: Vec<String> = artist_albums.iter().map(|album| text(album, "name")).collect();
+            let top = match enricher.apple_top(id) {
+                Some(top) => top,
+                None if enricher.asks_apple() => match apple.top_songs(name, &album_names).await {
+                    Fetched::Found(top) => {
+                        enricher.store_apple(id.clone(), Some(top.clone()));
+                        top
+                    }
+                    Fetched::Missing => {
+                        enricher.store_apple(id.clone(), None);
+                        Vec::new()
+                    }
+                    Fetched::Failed => Vec::new(),
+                },
+                None => Vec::new(),
+            };
+            tracing::debug!(name, top = top.len(), "apple top songs");
             choose(
                 &apple::ranked(&top),
                 &enricher.deezer_top(id),
                 artist_songs,
                 settings.max_tracks,
-            ),
+            )
+        };
+        // Fingerprinted after asking Apple, so a fresh answer doesn't count as a change next hour.
+        let inputs = inputs(name, artist_albums, &enricher.popularity(id));
+        picks.push((
+            id.clone(),
+            Picked {
+                inputs,
+                title: format!("{PREFIX}{name}"),
+                songs,
+            },
         ));
     }
+
     let playlists = account.all("playlist").await?;
     // Only playlists this account owns are touched. `sync` playlists are imported from playlist
     // files and their tracks are managed by Navidrome, so they are left alone.
@@ -377,49 +530,63 @@ async fn run(
         })
         .map(|playlist| (text(playlist, "name"), playlist))
         .collect();
-    let titles: HashSet<String> = wanted.iter().map(|(_, name, _)| format!("{PREFIX}{name}")).collect();
     let (mut created, mut updated, mut drawn, mut removed) = (0, 0, 0, 0);
-    for (artist_id, name, songs) in &wanted {
-        let title = format!("{PREFIX}{name}");
-        let existing = ours.get(&title).copied();
-        let playlist_id = save_playlist(&account, existing, &title, songs).await?;
-        if existing.is_some() {
-            updated += 1
-        } else {
-            created += 1
-        }
-        account
-            .update_playlist(&playlist_id, &title, &comment(name, songs.len()))
-            .await?;
-        let artist_albums = albums_by_artist.get(artist_id).map(Vec::as_slice).unwrap_or_default();
-        if artist_albums.is_empty() {
+    for (artist_id, picked) in &picks {
+        if picked.songs.is_empty() {
+            state.artists.insert(artist_id.clone(), picked.clone());
             continue;
         }
-        // The cover is redrawn only when the signature (COVER_VERSION, name, shown albums and their
-        // updatedAt) changes, or the playlist has no uploaded image.
-        let signature = format!(
-            "{COVER_VERSION}|{name}|{}",
-            artist_albums
-                .iter()
-                .take(COVERS)
-                .map(|album| format!("{}@{}", text(album, "id"), text(album, "updatedAt")))
-                .collect::<Vec<_>>()
-                .join(",")
-        );
-        let has_image = existing.is_some_and(|playlist| !text(playlist, "uploadedImage").is_empty());
-        if has_image && state.covers.get(&playlist_id) == Some(&signature) {
-            continue;
-        }
-        match draw_cover(&account, name, artist_albums).await {
-            Ok(jpeg) => {
-                tracing::debug!(name, bytes = jpeg.len(), "cover drawn");
-                account.upload_cover(&playlist_id, jpeg).await?;
-                state.covers.insert(playlist_id, signature);
-                drawn += 1;
+        let name = &names[artist_id];
+        let existing = ours.get(&picked.title).copied();
+        // Rewriting an unchanged playlist would still make every app fetch it again.
+        let same = existing.is_some_and(|playlist| number(playlist, "songCount") == picked.songs.len() as i64)
+            && state
+                .artists
+                .get(artist_id)
+                .is_some_and(|old| old.title == picked.title && old.songs == picked.songs);
+        let playlist_id = match existing {
+            Some(playlist) if same => text(playlist, "id"),
+            _ => {
+                let id = save_playlist(&account, existing, &picked.title, &picked.songs).await?;
+                if existing.is_some() {
+                    updated += 1
+                } else {
+                    created += 1
+                }
+                id
             }
-            Err(error) => tracing::warn!(%error, name, "could not draw a This is cover"),
+        };
+        let comment = comment(name, picked.songs.len());
+        if existing.is_none_or(|playlist| !same || text(playlist, "comment") != comment || playlist["public"] != true) {
+            account.update_playlist(&playlist_id, &picked.title, &comment).await?;
         }
+        let artist_albums = &albums_by_artist[artist_id];
+        // The cover is redrawn only when the signature (COVER_VERSION, name, shown albums and their
+        // images) changes, or the playlist has no uploaded image.
+        let signature = cover_signature(name, artist_albums);
+        let has_image = existing.is_some_and(|playlist| !text(playlist, "uploadedImage").is_empty());
+        if !(has_image && state.covers.get(&playlist_id) == Some(&signature)) {
+            match draw_cover(&account, name, artist_albums).await {
+                Ok(jpeg) => {
+                    tracing::debug!(name, bytes = jpeg.len(), "cover drawn");
+                    account.upload_cover(&playlist_id, jpeg).await?;
+                    state.covers.insert(playlist_id, signature);
+                    drawn += 1;
+                }
+                Err(error) => tracing::warn!(%error, name, "could not draw a This is cover"),
+            }
+        }
+        state.artists.insert(artist_id.clone(), picked.clone());
     }
+    for id in &gone {
+        state.artists.remove(id);
+    }
+    let titles: HashSet<&String> = state
+        .artists
+        .values()
+        .filter(|picked| !picked.songs.is_empty())
+        .map(|picked| &picked.title)
+        .collect();
     for playlist in &playlists {
         let name = text(playlist, "name");
         let mine = text(playlist, "ownerId") == account.id
@@ -435,10 +602,10 @@ async fn run(
             removed += 1;
         }
     }
-    Ok(format!(
-        "{} artists: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed",
-        wanted.len()
-    ))
+    Ok(Some(format!(
+        "{} artists looked at: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed",
+        picks.len()
+    )))
 }
 
 #[cfg(test)]
@@ -491,6 +658,44 @@ mod tests {
         assert_eq!(
             choose(&[], &deezer, &songs, 5),
             ["paradise", "trap", "played", "intro", "skit"]
+        );
+    }
+
+    #[test]
+    fn inputs_change_with_albums_covers_and_popularity_but_not_plays() {
+        let one = json!({ "id": "a1", "songCount": 10, "updatedAt": "2024-01-01", "importedAt": "2024-01-02", "imageHash": "h1", "playCount": 3 });
+        let two = json!({ "id": "a2", "songCount": 8, "updatedAt": "2024-02-01", "importedAt": "2024-02-02", "imageHash": "h2" });
+        let base = inputs("Lume", &[&one, &two], "[]");
+        assert_eq!(base, inputs("Lume", &[&two, &one], "[]"));
+        let played = json!({ "id": "a1", "songCount": 10, "updatedAt": "2024-01-01", "importedAt": "2024-01-02", "imageHash": "h1", "playCount": 40 });
+        assert_eq!(base, inputs("Lume", &[&played, &two], "[]"));
+        let new_cover = json!({ "id": "a1", "songCount": 10, "updatedAt": "2024-01-01", "importedAt": "2024-01-02", "imageHash": "h9" });
+        assert_ne!(base, inputs("Lume", &[&new_cover, &two], "[]"));
+        let new_track = json!({ "id": "a1", "songCount": 11, "updatedAt": "2024-01-01", "importedAt": "2024-01-02", "imageHash": "h1" });
+        assert_ne!(base, inputs("Lume", &[&new_track, &two], "[]"));
+        assert_ne!(base, inputs("Lume", &[&one], "[]"));
+        assert_ne!(base, inputs("Lume", &[&one, &two], "[[\"Hit\",10],null]"));
+        assert_ne!(base, inputs("Lumen", &[&one, &two], "[]"));
+    }
+
+    #[test]
+    fn cover_signature_follows_the_image_not_the_tags() {
+        let album = json!({ "id": "a1", "updatedAt": "2024-01-01", "imageHash": "h1" });
+        let retagged = json!({ "id": "a1", "updatedAt": "2025-05-05", "imageHash": "h1" });
+        let new_image = json!({ "id": "a1", "updatedAt": "2024-01-01", "imageHash": "h2" });
+        assert_eq!(
+            cover_signature("Lume", &[&album]),
+            cover_signature("Lume", &[&retagged])
+        );
+        assert_ne!(
+            cover_signature("Lume", &[&album]),
+            cover_signature("Lume", &[&new_image])
+        );
+        let older_navidrome = json!({ "id": "a1", "updatedAt": "2024-01-01" });
+        let older_retagged = json!({ "id": "a1", "updatedAt": "2025-05-05" });
+        assert_ne!(
+            cover_signature("Lume", &[&older_navidrome]),
+            cover_signature("Lume", &[&older_retagged])
         );
     }
 

@@ -6,7 +6,7 @@ export const playlistKindLabel = (playlist: Playlist) =>
 
 export function playlistMetaLine(playlist: Playlist): string {
 	if (playlist.kind === 'genre') return `${plural(playlist.albumCount, 'album')} · ${plural(playlist.songCount, 'track')}`;
-	if (playlist.kind === 'artist') return `${plural(playlist.songCount, 'track')} · updated weekly`;
+	if (playlist.kind === 'artist') return `${plural(playlist.songCount, 'track')} · updates automatically`;
 	if (playlist.kind === 'smart')
 		return `${plural(playlist.songCount, 'track')}${playlist.updated ? ` · updated ${relativeTime(playlist.updated)}` : ''}`;
 	return plural(playlist.songCount, 'track');

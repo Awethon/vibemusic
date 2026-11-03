@@ -487,6 +487,20 @@ impl Enricher {
             .map(|entry| entry.value.clone().unwrap_or_default())
     }
 
+    /// What Deezer and Apple say about an artist's popularity, fresh or not, as one string that
+    /// changes whenever either answer does.
+    pub fn popularity(&self, artist_id: &str) -> String {
+        let state = self.state.lock().unwrap();
+        let deezer = state
+            .cache
+            .deezer
+            .get(artist_id)
+            .and_then(|entry| entry.value.as_ref())
+            .map(|artist| &artist.top);
+        let apple = state.cache.apple.get(artist_id).map(|entry| &entry.value);
+        json!([deezer, apple]).to_string()
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
         self.updates.subscribe()
     }
@@ -557,7 +571,7 @@ impl Enricher {
         state.unsaved = true;
     }
 
-    fn store_apple(&self, id: String, value: Option<Vec<String>>) {
+    pub fn store_apple(&self, id: String, value: Option<Vec<String>>) {
         let mut state = self.state.lock().unwrap();
         state.changes.apple.insert(id.clone(), value.clone());
         state.cache.apple.insert(id, Entry { at: now_ms(), value });

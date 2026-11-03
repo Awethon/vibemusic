@@ -14,7 +14,7 @@ network.
   Apple, for genre tags, artist countries and which tracks are popular. Genre playlists, "This is"
   playlists and the home page use this.
 - **"This is" playlists.** With its own Navidrome account it keeps one playlist per artist with
-  their most popular tracks that you own, with a generated cover, refreshed weekly. They're
+  their most popular tracks that you own, with a generated cover, kept up to date as your library changes. They're
   ordinary Navidrome playlists, so other apps see them too.
 - **Internet radio.** Stations configured in Navidrome play through the relay, so the background
   can move with them.

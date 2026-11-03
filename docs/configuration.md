@@ -60,7 +60,7 @@ make it everyone's default.
 | `THIS_IS_SKIP` | none | Artists that never get a "This is" playlist |
 | `THIS_IS_MIN_TRACKS` | `13` | Tracks an artist needs for one |
 | `THIS_IS_MAX_TRACKS` | `50` | Tracks per playlist |
-| `THIS_IS_EVERY_HOURS` | `168` | Hours between refreshes |
+| `THIS_IS_EVERY_HOURS` | `168` | Hours between full refreshes; changes are picked up hourly |
 | `RADIO_LOCAL_PROXY` | none | Proxy for radio stations on `.local` addresses, which containers can't resolve |
 | `RELAY_LOG` | `info` | Log level: `error`, `warn`, `info`, `debug` |
 
