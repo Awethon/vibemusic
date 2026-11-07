@@ -14,6 +14,7 @@ type Deck = {
 	pendingSeek: (() => void) | null;
 	blocked: boolean;
 	pausedAt: number | null;
+	played: boolean;
 };
 
 export type EngineListener = {
@@ -51,7 +52,16 @@ export class AudioEngine {
 	private createDeck(): Deck {
 		const element = new Audio();
 		element.preload = 'auto';
-		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false, pausedAt: null };
+		const deck: Deck = {
+			element,
+			trackId: '',
+			source: null,
+			startAt: null,
+			pendingSeek: null,
+			blocked: false,
+			pausedAt: null,
+			played: false
+		};
 		// The start position is applied once playback actually starts: Safari loads nothing before
 		// the first gesture, and iOS Safari accepts a seek on a never-played element but then plays
 		// from 0:00 with currentTime frozen.
@@ -60,6 +70,7 @@ export class AudioEngine {
 				element.currentTime = deck.startAt;
 			deck.startAt = null;
 			deck.pausedAt = null;
+			deck.played = true;
 		});
 		element.addEventListener('pause', () => {
 			deck.pausedAt = performance.now();
@@ -128,9 +139,13 @@ export class AudioEngine {
 	get position() {
 		// While blocked (waiting for a tap) or reloading, the element's currentTime is meaningless;
 		// the wanted position lives in startAt.
-		if (this.active.startAt !== null && (this.active.blocked || this.active.element.readyState < HTMLMediaElement.HAVE_FUTURE_DATA))
-			return this.active.startAt;
-		return this.active.element.currentTime || 0;
+		const deck = this.active;
+		if (
+			deck.startAt !== null &&
+			(deck.blocked || (this.plain && !deck.played) || deck.element.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
+		)
+			return deck.startAt;
+		return deck.element.currentTime || 0;
 	}
 
 	get duration() {
@@ -151,6 +166,7 @@ export class AudioEngine {
 		} else {
 			this.active.trackId = trackId;
 			this.active.element.src = url;
+			this.active.played = false;
 		}
 		const deck = this.active;
 		if (previous !== deck) {
@@ -190,10 +206,13 @@ export class AudioEngine {
 	}
 
 	// No seek is sent to a blocked deck (see the 'playing' handler); startAt alone carries it.
+	// On iPhone a track that hasn't played since it was loaded gets no seek at all, only startAt:
+	// metadata often arrives just before playback starts, and a seek then is the iOS case above
+	// (accepted, but playback starts at 0:00), which the 'playing' check can't tell apart.
 	private seekDeck(deck: Deck, seconds: number) {
 		this.dropPendingSeek(deck);
 		if (deck.element.paused) deck.startAt = seconds;
-		if (deck.blocked) return;
+		if (deck.blocked || (this.plain && !deck.played)) return;
 		const apply = () => {
 			deck.pendingSeek = null;
 			deck.element.currentTime = seconds;
@@ -231,6 +250,7 @@ export class AudioEngine {
 		if (deck.blocked || stale) {
 			deck.startAt ??= element.currentTime;
 			deck.blocked = false;
+			deck.played = false;
 			this.dropPendingSeek(deck);
 			element.load();
 		}
