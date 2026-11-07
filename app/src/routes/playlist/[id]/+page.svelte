@@ -7,6 +7,7 @@
 	import { COVER_PX, LAYOUT } from '#lib/tuning.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
+	import ShuffleButton from '#lib/ui/ShuffleButton.svelte';
 	import PlaylistMosaic from '#lib/ui/PlaylistMosaic.svelte';
 	import TrackRow from '#lib/ui/TrackRow.svelte';
 	import VirtualGrid from '#lib/ui/VirtualGrid.svelte';
@@ -43,7 +44,9 @@
 					</p>{/if}
 				{#if updateLine}<p class="sub smart-line"><Icon name="smart" /><span>{updateLine}</span></p>{/if}
 				<p class="genres">{plural(tracks.value.length, 'track')} · {longDuration(duration)}</p>
-				<div style:margin-top="20px"><PlayButton tracks={playable} sourceName={playlist.value.name} listKey="playlist:{id}" /></div>
+				<div class="list-actions">
+					<PlayButton tracks={playable} sourceName={playlist.value.name} listKey="playlist:{id}" /><ShuffleButton listKey="playlist:{id}" />
+				</div>
 			</div>
 		</div>
 		{#if tracks.value.length}

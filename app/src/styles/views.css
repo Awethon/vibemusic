@@ -372,6 +372,13 @@
 	margin-top: 26px;
 }
 
+.list-actions {
+	margin-top: 20px;
+	display: flex;
+	gap: 16px;
+	align-items: center;
+}
+
 .album-side .actions {
 	margin-top: 22px;
 	display: flex;

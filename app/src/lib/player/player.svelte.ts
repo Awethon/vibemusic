@@ -9,6 +9,7 @@ import { localAudioLive, startPlayback } from './playback.svelte.ts';
 import type * as queue from './queue.ts';
 import { isMirroring, perform, playOn } from './remote.svelte.ts';
 import { relay } from '../remote/relay.svelte.ts';
+import { rememberShuffle, shuffleFor } from './shuffle.svelte.ts';
 import { player, queueState, remember, setStarred } from './state.svelte.ts';
 
 export { currentTrack, player, playerQueue, totalDuration, trackById } from './state.svelte.ts';
@@ -33,10 +34,22 @@ export function startPlayer() {
 	});
 }
 
+export { shuffleFor } from './shuffle.svelte.ts';
+
+// With the list's shuffle on, a negative startIndex starts from a random track.
 export function playTracks(tracks: Track[], startIndex: number, sourceName: string, listKey: string) {
 	remember(tracks);
 	rememberPlayedList(listKey);
-	perform({ kind: 'playList', trackIds: tracks.map((track) => track.id), startIndex, sourceName, listKey });
+	perform({ kind: 'playList', trackIds: tracks.map((track) => track.id), startIndex, sourceName, listKey, shuffle: shuffleFor(listKey) });
+}
+
+// Shuffle for a list (the one playing when no key is given): remembered for the list, and applied
+// to the queue right away when that list is the one playing.
+export function toggleShuffle(listKey = queueState.sourceKey) {
+	if (!listKey) return;
+	const on = !shuffleFor(listKey);
+	rememberShuffle(listKey, on);
+	if (queueState.sourceKey === listKey) perform({ kind: 'shuffle', on });
 }
 
 export function isPlayingList(listKey: string) {
@@ -45,7 +58,7 @@ export function isPlayingList(listKey: string) {
 
 export function togglePlayList(tracks: Track[], sourceName: string, listKey: string) {
 	if (queueState.sourceKey === listKey && listKey && tracks.some((track) => track.id === queueState.currentTrackId)) togglePlay();
-	else playTracks(tracks, 0, sourceName, listKey);
+	else playTracks(tracks, shuffleFor(listKey) ? -1 : 0, sourceName, listKey);
 }
 
 export function playTrackInList(tracks: Track[], index: number, sourceName: string, listKey: string) {

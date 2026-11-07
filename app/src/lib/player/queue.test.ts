@@ -13,6 +13,7 @@ import {
 	removeQueuedAt,
 	reorderUpNext,
 	savedOrder,
+	setShuffle,
 	upNextCount,
 	type QueueState
 } from './queue.ts';
@@ -134,5 +135,33 @@ describe('queue', () => {
 		expect(savedOrder(state)).toEqual({ trackIds: ['a', 'b', 'x', 'c', 'd'], currentIndex: 1 });
 		playNext(state);
 		expect(savedOrder(state)).toEqual({ trackIds: ['a', 'b', 'x', 'c', 'd'], currentIndex: 2 });
+	});
+
+	it('shuffles a list behind the chosen track, or from a random one', () => {
+		const sequence = [0.9, 0.1, 0.5, 0.3, 0.7];
+		const random = () => sequence.shift() ?? 0;
+		const state = emptyQueue();
+		playList(state, ['a', 'b', 'c', 'd', 'e'], 2, 'Album', 'album:1', true, random);
+		expect(state.currentTrackId).toBe('c');
+		expect(state.sourceIndex).toBe(0);
+		expect(ids(state.sourceQueue)[0]).toBe('c');
+		expect(ids(state.sourceQueue).toSorted()).toEqual(['a', 'b', 'c', 'd', 'e']);
+		expect(state.shuffled).toBe(true);
+		playList(state, ['p', 'q', 'r', 's'], -1, 'Other', 'album:2', true, () => 0.6);
+		expect(state.currentTrackId).toBe('r');
+	});
+
+	it('turning shuffle on keeps the current track, and off restores the order after it', () => {
+		const state = playing(['a', 'b', 'c', 'd', 'e'], 1);
+		setShuffle(state, true, () => 0);
+		expect(state.currentTrackId).toBe('b');
+		expect(ids(state.sourceQueue)[0]).toBe('b');
+		playNext(state);
+		const now = state.currentTrackId;
+		setShuffle(state, false);
+		expect(state.shuffled).toBe(false);
+		expect(ids(state.sourceQueue)).toEqual(['a', 'b', 'c', 'd', 'e']);
+		expect(state.currentTrackId).toBe(now);
+		expect(state.sourceQueue[state.sourceIndex].trackId).toBe(now);
 	});
 });

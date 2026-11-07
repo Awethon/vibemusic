@@ -7,6 +7,7 @@
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import Cover from '#lib/ui/Cover.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
+	import ShuffleButton from '#lib/ui/ShuffleButton.svelte';
 	import TrackList from '#lib/ui/TrackList.svelte';
 	import { longDuration, plural } from '#lib/ui/format.ts';
 	import { live } from '#lib/ui/live.svelte.ts';
@@ -45,7 +46,9 @@
 				)}{#if album.value.genres.length}{' · '}{#each album.value.genres as genre, index (genre)}{#if index},
 						{/if}<a href={resolve('/')} onclick={() => showGenre(genre)}>{genre}</a>{/each}{/if}
 			</p>
-			<div class="actions"><PlayButton tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" /></div>
+			<div class="actions">
+				<PlayButton tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" /><ShuffleButton listKey="album:{id}" />
+			</div>
 		</div>
 		<div class="album-main">
 			<TrackList tracks={tracks.value} sourceName={album.value.name} listKey="album:{id}" numbering="track" discHeadings />

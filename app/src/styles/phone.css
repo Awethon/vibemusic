@@ -399,7 +399,7 @@ body.now-open #nowPhone {
 
 .nf-ctrl {
 	display: grid;
-	grid-template-columns: 44px 1fr auto 1fr 44px;
+	grid-template-columns: 44px 44px 1fr auto 1fr 44px 44px;
 	align-items: center;
 	justify-items: center;
 	margin-top: 2px;

@@ -119,6 +119,29 @@
 	flex: 0 0 92px;
 }
 
+/* Shuffle on: accent colour and a dot underneath, like a pressed toggle. */
+.icon-btn.shuffle {
+	position: relative;
+}
+.icon-btn.shuffle.on {
+	color: var(--accent);
+}
+.icon-btn.shuffle.on::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	bottom: 3px;
+	width: 4px;
+	height: 4px;
+	margin-left: -2px;
+	border-radius: 50%;
+	background: currentColor;
+}
+.icon-btn.shuffle:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
 /* Touch has no hover to reveal the knob, and a 20px strip is hard to hit with a finger: the hit
    area grows to the recommended 44px (the negative margin keeps the layout), and the rail and
    knob are always shown. */

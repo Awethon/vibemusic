@@ -9,6 +9,7 @@
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
 	import Icon from './Icon.svelte';
+	import ShuffleButton from './ShuffleButton.svelte';
 	import LikeButton from './LikeButton.svelte';
 	import { setFullScreen, togglePanel } from './shell.ts';
 	import Slider from './Slider.svelte';
@@ -88,12 +89,13 @@
 			{/if}
 		</div>
 		<div class="nf-ctrl">
-			{#if live}<span></span>{:else}<LikeButton className="nf-like" />{/if}
+			{#if live}<span></span><span></span>{:else}<LikeButton className="nf-like" /><ShuffleButton />{/if}
 			<button class="icon-btn" type="button" aria-label="Previous" onclick={playPreviousTrack}><Icon name="prev" /></button>
 			<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}
 				><Icon name={player.playing ? 'pause' : 'play'} /></button
 			>
 			<button class="icon-btn" type="button" aria-label="Next" onclick={playNextTrack}><Icon name="next" /></button>
+			<span></span>
 			<button class="icon-btn nf-queue" type="button" aria-label="Queue and lyrics" onclick={() => togglePanel(true, 'queue')}
 				><Icon name="queue" /></button
 			>

@@ -3,6 +3,7 @@
 // track); userQueue holds tracks the user added with "play next"/"add to queue" and always plays
 // before the rest of the source. Entries can also be "played now" out of order, which takes them
 // out of their list; playingOutOfOrder records that so Previous and saving behave correctly.
+// A shuffled source keeps its unshuffled entry order so turning shuffle off can restore it.
 
 // entryId tells apart repeated copies of the same track in the queue.
 export type Entry = { entryId: string; trackId: string };
@@ -16,6 +17,8 @@ export type QueueState = {
 	currentEntryId: string;
 	currentTrackId: string;
 	playingOutOfOrder: boolean;
+	shuffled: boolean;
+	unshuffledOrder: string[];
 };
 
 export type QueueEffect = 'play' | 'restart' | 'stop' | 'none';
@@ -43,7 +46,9 @@ export const emptyQueue = (): QueueState => ({
 	userQueue: [],
 	currentEntryId: '',
 	currentTrackId: '',
-	playingOutOfOrder: false
+	playingOutOfOrder: false,
+	shuffled: false,
+	unshuffledOrder: []
 });
 
 function makeCurrent(state: QueueState, entry: Entry, outOfOrder: boolean) {
@@ -52,14 +57,58 @@ function makeCurrent(state: QueueState, entry: Entry, outOfOrder: boolean) {
 	state.playingOutOfOrder = outOfOrder;
 }
 
-export function playList(state: QueueState, trackIds: string[], startIndex: number, sourceName: string, sourceKey: string): QueueEffect {
+function shuffledCopy<T>(items: T[], random: () => number): T[] {
+	const copy = [...items];
+	for (let index = copy.length - 1; index > 0; index--) {
+		const other = Math.floor(random() * (index + 1));
+		[copy[index], copy[other]] = [copy[other], copy[index]];
+	}
+	return copy;
+}
+
+// Puts the entry at `first` in front and shuffles the rest behind it.
+function shuffleSource(state: QueueState, first: number, random: () => number) {
+	const entries = state.sourceQueue;
+	state.unshuffledOrder = entries.map((entry) => entry.entryId);
+	state.sourceQueue = [entries[first], ...shuffledCopy([...entries.slice(0, first), ...entries.slice(first + 1)], random)];
+	state.sourceIndex = 0;
+	state.shuffled = true;
+}
+
+// With shuffle, a negative startIndex starts from a random track (the list's Play button).
+export function playList(
+	state: QueueState,
+	trackIds: string[],
+	startIndex: number,
+	sourceName: string,
+	sourceKey: string,
+	shuffle = false,
+	random = Math.random
+): QueueEffect {
 	if (!trackIds.length) return 'none';
 	state.sourceQueue = createEntries(trackIds);
 	state.sourceIndex = Math.min(Math.max(0, startIndex), trackIds.length - 1);
 	state.sourceName = sourceName;
 	state.sourceKey = sourceKey;
+	state.shuffled = false;
+	state.unshuffledOrder = [];
+	if (shuffle) shuffleSource(state, startIndex < 0 ? Math.floor(random() * trackIds.length) : state.sourceIndex, random);
 	makeCurrent(state, state.sourceQueue[state.sourceIndex], false);
 	return 'play';
+}
+
+// Turning shuffle on keeps the current source entry and shuffles every other one behind it;
+// turning it off restores the original order and continues after the current entry.
+export function setShuffle(state: QueueState, on: boolean, random = Math.random) {
+	if (on === state.shuffled || !state.sourceQueue.length) return;
+	if (on) return shuffleSource(state, state.sourceIndex, random);
+	const current = state.sourceQueue[state.sourceIndex];
+	const byId = new Map(state.sourceQueue.map((entry) => [entry.entryId, entry]));
+	const restored = state.unshuffledOrder.flatMap((entryId) => byId.get(entryId) ?? []);
+	state.sourceQueue = [...restored, ...state.sourceQueue.filter((entry) => !state.unshuffledOrder.includes(entry.entryId))];
+	state.sourceIndex = Math.max(0, state.sourceQueue.indexOf(current));
+	state.shuffled = false;
+	state.unshuffledOrder = [];
 }
 
 export function playQueuedAt(state: QueueState, queuedIndex: number): QueueEffect {
@@ -173,7 +222,9 @@ export function applyEdit(state: QueueState, edit: QueueEdit) {
 export const copyQueue = (state: QueueState): QueueState => ({
 	...state,
 	sourceQueue: state.sourceQueue.map((entry) => ({ ...entry })),
-	userQueue: state.userQueue.map((entry) => ({ ...entry }))
+	userQueue: state.userQueue.map((entry) => ({ ...entry })),
+	shuffled: state.shuffled ?? false,
+	unshuffledOrder: [...(state.unshuffledOrder ?? [])]
 });
 
 export function replaceQueue(state: QueueState, next: QueueState) {

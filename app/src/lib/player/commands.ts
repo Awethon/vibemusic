@@ -5,7 +5,8 @@ import { PLAYBACK } from '../tuning.ts';
 import * as queue from './queue.ts';
 
 export type Command =
-	| { kind: 'playList'; trackIds: string[]; startIndex: number; sourceName: string; listKey: string }
+	| { kind: 'playList'; trackIds: string[]; startIndex: number; sourceName: string; listKey: string; shuffle?: boolean }
+	| { kind: 'shuffle'; on: boolean }
 	| { kind: 'togglePlay' }
 	| { kind: 'next' }
 	| { kind: 'previous' }
@@ -33,7 +34,10 @@ export const STARTS_PLAYBACK = new Set<Command['kind']>([
 export function applyToQueue(state: queue.QueueState, command: Command, positionSeconds: number): queue.QueueEffect | null {
 	switch (command.kind) {
 		case 'playList':
-			return queue.playList(state, command.trackIds, command.startIndex, command.sourceName, command.listKey);
+			return queue.playList(state, command.trackIds, command.startIndex, command.sourceName, command.listKey, command.shuffle);
+		case 'shuffle':
+			queue.setShuffle(state, command.on);
+			return 'none';
 		case 'next':
 			return queue.playNext(state);
 		case 'previous':

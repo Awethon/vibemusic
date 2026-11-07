@@ -135,6 +135,12 @@ body.now-open #dock {
 	flex: none;
 }
 
+/* Keeps Play centred: shuffle sits left of Previous, and there is no button on the right to match. */
+.cap-balance {
+	flex: none;
+	width: 36px;
+}
+
 .cap-ctrl .play {
 	width: 40px;
 	height: 40px;

@@ -16,6 +16,7 @@
 	import Cover from './Cover.svelte';
 	import { clock } from './format.ts';
 	import Icon from './Icon.svelte';
+	import ShuffleButton from './ShuffleButton.svelte';
 	import LikeButton from './LikeButton.svelte';
 	import { toggleFullScreen, togglePanel } from './shell.ts';
 	import Slider from './Slider.svelte';
@@ -52,11 +53,13 @@
 		</div>
 		<div class="cap-center">
 			<div class="cap-ctrl">
+				<ShuffleButton />
 				<button class="icon-btn" type="button" aria-label="Previous" onclick={playPreviousTrack}><Icon name="prev" /></button>
 				<button class="play" type="button" aria-label={player.playing ? 'Pause' : 'Play'} onclick={togglePlay}
 					><Icon name={player.playing ? 'pause' : 'play'} /></button
 				>
 				<button class="icon-btn" type="button" aria-label="Next" onclick={playNextTrack}><Icon name="next" /></button>
+				<span class="cap-balance" aria-hidden="true"></span>
 			</div>
 			<div class="cap-seek" class:live>
 				{#if live}<span class="live-badge"><i></i>Live</span>{:else}
