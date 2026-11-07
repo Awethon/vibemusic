@@ -759,6 +759,12 @@ body.phone.tap-to-play #remoteBanner {
 	transform: none;
 }
 
+/* The full-screen player names the playing device under the title, and the banner would cover its
+   header (close, like and devices). */
+body.phone.now-open.remote #remoteBanner {
+	transform: translateY(calc(-80px - var(--phone-safe-t)));
+}
+
 body.phone #remoteBanner .rb-text {
 	flex: 1;
 	min-width: 0;
