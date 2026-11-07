@@ -2,21 +2,42 @@ import { coverUrl } from '../navidrome/credentials.ts';
 import { requireCredentials } from '../session.svelte.ts';
 import { patchLibrary } from './library.svelte.ts';
 import { coverPalette } from './coverPalette.ts';
+import PaletteWorker from './palette.worker.ts?worker';
+import { coverPixels, type PaletteResponse } from './paletteExtract.ts';
 import { PALETTE_KEY_SUFFIX, savedPalette } from './queries.ts';
-import { COVER_PX, PALETTE } from '../tuning.ts';
+import { COVER_PX } from '../tuning.ts';
 
-// Downscales the cover to a small bitmap first; a few thousand pixels are plenty for a palette.
+let worker: Worker | null | undefined;
+let nextRequest = 0;
+const waiting = new Map<number, { resolve: (colors: string[]) => void; reject: (error: Error) => void }>();
+
+// One worker for all extractions; null when workers can't start, and extraction runs here instead.
+function paletteWorker(): Worker | null {
+	if (worker !== undefined) return worker;
+	try {
+		worker = new PaletteWorker();
+		worker.addEventListener('message', (event: MessageEvent<PaletteResponse>) => {
+			const response = event.data;
+			const request = waiting.get(response.id);
+			waiting.delete(response.id);
+			if ('colors' in response) request?.resolve(response.colors);
+			else request?.reject(new Error(response.error));
+		});
+	} catch {
+		worker = null;
+	}
+	return worker;
+}
+
 async function extract(albumId: string): Promise<string[]> {
-	const response = await fetch(coverUrl(requireCredentials(), albumId, COVER_PX.paletteSample));
-	const bitmap = await createImageBitmap(await response.blob(), {
-		resizeWidth: PALETTE.coverSamplePx,
-		resizeHeight: PALETTE.coverSamplePx
+	const url = coverUrl(requireCredentials(), albumId, COVER_PX.paletteSample);
+	const target = paletteWorker();
+	if (!target) return coverPalette(await coverPixels(url));
+	const id = ++nextRequest;
+	return new Promise((resolve, reject) => {
+		waiting.set(id, { resolve, reject });
+		target.postMessage({ id, url });
 	});
-	const canvas = new OffscreenCanvas(PALETTE.coverSamplePx, PALETTE.coverSamplePx);
-	const context = canvas.getContext('2d')!;
-	context.drawImage(bitmap, 0, 0);
-	bitmap.close();
-	return coverPalette(context.getImageData(0, 0, PALETTE.coverSamplePx, PALETTE.coverSamplePx).data);
 }
 
 const inFlight = new Map<string, Promise<string[]>>();
