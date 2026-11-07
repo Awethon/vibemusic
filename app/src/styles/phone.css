@@ -518,6 +518,24 @@ body.phone:not(.now-open):not(.panel-open) .pop {
 	max-height: calc(100dvh - var(--tabs-h) - var(--phone-safe-b) - var(--phone-safe-t) - 24px);
 }
 
+/* #devices has a fixed desktop width; as a phone sheet it spans the screen like the other popovers. */
+body.phone #devices {
+	width: auto;
+}
+
+/* The devices popover opened from the full-screen player's header drops down from its button. */
+body.phone #devices.dropdown {
+	left: auto;
+	bottom: auto;
+	width: min(320px, calc(100vw - 16px));
+	transform-origin: top right;
+	transform: translateY(-8px) scale(0.98);
+}
+
+body.phone #devices.dropdown.open {
+	transform: none;
+}
+
 body.phone #ctx.open,
 body.phone .pop.open {
 	transform: none;

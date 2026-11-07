@@ -8,7 +8,10 @@
 	import { ui } from './state.svelte.ts';
 
 	let element = $state<HTMLElement | null>(null);
-	let position = $state({ right: 0, bottom: 0 });
+	let position = $state({ right: 0, bottom: 0, top: 0 });
+	// On the phone the popover is a bottom sheet, except from the full-screen player, whose devices
+	// button is in the top corner: there it drops down from the button.
+	const dropdown = $derived(formFactor.phone && ui.fullScreen);
 	const labels = $derived(deviceLabels());
 	const devices = $derived(onlineDevices().toSorted((a, b) => Number(b.id === relay.deviceId) - Number(a.id === relay.deviceId)));
 
@@ -16,7 +19,11 @@
 		if (!ui.devicesOpen || !element) return;
 		const anchor = document.getElementById('bDevice')?.getBoundingClientRect();
 		if (!anchor) return;
-		position = { right: Math.max(POPOVER.edgeMarginPx, innerWidth - anchor.right), bottom: innerHeight - anchor.top + POPOVER.anchorGapPx };
+		position = {
+			right: Math.max(POPOVER.edgeMarginPx, innerWidth - anchor.right),
+			bottom: innerHeight - anchor.top + POPOVER.anchorGapPx,
+			top: anchor.bottom + POPOVER.anchorGapPx / 2
+		};
 	});
 
 	function status(device: Device) {
@@ -51,8 +58,10 @@
 	role="dialog"
 	aria-label="Devices"
 	bind:this={element}
-	style:right={formFactor.phone ? undefined : `${position.right}px`}
-	style:bottom={formFactor.phone ? undefined : `${position.bottom}px`}
+	class:dropdown
+	style:right={formFactor.phone && !dropdown ? undefined : `${position.right}px`}
+	style:bottom={formFactor.phone || dropdown ? undefined : `${position.bottom}px`}
+	style:top={dropdown ? `${position.top}px` : undefined}
 >
 	<p class="pop-title">Play on</p>
 	{#each devices as device (device.id)}
