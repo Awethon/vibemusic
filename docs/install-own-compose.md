@@ -5,21 +5,13 @@ and they reach Navidrome by name on the shared network.
 
 [Back to the overview](../README.md)
 
-## Get the source
-
-There are no published images yet, so Docker builds them from a copy of this repository:
-
-```bash
-git clone <this repository> /srv/vibemusic
-```
-
 ## Add the services
 
 Next to your `navidrome` service:
 
 ```yaml
   vibemusic:
-    build: /srv/vibemusic/app
+    image: ghcr.io/awethon/vibemusic:latest
     restart: unless-stopped
     ports:
       - 8080:80
@@ -28,7 +20,7 @@ Next to your `navidrome` service:
       - RELAY_URL=http://vibemusic-relay:4600
 
   vibemusic-relay:
-    build: /srv/vibemusic/relay
+    image: ghcr.io/awethon/vibemusic-relay:latest
     restart: unless-stopped
     environment:
       - NAVIDROME_URL=http://navidrome:4533
@@ -80,6 +72,9 @@ with the password in the `.env` file next to your compose file.
 ## Updating
 
 ```bash
-git -C /srv/vibemusic pull
-docker compose up -d --build vibemusic vibemusic-relay
+docker compose pull vibemusic vibemusic-relay
+docker compose up -d vibemusic vibemusic-relay
 ```
+
+`latest` is the newest release; use a version such as `0.1.0` to pin one, or `edge` for the
+newest commit on main.

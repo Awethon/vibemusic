@@ -56,8 +56,12 @@ skipped that step, run `./setup.sh` again. See [The relay](relay.md).
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+`VIBEMUSIC_VERSION` in `.env` pins a release (see [Settings](configuration.md)). To build from
+this copy of the source instead, run `docker compose up -d --build`.
 
 ## Behind a domain
 

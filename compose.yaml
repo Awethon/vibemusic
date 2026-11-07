@@ -1,12 +1,14 @@
 # vibemusic with its relay, and optionally Navidrome. Run ./setup.sh, which asks a few questions,
 # writes .env and starts everything. Or by hand: copy .env.example to .env, fill it in, then
-#   docker compose up -d
+#   docker compose pull && docker compose up -d
 # The app is then at http://<this machine>:8080. COMPOSE_PROFILES in .env picks the optional parts.
+# The images are published on GitHub's registry; `docker compose up -d --build` builds them from
+# this copy of the source instead.
 
 services:
   vibemusic:
+    image: ghcr.io/awethon/vibemusic:${VIBEMUSIC_VERSION:-latest}
     build: ./app
-    image: vibemusic:local
     restart: unless-stopped
     ports:
       - ${VIBEMUSIC_PORT:-8080}:80
@@ -32,8 +34,8 @@ services:
   # Remote control between devices, genre and popularity lookups, internet radio, share previews
   # and "This is" playlists. Optional: without it the app works and those features are missing.
   relay:
+    image: ghcr.io/awethon/vibemusic-relay:${VIBEMUSIC_VERSION:-latest}
     build: ./relay
-    image: vibemusic-relay:local
     profiles: [relay]
     restart: unless-stopped
     environment:

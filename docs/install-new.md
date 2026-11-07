@@ -29,8 +29,7 @@ cd vibemusic
 4. **Public address**, only if you'll put vibemusic behind a domain (see
    [Behind your own domain](reverse-proxy.md)). Leave it empty otherwise.
 
-It writes `.env` and `navidrome.env`, builds the images (a few minutes the first time) and starts
-everything.
+It writes `.env` and `navidrome.env`, downloads the images and starts everything.
 
 ## First visit
 
@@ -53,10 +52,14 @@ later. See [The relay](relay.md) for what else it does.
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Your library, accounts and playlists live in Docker volumes, so rebuilding keeps them.
+`VIBEMUSIC_VERSION` in `.env` pins a release (see [Settings](configuration.md)). To build from
+this copy of the source instead, run `docker compose up -d --build`.
+
+Your library, accounts and playlists live in Docker volumes, so updating keeps them.
 
 ## Where things are
 

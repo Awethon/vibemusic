@@ -11,6 +11,7 @@ change, apply it with `docker compose up -d`. Lists are comma-separated.
 | Variable | Default | What it does |
 |---|---|---|
 | `COMPOSE_PROFILES` | `relay,navidrome` | Which optional parts run: `relay`, `navidrome` |
+| `VIBEMUSIC_VERSION` | `latest` | Image version: `latest` (newest release), a release such as `0.1.0`, or `edge` (newest commit) |
 | `VIBEMUSIC_PORT` | `8080` | Port for vibemusic on this machine |
 | `NAVIDROME_URL` | the bundled one | Navidrome as the containers reach it, e.g. `http://192.168.1.10:4533` |
 | `MUSIC_FOLDER` | `./music` | Bundled Navidrome: your music folder, mounted read-only |

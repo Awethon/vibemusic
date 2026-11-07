@@ -68,3 +68,10 @@ docker compose build
 
 builds `app/Dockerfile` (the app served by Caddy, with `app/Caddyfile` doing the routing) and
 `relay/Dockerfile`.
+
+## CI and releases
+
+GitHub Actions runs the checks above on every push and pull request. Every push to main also
+publishes both images for amd64 and arm64 to `ghcr.io/awethon/vibemusic` and
+`ghcr.io/awethon/vibemusic-relay` as `edge`. Pushing a tag such as `v0.2.0` publishes them as
+`0.2.0`, `0.2` and `latest` and creates a GitHub release with generated notes.

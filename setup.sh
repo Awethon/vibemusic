@@ -96,8 +96,10 @@ esac
 port=$(env_value VIBEMUSIC_PORT)
 base="http://localhost:${port:-8080}"
 
-echo "Starting vibemusic (the first run builds the images, which takes a few minutes)…"
-docker compose up -d --build
+echo "Starting vibemusic…"
+# Published images when they're available; otherwise compose builds them from this copy (a few minutes).
+docker compose pull --ignore-pull-failures --quiet || true
+docker compose up -d
 
 printf 'Waiting for vibemusic to answer…'
 tries=0
