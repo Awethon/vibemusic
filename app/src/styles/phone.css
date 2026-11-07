@@ -332,7 +332,8 @@ body.now-open #nowPhone {
 }
 
 .nf-lyrics {
-	min-height: 3.4em;
+	/* Room for a current line wrapped onto two lines plus the next one, so wrapping never moves the controls. */
+	min-height: calc(3 * 1.35em);
 	margin: 8px 0 2px;
 	text-align: center;
 	font-family: var(--display);
@@ -342,14 +343,19 @@ body.now-open #nowPhone {
 }
 
 .nf-line {
+	display: -webkit-box;
 	margin: 0;
-	white-space: nowrap;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	text-wrap: balance;
 	animation: nf-line-in 0.4s var(--ease);
 }
 
 .nf-line.next {
+	display: block;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	color: var(--ink-4);
 }
 
