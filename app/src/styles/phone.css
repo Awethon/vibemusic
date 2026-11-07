@@ -378,6 +378,12 @@ body.now-open #nowPhone {
 	gap: 2px;
 }
 
+/* .slider grows with flex: 1 in rows (the desktop bar); in this column that would squash its
+   height to a few pixels, leaving almost nothing to tap. */
+.nf-seek .slider {
+	flex: none;
+}
+
 .nf-seek.live {
 	align-items: center;
 	padding: 10px 0;

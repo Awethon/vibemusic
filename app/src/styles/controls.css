@@ -119,6 +119,26 @@
 	flex: 0 0 92px;
 }
 
+/* Touch has no hover to reveal the knob, and a 20px strip is hard to hit with a finger: the hit
+   area grows to the recommended 44px (the negative margin keeps the layout), and the rail and
+   knob are always shown. */
+@media (pointer: coarse) {
+	.slider {
+		height: 44px;
+		margin: -12px 0;
+	}
+	.slider .rail {
+		transform: none;
+	}
+	.slider .knob {
+		opacity: 1;
+		transform: scale(0.8);
+	}
+	.slider.drag .knob {
+		transform: scale(1.2);
+	}
+}
+
 .pop,
 .menu {
 	position: fixed;
