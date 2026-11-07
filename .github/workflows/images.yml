@@ -14,6 +14,10 @@ permissions:
   contents: read
   packages: write
 
+# Image names must be lowercase, and the account name isn't; compose.yaml uses the same names.
+env:
+  REGISTRY: ghcr.io/awethon
+
 jobs:
   build:
     strategy:
@@ -37,14 +41,14 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image.name }}
+          images: ${{ env.REGISTRY }}/${{ matrix.image.name }}
       - id: build
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.image.context }}
           platforms: ${{ matrix.arch.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.image.name }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ matrix.image.name }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.arch.slug }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.arch.slug }}
       - run: |
@@ -79,7 +83,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          images: ${{ env.REGISTRY }}/${{ matrix.name }}
           flavor: latest=false
           tags: |
             type=edge,branch=main
@@ -90,8 +94,8 @@ jobs:
       - working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}@sha256:%s ' *)
-      - run: docker buildx imagetools inspect "ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ steps.meta.outputs.version }}"
+            $(printf '${{ env.REGISTRY }}/${{ matrix.name }}@sha256:%s ' *)
+      - run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ matrix.name }}:${{ steps.meta.outputs.version }}"
 
   release:
     needs: publish
