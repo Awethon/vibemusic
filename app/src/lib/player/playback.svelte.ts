@@ -75,7 +75,9 @@ export function refreshPlayback(force = false) {
 	player.playing = engine.playing;
 	player.buffering = engine.buffering;
 	player.position = engine.position;
-	player.duration = engine.duration || currentTrack()?.duration || 0;
+	// The library's duration comes first: Safari estimates the length of Ogg files from their bitrate
+	// and can be off by minutes (radio streams have no library duration).
+	player.duration = currentTrack()?.duration || engine.duration || 0;
 	updateMediaSession(currentTrack(), player.playing, player.position, player.duration);
 	remote.refreshed(force);
 }
@@ -168,7 +170,7 @@ export function runLocally(command: Command) {
 			return;
 		}
 		case 'seek':
-			engine.seek(command.seconds);
+			engine.seek(Math.min(command.seconds, player.duration || command.seconds));
 			refreshPlayback(true);
 			return scheduleSave();
 		case 'volume':

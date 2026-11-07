@@ -288,8 +288,9 @@ export class AudioEngine {
 		this.seekDeck(this.active, 0);
 	}
 
+	// The caller clamps to the track's known duration; the element's own can be a poor estimate.
 	seek(seconds: number) {
-		this.seekDeck(this.active, Math.max(0, Math.min(seconds, this.duration || seconds)));
+		this.seekDeck(this.active, Math.max(0, seconds));
 	}
 
 	setLevel(level: number) {
