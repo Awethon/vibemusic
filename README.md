@@ -6,6 +6,11 @@ vibemusic is a player for your [Navidrome](docs/install-existing-navidrome.md#wh
 library that works the way a music app should today. It has the things people actually miss from
 streaming services, and leaves out what only gets in the way.
 
+<p align="center">
+  <img src="docs/images/home.webp" alt="The home page on a desktop, tinted by the playing album" width="70%">
+  <img src="docs/images/player-phone.webp" alt="The full-screen player on a phone" width="20%">
+</p>
+
 ### Calm, and in colour
 
 Each album colours the whole interface while it plays, and the background drifts with the music.
