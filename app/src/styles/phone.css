@@ -242,13 +242,27 @@ body.now-open #nowPhone {
 
 .nf-head-end {
 	display: flex;
+	align-items: center;
 	justify-content: flex-end;
 }
 
-.nf-head .nf-like {
+/* Like and devices side by side: same box, icon size and tone (like keeps its accent when on). */
+.nf-head .nf-like,
+.nf-head-end .icon-btn {
 	position: static;
 	width: 40px;
 	height: 40px;
+}
+
+.nf-head .nf-like svg,
+.nf-head-end .icon-btn svg {
+	width: 20px;
+	height: 20px;
+}
+
+.nf-head .nf-like:not(.on) {
+	--ia: 0.72;
+	color: var(--ink-2);
 }
 
 .nf-head .eyebrow {
