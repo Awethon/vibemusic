@@ -92,12 +92,12 @@ const TRACK_COLUMNS = `track.id, track.album_id as albumId, album.name as album,
 
 const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount, artist.track_count as trackCount, artist.first_year as firstYear,
 	artist.newest_album_id as newestAlbumId,
-	(select json_group_array(id) from (select id from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) order by year desc, created desc limit 4)) as coverAlbumIds`;
+	(select json_group_array(id) from (select id from album where album.image_hash != '' and exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) order by year desc, created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
 	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image_hash as imageHash, playlist.readonly, playlist.artist_id as artistId,
-	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id
-		where playlist_track.playlist_id = playlist.id group by track.album_id order by min(playlist_track.position) limit 8)) as mosaicAlbumIds`;
+	(select json_group_array(album_id) from (select track.album_id from playlist_track join track on track.id = playlist_track.track_id join album on album.id = track.album_id
+		where playlist_track.playlist_id = playlist.id and album.image_hash != '' group by track.album_id order by min(playlist_track.position) limit 8)) as mosaicAlbumIds`;
 
 const toAlbum = (row: Raw<Album>): Album => ({
 	...row,
