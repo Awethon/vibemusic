@@ -78,6 +78,7 @@ All of them use Docker Compose, and most of the work is done by `./setup.sh`.
 - [Settings](docs/configuration.md): every option, from genre playlists to the defaults visitors
   see.
 - [The relay](docs/relay.md): what it does, and which outside services it asks about your music.
+- [Tech stack](docs/tech-stack.md): what the app and the relay are built with.
 - [Development](docs/development.md): running the app and relay from source.
 
 ## Built with AI
