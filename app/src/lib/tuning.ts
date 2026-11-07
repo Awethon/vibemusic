@@ -252,7 +252,9 @@ export const PLAYBACK = Object.freeze({
 	initialVolume: 0.72,
 	tickMs: 100,
 	startToleranceSeconds: 1,
-	contextResumeTimeoutMs: 1500
+	contextResumeTimeoutMs: 1500,
+	// iPhone only: a pause longer than this reloads the track on resume (see AudioEngine.resume).
+	reloadAfterPauseMs: 20_000
 });
 
 // Album colour palettes and how fast the background follows them. *Rate values are exponential

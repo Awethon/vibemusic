@@ -7,7 +7,8 @@ import type { Track } from '../library/queries.ts';
 import { navidrome } from '../session.svelte.ts';
 import { localAudioLive, startPlayback } from './playback.svelte.ts';
 import type * as queue from './queue.ts';
-import { isMirroring, perform } from './remote.svelte.ts';
+import { isMirroring, perform, playOn } from './remote.svelte.ts';
+import { relay } from '../remote/relay.svelte.ts';
 import { player, queueState, remember, setStarred } from './state.svelte.ts';
 
 export { currentTrack, player, playerQueue, totalDuration, trackById } from './state.svelte.ts';
@@ -15,9 +16,13 @@ export { restoreSavedQueue, sampleAudio } from './playback.svelte.ts';
 export { playOn, startRemoteControl } from './remote.svelte.ts';
 
 export function startPlayer() {
+	// The lock screen and headphone controls belong to the audio in this tab, so play always means
+	// "play here": a tab mirroring another device takes playback back instead of sending the command
+	// to a device that may be gone.
 	startPlayback({
 		play: () => {
-			if (!player.playing) togglePlay();
+			if (isMirroring()) playOn(relay.deviceId);
+			else if (!player.playing) togglePlay();
 		},
 		pause: () => {
 			if (player.playing) togglePlay();

@@ -13,6 +13,7 @@ type Deck = {
 	startAt: number | null;
 	pendingSeek: (() => void) | null;
 	blocked: boolean;
+	pausedAt: number | null;
 };
 
 export type EngineListener = {
@@ -50,7 +51,7 @@ export class AudioEngine {
 	private createDeck(): Deck {
 		const element = new Audio();
 		element.preload = 'auto';
-		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false };
+		const deck: Deck = { element, trackId: '', source: null, startAt: null, pendingSeek: null, blocked: false, pausedAt: null };
 		// The start position is applied once playback actually starts: Safari loads nothing before
 		// the first gesture, and iOS Safari accepts a seek on a never-played element but then plays
 		// from 0:00 with currentTime frozen.
@@ -58,6 +59,10 @@ export class AudioEngine {
 			if (deck.startAt !== null && Math.abs(element.currentTime - deck.startAt) > PLAYBACK.startToleranceSeconds)
 				element.currentTime = deck.startAt;
 			deck.startAt = null;
+			deck.pausedAt = null;
+		});
+		element.addEventListener('pause', () => {
+			deck.pausedAt = performance.now();
 		});
 		// The standby deck is preloading the next track; its events must not drive the player.
 		const fromActive = (handler: () => void) => () => {
@@ -121,9 +126,10 @@ export class AudioEngine {
 	}
 
 	get position() {
-		// While blocked (waiting for a tap) the element has never played, so its currentTime is
-		// meaningless; the wanted position lives in startAt.
-		if (this.active.blocked && this.active.startAt !== null) return this.active.startAt;
+		// While blocked (waiting for a tap) or reloading, the element's currentTime is meaningless;
+		// the wanted position lives in startAt.
+		if (this.active.startAt !== null && (this.active.blocked || this.active.element.readyState < HTMLMediaElement.HAVE_FUTURE_DATA))
+			return this.active.startAt;
 		return this.active.element.currentTime || 0;
 	}
 
@@ -157,6 +163,7 @@ export class AudioEngine {
 		this.analysis?.reset();
 		deck.startAt = null;
 		deck.blocked = false;
+		deck.pausedAt = null;
 		this.dropPendingSeek(deck);
 		if (options.startAt) this.seekDeck(deck, options.startAt);
 		else if (deck.element.currentTime) deck.element.currentTime = 0;
@@ -218,8 +225,13 @@ export class AudioEngine {
 		const deck = this.active;
 		const element = deck.element;
 		// The tap that unblocks reloads the track inside the gesture; startAt is applied on 'playing'.
-		if (deck.blocked) {
+		// On iPhone a long pause in the background also needs a reload: iOS drops the paused page's
+		// connection, and play() then reports playing while no audio arrives.
+		const stale = this.plain && deck.pausedAt !== null && performance.now() - deck.pausedAt > PLAYBACK.reloadAfterPauseMs;
+		if (deck.blocked || stale) {
+			deck.startAt ??= element.currentTime;
 			deck.blocked = false;
+			this.dropPendingSeek(deck);
 			element.load();
 		}
 		try {
