@@ -6,7 +6,7 @@
 
 | Folder | What |
 |---|---|
-| `app/` | The web app: SvelteKit 5, TypeScript, SQLite (WebAssembly) in a worker |
+| `app/` | The web app: Svelte 5 with SvelteKit, TypeScript, SQLite (WebAssembly) in a worker |
 | `relay/` | The relay: Rust, axum |
 | `dev/` | A Navidrome with test music, for development |
 | `compose.yaml`, `setup.sh` | The installed setup ([New setup](install-new.md)) |

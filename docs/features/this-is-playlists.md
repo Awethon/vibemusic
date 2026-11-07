@@ -2,9 +2,9 @@
 
 The relay can keep one playlist per artist, called "This is" and the artist's name, with that
 artist's best-known tracks that are in your library. Tracks are ordered by how popular they are
-on Apple and Deezer. Each playlist gets a cover drawn in the colours of
-the artist's newest album. Playlists follow your library: new albums and tracks show up within
-about an hour, and a playlist is only rewritten when it actually changes.
+on Apple and Deezer. Each playlist gets a cover drawn in the colours of the artist's newest
+album. Playlists follow your library: new albums and tracks show up within about an hour, and a
+playlist is only rewritten when it actually changes.
 
 [All features](README.md)
 
@@ -34,14 +34,14 @@ library can take a while, mostly because Apple has to be asked slowly.
 | `THIS_IS_EVERY_HOURS` | `168` | Hours between full refreshes of every artist (168 is a week) |
 | `THIS_IS_SKIP` | none | Artists that never get one, comma-separated, any capitalisation |
 | `ENRICHMENT_SOURCES` | `musicbrainz,deezer,apple` | Which outside services may be asked |
-| `APPLE_STOREFRONTS` | `us` | Apple country catalogs to search, in order |
+| `APPLE_STOREFRONTS` | `us` | Apple country catalogues to search, in order |
 
 `ENRICHMENT_SOURCES` decides where popularity comes from. Leave out `apple` and Apple isn't
 asked; leave out `deezer` and no new Deezer lookups are made. Answers the relay already has
 are still used. With neither, tracks are ordered by release year. See
 [The relay](../relay.md#what-it-sends-outside) for what these services are sent.
 
-If an artist is missing from Apple's US catalog, or ranked oddly there, add the countries where
+If an artist is missing from Apple's US catalogue, or ranked oddly there, add the countries where
 they're better known, for example `APPLE_STOREFRONTS=us,de`.
 
 ## Which artists get one
@@ -164,7 +164,7 @@ zero. When many artists changed, or at the weekly refresh, it reads the whole li
 skipped names are dropped. For the rest, the artist's albums are sorted newest first, by release
 year and then by when they were added, which sets the cover's colours and the order of the fan.
 
-**Popularity from Apple.** The relay searches Apple's catalog for the artist's name in each
+**Popularity from Apple.** The relay searches Apple's catalogue for the artist's name in each
 storefront from `APPLE_STOREFRONTS`, in order. Several artists can share a name, so a search hit
 is only trusted if its discography on Apple includes at least one album title from your library;
 up to three hits are checked. The first storefront where the artist is confirmed gives up to 50

@@ -90,7 +90,7 @@ those requests with a small page made for previews, so the chat shows:
   album, shows as "Single".
 - **for an album or a playlist:** the share's name as the title, and the number of tracks and
   total minutes below, for example "12 tracks · 48 min".
-- the cover of the first track as the picture, and vibemusic as the site name.
+- the cover of the first track as the picture, and vibemusic as the website name.
 
 The preview's links assume your domain is served over https, so previews need a public https
 address, as in [Behind your own domain](../reverse-proxy.md).

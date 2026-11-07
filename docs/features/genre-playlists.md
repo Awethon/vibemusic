@@ -104,8 +104,8 @@ The person running the server can adjust genre playlists for everyone:
 |---|---|---|
 | `VIBEMUSIC_GENRE_HIDDEN` | none | Genres that never get a playlist |
 | `VIBEMUSIC_GENRE_PINNED` | none | Genres that always get one, however small |
-| `VIBEMUSIC_GENRE_MAX_PLAYLISTS` | `24` | Most genre playlists |
-| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Most tracks per playlist |
+| `VIBEMUSIC_GENRE_MAX_PLAYLISTS` | `24` | Maximum number of genre playlists |
+| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Maximum tracks per playlist |
 | `VIBEMUSIC_GENRE_MIN_SONGS` | `30`, sub-genres `50` | Tracks a genre needs |
 | `VIBEMUSIC_GENRE_MIN_ARTISTS` | `2`, sub-genres `3` | Artists a genre needs |
 
@@ -162,12 +162,12 @@ Each track's genres are decided by a small vote, from up to four sources:
   album's genre tags are used instead. These are trusted most: every genre in them gets a full
   vote.
 - **The album's tags on MusicBrainz**, when the relay found the album there. People vote on these
-  tags, so they're weighed by how many votes they got: the most-voted tag counts most, tags with
+  tags, so they're weighted by how many votes they got: the most-voted tag counts most, tags with
   fewer than 40% of its votes are dropped as noise, and when even the top tag has only one or two
   votes, all of them count for less. Only tags that are genres in the tree are used.
 - **The album's genre on Deezer**, when the relay matched the album there by title. It's a single
   broad genre, like Rock or Electronic, and counts for half a vote.
-- **The artist's tags on MusicBrainz**, weighed the same way as album tags. They're only asked
+- **The artist's tags on MusicBrainz**, weighted the same way as album tags. They're only used
   when the track has no usable genre tags and the album's MusicBrainz tags are thin, because an
   artist's tags describe their whole career rather than this album.
 
@@ -218,7 +218,7 @@ The candidates are then considered in order: pinned genres first, then top-level
 sub-genres one level down, and so on, with bigger genres before smaller ones at the same level.
 Each one is added unless it repeats a playlist already chosen:
 
-- **A sub-genre is skipped** when it holds 70% or more as many tracks as one of its parents that
+- **A sub-genre is skipped** when it has at least 70% as many tracks as one of its parents that
   already has a playlist, since it would mostly be a copy of it.
 - **Any other genre is skipped** when 80% or more of its tracks are already in a chosen playlist,
   or when half or more of the tracks it would actually play are already picked for one.
@@ -245,7 +245,7 @@ Every remaining track gets a score:
 
 Next, the 100 places are shared out between artists. Each artist has a weight, from their Deezer
 fan count (heavily flattened, so a superstar weighs only a few times more than a small band) and
-how much you play them. Every artist gets one place first, heaviest first, while places last.
+how much you play them. Every artist gets one place first, heaviest first, until the places run out.
 The rest are handed out one at a time, each to the artist with the best weight relative to the
 places they already have, so big artists get more without crowding out the rest. Nobody gets more
 than 15% of the playlist unless there's no one else with tracks left. Each artist's places are
@@ -256,7 +256,7 @@ Finally, the order. Each track's score gets a random nudge that depends on the t
 current week, so the order is stable for a week and changes the next. Tracks are then placed from
 the highest nudged score down, keeping at least three tracks between two by the same artist (fewer
 when there are only a handful of artists). An artist with many tracks left is brought forward
-before the spacing becomes impossible to keep near the end. The walk decides which artist
+before the spacing becomes impossible to keep near the end. This pass decides which artist
 plays in each slot; each artist's slots are then filled with their tracks from most to least
 popular, so their biggest track comes first.
 
@@ -283,12 +283,12 @@ Genre playlists don't have a cover image; vibemusic draws one for each, live in 
 the playlist's own albums.
 
 - **The wall.** The background is a grid of album covers, four to a row, taken from the first
-  eight different albums in the playlist, in playlist order. Each row starts one album later than
+  eight different albums in the playlist that have a cover, in playlist order. Each row starts one album later than
   the one above, so the same cover never lines up in a column, and with fewer albums the covers
   repeat. The whole wall is tilted about 14 degrees and runs off the edges.
 - **The fade.** The wall fades into a dark background at the top, where the title sits, and at
   the bottom, leaving the covers clearest in the middle.
-- **The colours.** They come from the cover of the first album in the playlist. Of its main
+- **The colours.** They come from the cover of the first of those albums. Of its main
   colours, the most colourful one is chosen (strongly coloured, and neither too dark nor too
   light), and its hue is used twice: as a light accent colour and as a very dark background.
   Dull covers are given a little more colour and loud ones are toned down, so every cover looks

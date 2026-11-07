@@ -48,8 +48,9 @@ what you've set up there shows in vibemusic too.
 
 ## "This is" playlists
 
-Run `./setup.sh` again and give your Navidrome admin login when it asks. It creates a separate,
-non-admin account for the relay and restarts it. See [The relay](relay.md).
+At the end, `setup.sh` offers to create a separate, non-admin account for the relay: give your
+Navidrome admin login when it asks, and it creates the account and restarts the relay. If you
+skipped that step, run `./setup.sh` again. See [The relay](relay.md).
 
 ## Updating
 

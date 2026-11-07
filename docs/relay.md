@@ -8,14 +8,14 @@ network.
 
 ## What it adds
 
-- **Remote control between devices.** Every open vibemusic of the same account sees the others:
+- **Remote control between devices.** Every vibemusic tab signed in to the same account sees the others:
   play on one and control it from another.
 - **Genres and popularity.** It looks up your artists and albums on MusicBrainz, Deezer and
   Apple, for genre tags, artist countries and which tracks are popular. Genre playlists, "This is"
   playlists and the home page use this.
 - **"This is" playlists.** With its own Navidrome account it keeps one playlist per artist with
-  their most popular tracks that you own, with a generated cover, kept up to date as your library changes. They're
-  ordinary Navidrome playlists, so other apps see them too.
+  their most popular tracks that you own, with a generated cover, kept up to date as your
+  library changes. They're ordinary Navidrome playlists, so other apps see them too.
 - **Internet radio.** Stations configured in Navidrome play through the relay, so the background
   can move with them.
 - **Shared links.** The public page a shared link opens gets its track list from the relay, and
@@ -31,7 +31,7 @@ titles** from your library to:
 |---|---|
 | MusicBrainz | genre tags and countries of artists and albums |
 | Deezer | genres, popularity and top tracks |
-| Apple (iTunes Search) | top tracks, from the country catalogs you choose |
+| Apple (iTunes Search) | top tracks, from the country catalogues you choose |
 
 Nothing else leaves: no accounts, no listening history, no files. Answers are cached, so each
 artist is looked up again only every couple of weeks.

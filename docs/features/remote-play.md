@@ -38,8 +38,8 @@ progress, play or pause, the volume, whether the track is liked, the whole queue
 whatever you do to the playing device.
 
 Everything you'd do on the playing device works from a remote: play, pause, next, previous,
-seeking, volume and mute, playing an album or playlist, adding tracks to the queue, reordering
-or removing queued tracks, and liking a track. The remote shows the result straight away; a
+seeking, volume and mute, shuffle, playing an album or playlist, adding tracks to the queue,
+reordering or removing queued tracks, and liking a track. The remote shows the result straight away; a
 moment later the playing device's own update arrives and takes its place, so both always end up
 showing the same thing.
 
@@ -49,7 +49,7 @@ icon.
 
 ## The devices list
 
-The devices button sits next to the player controls. It shows up once there's more than one
+The devices button sits next to the player controls (in the player's header on phones). It shows up once there's more than one
 device, or while this tab is a remote. It opens a "Play on" list with this tab first:
 
 - The playing device shows **Playing** or **Paused** (with "in this tab" if that's this one),

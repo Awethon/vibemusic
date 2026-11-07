@@ -13,7 +13,7 @@ fetches what changed.
 The copy holds the information about your music, not the music itself:
 
 - **Albums**, with title, album artist, year, genres, track count, length, when they were added,
-  and how often and when you last played them, and whether you liked them.
+  play count, when you last played them, and whether you liked them.
 - **Tracks**, with title, artist, track and disc number, length, format and bit rate, plays,
   likes and dislikes.
 - **Artists.** Only album artists get a page, so the artist list is worked out from the albums
@@ -196,8 +196,8 @@ in when it's ready, so the library stays usable while it's being rebuilt.
 
 ### Search
 
-Search looks through artists, albums (by title and album artist), playlists, including genre
-playlists, and tracks (by title and artist), all at once. It ignores upper and lower case, and
+Search looks through artists, albums (by title and album artist), playlists (genre playlists
+included) and tracks (by title and artist), all at once. It ignores upper and lower case, and
 treats ё as е.
 
 Results that start with what you typed come first, then results that contain it anywhere, so

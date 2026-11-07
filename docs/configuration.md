@@ -22,8 +22,8 @@ change, apply it with `docker compose up -d`. Lists are comma-separated.
 |---|---|---|
 | `VIBEMUSIC_GENRE_HIDDEN` | none | Genres that never get a playlist |
 | `VIBEMUSIC_GENRE_PINNED` | none | Genres that always get one, however small |
-| `VIBEMUSIC_GENRE_MAX_PLAYLISTS` | `24` | Most genre playlists |
-| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Most tracks per playlist |
+| `VIBEMUSIC_GENRE_MAX_PLAYLISTS` | `24` | Maximum number of genre playlists |
+| `VIBEMUSIC_GENRE_SONG_CAP` | `100` | Maximum tracks per playlist |
 | `VIBEMUSIC_GENRE_MIN_SONGS` | `30`, sub-genres `50` | Tracks a genre needs |
 | `VIBEMUSIC_GENRE_MIN_ARTISTS` | `2`, sub-genres `3` | Artists a genre needs |
 
@@ -53,7 +53,7 @@ make it everyone's default.
 | Variable | Default | What it does |
 |---|---|---|
 | `ENRICHMENT_SOURCES` | `musicbrainz,deezer,apple` | Outside services it may ask; empty for none ([why](relay.md#what-it-sends-outside)) |
-| `APPLE_STOREFRONTS` | `us` | Apple country catalogs to search, in order, e.g. `us,de` |
+| `APPLE_STOREFRONTS` | `us` | Apple country catalogues to search, in order, e.g. `us,de` |
 | `APPLE_PAUSE_MS` | `3200` | Pause between Apple requests (Apple allows about 20 a minute) |
 | `VIBEMUSIC_RELAY_NAVIDROME_USER` | none | Navidrome account for "This is" playlists; unset turns them off |
 | `VIBEMUSIC_RELAY_NAVIDROME_PASSWORD` | none | Its password |
@@ -72,9 +72,10 @@ Navidrome's documentation works. `navidrome.env.example` has the useful ones: sh
 
 ## Without Compose
 
-The app container reads `NAVIDROME_URL`, `RELAY_URL` and the `VIBEMUSIC_*` variables above and
-serves them to the app as `/config.json`. If you serve the built app some other way, write that
-file yourself:
+The app container uses `NAVIDROME_URL` and `RELAY_URL` to route requests, and serves the
+`VIBEMUSIC_*` variables above to the app as `/config.json`. If you serve the built app some other
+way, route the same paths (Navidrome's `/auth`, `/api`, `/rest` and `/share`, the relay's
+`/relay` and `/radio`) and write that file yourself:
 
 ```json
 {

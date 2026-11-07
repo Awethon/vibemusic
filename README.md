@@ -26,7 +26,8 @@ the rest.
 ### Always something new to play
 
 Fresh genre mixes every week, and a "This is" playlist for each artist built from their
-best-known tracks. The home page suggests what to play rather than listing everything you own.
+best-known tracks. The home page suggests what to play rather than listing everything you own,
+and any album or playlist can be shuffled, remembered for that list alone.
 
 ### Genres that make sense
 

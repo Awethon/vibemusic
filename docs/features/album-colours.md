@@ -17,7 +17,7 @@ cover is analysed once, in your browser, and the result is kept in your library.
 - **The tab icon.** The "m" in the browser tab icon takes a vivid version of the album's colour.
   Grey and black-and-white covers leave it at its usual colour.
 - **Hover preview.** Point at an album, artist or playlist while browsing and the background
-  tints toward that album, then drifts back to the playing one when you move away.
+  tints towards that album, then drifts back to the playing one when you move away.
 - **Elsewhere.** Generated genre playlist covers are coloured from one of their albums, the
   timeline's minimap shows each album as a short stripe in its main colour, and shared links take
   their accent and tab icon from the shared music's cover.
@@ -52,9 +52,9 @@ colours by repeating the ones it has.
 
 The accent follows the playing album only; hover previews don't change it.
 
-It starts from the most colourful colour in the palette, the one with the strongest colour that
+It starts from the most vivid colour in the palette, the one with the strongest colour that
 isn't nearly black or nearly white. That colour is brightened to a fixed level and then mixed a
-good way toward white. So even a very dark album gives an accent that's easy to read on the dark
+good way towards white. So even a very dark album gives an accent that's easy to read on the dark
 interface, and the hue stays recognisably the album's. A grey cover gives a light grey accent.
 
 When the album changes, the accent blends to the new colour at the same pace as the background.
@@ -76,7 +76,7 @@ whatever the cover, while keeping each colour's hue.
 
 ### Moving between albums
 
-The background never switches in one frame. It eases toward the new colours: quickly at first,
+The background never switches in one frame. It eases towards the new colours: quickly at first,
 then more and more gently, until it arrives. How fast depends on why the colours change:
 
 - **A new album starts playing:** the slowest, settling over a few seconds.
@@ -92,7 +92,7 @@ late can't overwrite a newer one.
 
 ## Hover preview
 
-While browsing, pointing at something with a cover tints the background toward that album:
+While browsing, pointing at something with a cover tints the background towards that album:
 
 - album tiles and covers on the timeline use that album;
 - playlist and genre playlist tiles use the album of their first cover;
@@ -173,9 +173,9 @@ The steps below run once per cover.
 
 9. **Lift muddy browns.** Some colours sit in an unflattering band: medium brightness, a little
    colour, a yellow-brown hue, the khaki and olive-brown tones that look dull as a background. A
-   colour in that band is gently moved toward whichever end it's closer to, darker toward
-   espresso or lighter toward cream, and turned slightly toward red, so khaki leans toward
-   mahogany. The effect fades out toward the edges of the band, so vivid, very dark, very light
+   colour in that band is gently moved towards whichever end it's closer to, darker towards
+   espresso or lighter towards cream, and turned slightly towards red, so khaki leans towards
+   mahogany. The effect fades out towards the edges of the band, so vivid, very dark, very light
    and grey colours are left alone.
 
 The result is up to five colours, the largest first, saved with the album in your library.

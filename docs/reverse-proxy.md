@@ -39,7 +39,7 @@ Caddy gets the certificate on its own and passes WebSockets and streams through 
 server {
     listen 443 ssl;
     server_name music.example.com;
-    # ssl_certificate ... as for your other sites
+    # ssl_certificate ... as for your other websites
 
     location / {
         proxy_pass http://192.168.1.10:8080;

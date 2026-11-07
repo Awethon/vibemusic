@@ -43,9 +43,11 @@ Navidrome's own web UI, for adding users or changing its settings, is at
 
 ## "This is" playlists
 
-These need a separate, non-admin Navidrome account for the relay. Run `./setup.sh` again: it asks
-for your admin login once, creates the account, saves it in `.env` and restarts the relay. The
-first playlists appear a few minutes later. See [The relay](relay.md) for what else it does.
+These need a separate, non-admin Navidrome account for the relay. At the end of its first run,
+`setup.sh` offers to create it: it waits while you create your first account in the browser,
+then asks for that login once, creates the relay's account, saves it in `.env` and restarts the
+relay. If you skipped that step, run `./setup.sh` again. The first playlists appear a few minutes
+later. See [The relay](relay.md) for what else it does.
 
 ## Updating
 
