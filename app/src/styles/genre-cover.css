@@ -1,11 +1,20 @@
 /* Generated genre playlist covers (tilted wall of album covers under the genre name). */
 
+/*
+ * The cover rounds itself with the tile's radius through clip-path, and the tile doesn't clip.
+ * Safari clips the masked wall separately when an ancestor rounds it with overflow: hidden, and
+ * the wall's light edge pixels showed as a thin outline around the whole cover.
+ */
 .genre-cover {
 	display: block;
 	width: 100%;
 	aspect-ratio: 1;
 	container-type: inline-size;
-	overflow: hidden;
+	border-radius: inherit;
+	clip-path: border-box;
+}
+:is(.mosaic, .mini-mosaic).image:has(> .genre-cover) {
+	overflow: visible;
 }
 .gc-canvas {
 	/* Everything is laid out on a 600-unit design grid, so the cover scales with its container. */
