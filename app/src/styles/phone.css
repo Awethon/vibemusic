@@ -761,3 +761,21 @@ body.phone #remoteBanner .rb-extra {
 body.phone #remoteBanner button {
 	flex: none;
 }
+
+/* Touch has no hover: a tap leaves :hover stuck on the tapped cover, which dimmed every other cover
+   and lifted or zoomed the tapped one. In the phone layout covers stay still and fully opaque. */
+body.phone :is(.tile, .pl-card, .pl-tile, .g-tile) {
+	opacity: 1 !important;
+	transition: none !important;
+}
+
+body.phone .tile:hover .art {
+	transform: none;
+	box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+}
+
+body.phone :is(.pl-card, .pl-tile, .g-tile):hover .mosaic,
+body.phone .this-is-card a:hover .mosaic,
+body.phone .tl-item:hover {
+	transform: none;
+}
