@@ -246,7 +246,7 @@ body.now-open #nowPhone {
 	justify-content: flex-end;
 }
 
-/* Like and devices side by side: same box, icon size and tone (like keeps its accent when on). */
+/* Like and devices side by side: same box and icon size. */
 .nf-head .nf-like,
 .nf-head-end .icon-btn {
 	position: static;
@@ -258,11 +258,6 @@ body.now-open #nowPhone {
 .nf-head-end .icon-btn svg {
 	width: 20px;
 	height: 20px;
-}
-
-.nf-head .nf-like:not(.on) {
-	--ia: 0.72;
-	color: var(--ink-2);
 }
 
 .nf-head .eyebrow {

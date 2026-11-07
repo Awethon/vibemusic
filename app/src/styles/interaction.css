@@ -26,11 +26,15 @@
 }
 
 .nav,
-.like,
 .pal-ico,
 .fbtn,
 .seg-toggle button {
 	--ia: 0.5;
+}
+
+/* Like sits among the player's icon buttons, so it shares their tone. */
+.like {
+	--ia: 0.72;
 }
 
 .nav.nav-search {

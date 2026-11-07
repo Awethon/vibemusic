@@ -583,7 +583,7 @@ body.is-playing .trk.playing .n::after {
 	height: 32px;
 	display: grid;
 	place-items: center;
-	color: var(--ink-3);
+	color: var(--ink-2);
 	border-radius: 50%;
 	transition:
 		color 0.2s,
