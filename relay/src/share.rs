@@ -138,7 +138,9 @@ pub fn preview_page(info: &Value, id: &str, host: &str) -> String {
             let album = text(&track["album"]);
             let length = track["duration"]
                 .as_f64()
-                .map(|seconds| format!("{}:{:02}", (seconds / 60.0) as u64, seconds.round() as u64 % 60))
+                // Rounded once, as a whole: rounding only the seconds part turned 59.6 s into "0:00".
+                .map(|seconds| seconds.round() as u64)
+                .map(|seconds| format!("{}:{:02}", seconds / 60, seconds % 60))
                 .unwrap_or_default();
             let release = if album.is_empty() || album.trim().eq_ignore_ascii_case(text(&track["title"]).trim()) {
                 "Single".to_owned()
@@ -214,5 +216,39 @@ mod tests {
         assert!(
             preview_page(&single, "ef", "h").contains(r#"<meta property="og:description" content="Single · 4:43">"#)
         );
+    }
+
+    #[test]
+    fn text_from_navidrome_cannot_add_markup_to_the_preview() {
+        let hostile = r#""><script>alert('x')</script>&"#;
+        let pages_for = |text: &str| {
+            let song = serde_json::json!({ "tracks": [{ "id": text, "title": text, "artist": text, "album": format!("{text} (live)"), "duration": 60.0 }] });
+            let playlist =
+                serde_json::json!({ "description": text, "tracks": [{ "id": text, "title": text }, { "id": text }] });
+            preview_page(&song, text, text) + &preview_page(&playlist, text, text)
+        };
+        let (plain, attacked) = (pages_for("Lume"), pages_for(hostile));
+        // Escaped text adds none of the characters that open or close a tag or an attribute.
+        for mark in ['<', '>', '"'] {
+            assert_eq!(
+                attacked.matches(mark).count(),
+                plain.matches(mark).count(),
+                "{mark} from a share got into the page"
+            );
+        }
+        assert!(attacked.contains(
+            r#"<meta property="og:title" content="&quot;&gt;&lt;script&gt;alert('x')&lt;/script&gt;&amp;">"#
+        ));
+    }
+
+    #[test]
+    fn a_track_length_carries_rounded_seconds_into_the_minute() {
+        let summary_of = |seconds: f64| {
+            let info = serde_json::json!({ "tracks": [{ "id": "t", "title": "Lantern", "artist": "Low Tide", "album": "Harbor Lights", "duration": seconds }] });
+            preview_page(&info, "ab", "h")
+        };
+        assert!(summary_of(59.6).contains(r#"content="Harbor Lights · 1:00""#));
+        assert!(summary_of(239.5).contains(r#"content="Harbor Lights · 4:00""#));
+        assert!(summary_of(239.4).contains(r#"content="Harbor Lights · 3:59""#));
     }
 }
