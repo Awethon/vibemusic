@@ -12,7 +12,7 @@
 		type Artist,
 		type Track
 	} from '#lib/library/queries.ts';
-	import { artistInfo } from '#lib/navidrome/artistInfo.ts';
+	import { artistInfo, type ArtistInfo } from '#lib/navidrome/artistInfo.ts';
 	import AlbumTile from '#lib/ui/AlbumTile.svelte';
 	import PlayButton from '#lib/ui/PlayButton.svelte';
 	import PlaylistMosaic from '#lib/ui/PlaylistMosaic.svelte';
@@ -30,33 +30,34 @@
 		return playlist ? { playlist, tracks: await playlistTracks(playlist.id) } : null;
 	}, null);
 
-	let biography = $state('');
-	let popular = $state<Track[]>([]);
-	let similar = $state<Artist[]>([]);
+	// What Navidrome knows about the artist from outside: biography, top songs, similar artists.
+	// It follows the artist's id and name, not the artist row, which is read again after every
+	// like and play: that used to empty this part of the page and close an opened biography.
+	let info = $state<ArtistInfo | null>(null);
 	let expanded = $state(false);
+	const shownId = $derived(artist.value?.id ?? '');
+	const shownName = $derived(artist.value?.name ?? '');
 
 	$effect(() => {
-		const current = artist.value;
-		biography = '';
-		popular = [];
-		similar = [];
+		info = null;
 		expanded = false;
-		if (!current) return;
+		if (!shownId) return;
 		let active = true;
-		void artistInfo(current.id, current.name).then(async (info) => {
-			const [popularTracks, similarArtists] = await Promise.all([
-				tracksByIds(info.topTrackIds),
-				Promise.all(info.similarArtistIds.map((similarId) => artistById(similarId)))
-			]);
-			if (!active) return;
-			biography = info.biography;
-			popular = popularTracks.slice(0, ARTIST_PAGE.popularCount);
-			similar = similarArtists.filter((candidate): candidate is Artist => !!candidate);
+		void artistInfo(shownId, shownName).then((found) => {
+			if (active) info = found;
 		});
 		return () => {
 			active = false;
 		};
 	});
+
+	const biography = $derived(info?.biography ?? '');
+	const popular = live(async () => (info ? (await tracksByIds(info.topTrackIds)).slice(0, ARTIST_PAGE.popularCount) : []), [], ['track']);
+	const similar = live(
+		async () => (await Promise.all((info?.similarArtistIds ?? []).map((similarId) => artistById(similarId)))).filter((found) => !!found),
+		[],
+		[]
+	);
 </script>
 
 {#if artist.value}
@@ -76,7 +77,7 @@
 				{/if}
 			</div>
 		</div>
-		{#if thisIs.value || popular.length}
+		{#if thisIs.value || popular.value.length}
 			<div class="popular-block" class:with-playlist={!!thisIs.value}>
 				<div>
 					<h2 class="section-title">Popular</h2>
@@ -89,7 +90,7 @@
 							showAlbum
 						/>
 					{:else}
-						<TrackList tracks={popular} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
+						<TrackList tracks={popular.value} sourceName={artist.value.name} listKey="top:{id}" showAlbum />
 					{/if}
 				</div>
 				{#if thisIs.value}
@@ -109,10 +110,10 @@
 		<div class="grid" id="grid">
 			{#each albums.value as album (album.id)}<AlbumTile {album} />{/each}
 		</div>
-		{#if similar.length}
+		{#if similar.value.length}
 			<h2 class="section-title">Similar in your library</h2>
 			<div class="artist-strip">
-				{#each similar as other (other.id)}
+				{#each similar.value as other (other.id)}
 					<a href={resolve('/artist/[id]', { id: other.id })} data-preview-album={other.newestAlbumId}
 						>{other.name}<sup>{other.albumCount}</sup></a
 					>
