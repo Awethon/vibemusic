@@ -74,7 +74,9 @@ async function recoverFromFailure({ message, network, playing }: PlaybackFailure
 	// always ends there is skipped below instead of retried forever.
 	if (network && (retried.trackId !== trackId || Math.abs(position - retried.position) > PLAYBACK.sameFailureWithinSeconds)) {
 		retried = { trackId, position };
-		await loadCurrent(true, isRadio(trackId) ? 0 : position);
+		// Not awaited: while this function runs, further failures are ignored (handlingFailure), and
+		// a file that is cut short fails again before the reload has got as far as playing.
+		void loadCurrent(true, isRadio(trackId) ? 0 : position);
 		return;
 	}
 	failedInRow += 1;
@@ -195,7 +197,12 @@ export function runLocally(command: Command) {
 				saveNow();
 			} else if (loaded && !player.error && !engine.failed && !isRadio(engine.trackId)) void resumeEngine();
 			else if (isRadio(queueState.currentTrackId)) void startCurrent(true);
-			else void startCurrent(true, loaded ? engine.position : resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
+			else if (loaded) {
+				// The loaded track broke while it was paused: load it again and carry on. It is still
+				// the same play, so the time listened so far keeps counting for the scrobble.
+				retried = { trackId: '', position: 0 };
+				void loadCurrent(true, engine.position);
+			} else void startCurrent(true, resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
 			return;
 		}
 		case 'seek':
