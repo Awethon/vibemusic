@@ -178,12 +178,15 @@ async function obey(command: Command) {
 // Becomes the active device with the given queue and playback ("Play here" handoff, or adopting
 // the state of an active device that went offline).
 async function takeOver(snapshot: queue.QueueState | null, playback: Playback | null, ageMs: number) {
-	mirrorSequence += 1;
+	const sequence = ++mirrorSequence;
 	leaveMirror();
 	if (!snapshot?.currentTrackId) return;
 	takingOver = true;
 	try {
 		await ensureTracks(queue.queuedTrackIds(snapshot));
+		// Playback moved on while the track details loaded (to another device, or a newer takeover):
+		// carrying on would start this tab next to the device that plays now.
+		if (mirroring || sequence !== mirrorSequence) return;
 		queue.replaceQueue(queueState, snapshot);
 	} finally {
 		takingOver = false;
@@ -225,6 +228,10 @@ function onRelayMessage(message: RelayMessage) {
 				void mirrorQueue(message.queue as queue.QueueState | null);
 				mirrorPlayback(message.playback as Playback | null, message.ageMs);
 			} else if (activeIsOffline()) void adopt(message.queue as queue.QueueState | null, message.playback as Playback | null);
+			// The relay no longer knows a device that plays (it restarted), so this tab stops showing
+			// one. It must not go on to the claim below: `player.playing` here is what the other device
+			// last reported, and a claim would make the relay stop that device when it comes back.
+			else if (mirroring) leaveMirror();
 			else if (!relay.active && player.playing) sendToRelay({ type: 'claim' });
 			announceIfActive();
 			return;
