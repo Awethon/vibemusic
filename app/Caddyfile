@@ -74,9 +74,23 @@
 
 	handle {
 		root * /srv/vibemusic
-		@immutable path /_app/immutable/*
-		header @immutable Cache-Control "public, max-age=31536000, immutable"
-		try_files {path} /index.html
-		file_server
+
+		# Built files carry a hash in their name, so they are cached for good. One that no longer
+		# exists (a page from before an upgrade asking for its old scripts) must answer 404, not the
+		# app's page: the browser would keep that page as the script for a year.
+		handle /_app/immutable/* {
+			@built file
+			header @built Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+
+		# Everything else is the app's page (for any path) and a few fixed-name files. no-cache keeps
+		# the copy but checks it first, so an upgrade is picked up on the next visit; without it
+		# browsers guess a lifetime and may open the old page, whose scripts are gone.
+		handle {
+			header Cache-Control no-cache
+			try_files {path} /index.html
+			file_server
+		}
 	}
 }
