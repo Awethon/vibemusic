@@ -31,6 +31,8 @@ const COVER_VERSION: &str = "discography-3";
 const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
 // Album covers fanned out on a playlist cover.
 const COVERS: usize = 5;
+// Playlist writes failing one after another before a run gives up until the next check.
+const GIVE_UP_AFTER_FAILURES: usize = 3;
 
 pub struct Settings {
     url: String,
@@ -531,6 +533,11 @@ async fn run(
         .map(|playlist| (text(playlist, "name"), playlist))
         .collect();
     let (mut created, mut updated, mut drawn, mut removed) = (0, 0, 0, 0);
+    // Titles of the playlists that could not be written. One refused write does not end the run:
+    // a full run that fails is repeated in full every hour. The artist is forgotten instead, so the
+    // next run takes them up again. Several in a row mean Navidrome itself is in trouble.
+    let mut failed: HashSet<&String> = HashSet::new();
+    let mut failed_in_a_row = 0;
     for (artist_id, picked) in &picks {
         if picked.songs.is_empty() {
             state.artists.insert(artist_id.clone(), picked.clone());
@@ -544,39 +551,60 @@ async fn run(
                 .artists
                 .get(artist_id)
                 .is_some_and(|old| old.title == picked.title && old.songs == picked.songs);
-        let playlist_id = match existing {
-            Some(playlist) if same => text(playlist, "id"),
-            _ => {
-                let id = save_playlist(&account, existing, &picked.title, &picked.songs).await?;
-                if existing.is_some() {
-                    updated += 1
-                } else {
-                    created += 1
+        let covers = &mut state.covers;
+        let written: Result<(), AccountError> = async {
+            let playlist_id = match existing {
+                Some(playlist) if same => text(playlist, "id"),
+                _ => {
+                    let id = save_playlist(&account, existing, &picked.title, &picked.songs).await?;
+                    if existing.is_some() {
+                        updated += 1
+                    } else {
+                        created += 1
+                    }
+                    id
                 }
-                id
+            };
+            let comment = comment(name, picked.songs.len());
+            if existing
+                .is_none_or(|playlist| !same || text(playlist, "comment") != comment || playlist["public"] != true)
+            {
+                account.update_playlist(&playlist_id, &picked.title, &comment).await?;
             }
-        };
-        let comment = comment(name, picked.songs.len());
-        if existing.is_none_or(|playlist| !same || text(playlist, "comment") != comment || playlist["public"] != true) {
-            account.update_playlist(&playlist_id, &picked.title, &comment).await?;
-        }
-        let artist_albums = &albums_by_artist[artist_id];
-        // The cover is redrawn only when the signature (COVER_VERSION, name, shown albums and their
-        // images) changes, or the playlist has no uploaded image.
-        let signature = cover_signature(name, artist_albums);
-        let has_image = existing.is_some_and(|playlist| !text(playlist, "uploadedImage").is_empty());
-        if !(has_image && state.covers.get(&playlist_id) == Some(&signature)) {
-            match draw_cover(&account, name, artist_albums).await {
-                Ok(jpeg) => {
-                    tracing::debug!(name, bytes = jpeg.len(), "cover drawn");
-                    account.upload_cover(&playlist_id, jpeg).await?;
-                    state.covers.insert(playlist_id, signature);
-                    drawn += 1;
+            let artist_albums = &albums_by_artist[artist_id];
+            // The cover is redrawn only when the signature (COVER_VERSION, name, shown albums and
+            // their images) changes, or the playlist has no uploaded image.
+            let signature = cover_signature(name, artist_albums);
+            let has_image = existing.is_some_and(|playlist| !text(playlist, "uploadedImage").is_empty());
+            if !(has_image && covers.get(&playlist_id) == Some(&signature)) {
+                match draw_cover(&account, name, artist_albums).await {
+                    Ok(jpeg) => {
+                        tracing::debug!(name, bytes = jpeg.len(), "cover drawn");
+                        account.upload_cover(&playlist_id, jpeg).await?;
+                        covers.insert(playlist_id, signature);
+                        drawn += 1;
+                    }
+                    Err(error) => tracing::warn!(%error, name, "could not draw a This is cover"),
                 }
-                Err(error) => tracing::warn!(%error, name, "could not draw a This is cover"),
+            }
+            Ok(())
+        }
+        .await;
+        match written {
+            Ok(()) => {
+                failed_in_a_row = 0;
+                state.artists.insert(artist_id.clone(), picked.clone());
+            }
+            Err(error) => {
+                tracing::warn!(%error, name, "could not write a This is playlist");
+                state.artists.remove(artist_id);
+                failed.insert(&picked.title);
+                failed_in_a_row += 1;
+                if failed_in_a_row == GIVE_UP_AFTER_FAILURES {
+                    return Err(error);
+                }
             }
         }
-        state.artists.insert(artist_id.clone(), picked.clone());
     }
     for id in &gone {
         state.artists.remove(id);
@@ -592,19 +620,27 @@ async fn run(
         let mine = text(playlist, "ownerId") == account.id
             && playlist["sync"] != true
             && name.starts_with(PREFIX)
-            && !titles.contains(&name);
+            && !titles.contains(&name)
+            // An artist whose write failed was forgotten above, but their playlist stays.
+            && !failed.contains(&name);
         // "This is" playlists imported from files in a `_playlists` folder are removed as well.
         let legacy =
             playlist["sync"] == true && name.starts_with(PREFIX) && text(playlist, "path").contains("/_playlists/");
         if mine || legacy {
-            account.delete_playlist(&text(playlist, "id")).await?;
-            state.covers.remove(&text(playlist, "id"));
-            removed += 1;
+            // A playlist that could not be removed is found again by the next run that writes.
+            match account.delete_playlist(&text(playlist, "id")).await {
+                Ok(()) => {
+                    state.covers.remove(&text(playlist, "id"));
+                    removed += 1;
+                }
+                Err(error) => tracing::warn!(%error, name, "could not remove a This is playlist"),
+            }
         }
     }
     Ok(Some(format!(
-        "{} artists looked at: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed",
-        picks.len()
+        "{} artists looked at: {created} created, {updated} updated, {drawn} covers drawn, {removed} removed, {} failed",
+        picks.len(),
+        failed.len()
     )))
 }
 
@@ -707,5 +743,180 @@ mod tests {
             json!({ "id": "studio", "title": "Undertow", "year": 2004, "playCount": 1 }),
         ];
         assert_eq!(choose(&[], &[], &songs, 5), ["studio"]);
+    }
+
+    const ARTISTS: [&str; 3] = ["Ana Reyes", "Lume", "Theo Brandt"];
+
+    // Stands in for Navidrome: three artists with one two-song album each, playlists kept in
+    // memory, and no cover images. It refuses to write the playlists named in `refuses`.
+    #[derive(Default)]
+    struct FakeNavidrome {
+        playlists: Vec<Value>,
+        refuses: HashSet<String>,
+        written: Vec<String>,
+    }
+
+    type Fake = std::sync::Arc<std::sync::Mutex<FakeNavidrome>>;
+
+    async fn write_playlist(
+        axum::extract::State(fake): axum::extract::State<Fake>,
+        axum::Form(form): axum::Form<Vec<(String, String)>>,
+    ) -> axum::Json<Value> {
+        let field = |name: &str| form.iter().find(|(key, _)| key == name).map(|(_, value)| value.clone());
+        let songs = form.iter().filter(|(key, _)| key == "songId").count();
+        let mut fake = fake.lock().unwrap();
+        let existing =
+            field("playlistId").and_then(|id| fake.playlists.iter().position(|playlist| playlist["id"] == id));
+        let title = match existing {
+            Some(index) => text(&fake.playlists[index], "name"),
+            None => field("name").unwrap_or_default(),
+        };
+        if fake.refuses.contains(&title) {
+            return axum::Json(
+                json!({ "subsonic-response": { "status": "failed", "error": { "message": "refused" } } }),
+            );
+        }
+        let id = match existing {
+            Some(index) => {
+                fake.playlists[index]["songCount"] = json!(songs);
+                text(&fake.playlists[index], "id")
+            }
+            None => {
+                let id = format!("playlist-{}", fake.playlists.len());
+                fake.playlists
+                    .push(json!({ "id": id, "name": title, "ownerId": "relay", "songCount": songs }));
+                id
+            }
+        };
+        fake.written.push(title);
+        axum::Json(json!({ "subsonic-response": { "status": "ok", "playlist": { "id": id } } }))
+    }
+
+    async fn fake_navidrome(fake: Fake) -> Settings {
+        use axum::extract::{Path, State};
+        use axum::routing::{get, post, put};
+        use axum::{Json, Router};
+
+        let albums: Vec<Value> = (0..3)
+            .map(|artist| {
+                json!({ "id": format!("album-{artist}"), "name": "Album", "albumArtistId": format!("artist-{artist}"),
+                    "albumArtist": ARTISTS[artist], "songCount": 2, "maxYear": 2020, "createdAt": "2024-01-01" })
+            })
+            .collect();
+        let songs: Vec<Value> = (0..6)
+            .map(|song| {
+                json!({ "id": format!("song-{song}"), "title": format!("Song {song}"), "albumArtistId": format!("artist-{}", song / 2),
+                    "albumArtist": ARTISTS[song / 2], "year": 2020, "duration": 200.0 })
+            })
+            .collect();
+        let router = Router::new()
+            .route(
+                "/auth/login",
+                post(|| async {
+                    Json(json!({ "id": "relay", "username": "relay", "token": "t", "subsonicToken": "st", "subsonicSalt": "ss" }))
+                }),
+            )
+            .route("/api/album", get(move || async move { Json(albums) }))
+            .route("/api/song", get(move || async move { Json(songs) }))
+            .route(
+                "/api/playlist",
+                get(|State(fake): State<Fake>| async move { Json(fake.lock().unwrap().playlists.clone()) }),
+            )
+            .route(
+                "/api/playlist/{id}",
+                put(|| async { Json(json!({})) }).delete(|State(fake): State<Fake>, Path(id): Path<String>| async move {
+                    fake.lock().unwrap().playlists.retain(|playlist| playlist["id"] != id.as_str());
+                }),
+            )
+            .route("/rest/createPlaylist", post(write_playlist))
+            .with_state(fake);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, router).await });
+        Settings {
+            url,
+            username: "relay".to_owned(),
+            password: "password".to_owned(),
+            min_tracks: 2,
+            max_tracks: 50,
+            every_ms: 0,
+            skip: HashSet::new(),
+            state: None,
+        }
+    }
+
+    fn quiet_enricher() -> std::sync::Arc<Enricher> {
+        let sources = crate::enrich::Sources {
+            musicbrainz: false,
+            deezer: false,
+            apple: false,
+        };
+        Enricher::new(None, Apple::from_env(reqwest::Client::new()), sources)
+    }
+
+    fn playlist_names(fake: &Fake) -> Vec<String> {
+        let mut names: Vec<String> = fake
+            .lock()
+            .unwrap()
+            .playlists
+            .iter()
+            .map(|playlist| text(playlist, "name"))
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[tokio::test]
+    async fn a_refused_playlist_is_skipped_kept_and_written_by_the_next_run() {
+        let fake = Fake::default();
+        {
+            let mut fake = fake.lock().unwrap();
+            fake.refuses.insert("This is Lume".to_owned());
+            fake.playlists
+                .push(json!({ "id": "old", "name": "This is Lume", "ownerId": "relay", "songCount": 1 }));
+        }
+        let settings = fake_navidrome(fake.clone()).await;
+        let (client, enricher, mut state) = (reqwest::Client::new(), quiet_enricher(), State::default());
+
+        let summary = run(&client, &settings, &enricher, &mut state, true)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(summary.contains("2 created"), "{summary}");
+        assert!(summary.contains("0 removed, 1 failed"), "{summary}");
+        assert_eq!(
+            playlist_names(&fake),
+            ["This is Ana Reyes", "This is Lume", "This is Theo Brandt"]
+        );
+        assert!(state.artists.contains_key("artist-0") && state.artists.contains_key("artist-2"));
+        assert!(!state.artists.contains_key("artist-1"));
+
+        {
+            let mut fake = fake.lock().unwrap();
+            fake.refuses.clear();
+            fake.written.clear();
+        }
+        let summary = run(&client, &settings, &enricher, &mut state, false)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(summary.contains("1 updated"), "{summary}");
+        assert!(summary.contains("0 failed"), "{summary}");
+        assert_eq!(fake.lock().unwrap().written, ["This is Lume"]);
+        assert!(state.artists.contains_key("artist-1"));
+    }
+
+    #[tokio::test]
+    async fn gives_up_when_writes_keep_being_refused() {
+        let fake = Fake::default();
+        fake.lock()
+            .unwrap()
+            .refuses
+            .extend(ARTISTS.map(|name| format!("This is {name}")));
+        let settings = fake_navidrome(fake.clone()).await;
+        let mut state = State::default();
+        let result = run(&reqwest::Client::new(), &settings, &quiet_enricher(), &mut state, true).await;
+        assert!(result.is_err());
+        assert!(playlist_names(&fake).is_empty());
     }
 }
