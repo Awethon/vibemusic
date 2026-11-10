@@ -17,7 +17,7 @@
 	import { library } from '#lib/library/library.svelte.ts';
 	import { loadLyricsFor } from '#lib/player/lyricsState.svelte.ts';
 	import { currentTrack, player } from '#lib/player/player.svelte.ts';
-	import { session } from '#lib/session.svelte.ts';
+	import { followOtherTabs, session } from '#lib/session.svelte.ts';
 	import { installShell, libraryReady, startServices } from '#lib/startup.ts';
 	import AlphabetNav from '#lib/ui/AlphabetNav.svelte';
 	import Ambient from '#lib/ui/Ambient.svelte';
@@ -55,6 +55,7 @@
 	// The share page is public: it renders on its own, without sign-in, services or the app shell.
 	const publicPage = page.route.id === '/share/[id]';
 	const signedIn = $derived(!publicPage && !!session.credentials && !session.expired);
+	if (!publicPage) followOtherTabs();
 
 	export const snapshot: Snapshot<number> = {
 		capture: () => main?.scrollTop ?? 0,

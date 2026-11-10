@@ -35,6 +35,14 @@ export function forgetCredentials() {
 	localStorage.removeItem(STORAGE_KEY);
 }
 
+// Calls the listener when another tab saves or forgets the credentials (a key of null means the
+// whole storage was cleared). The browser doesn't report a tab's own changes to it.
+export function watchCredentials(listener: (credentials: Credentials | null) => void) {
+	addEventListener('storage', (event) => {
+		if (event.key === STORAGE_KEY || event.key === null) listener(loadCredentials());
+	});
+}
+
 // The Subsonic token is md5(password + salt) and Navidrome accepts any salt. Keeping the salt
 // stable per user keeps the token, and therefore every cover URL, the same across logins, so
 // the browser's image cache stays valid.

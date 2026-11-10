@@ -2,7 +2,7 @@
 
 import { NavidromeHttp } from './navidrome/http.ts';
 import type { Credentials } from './navidrome/credentials.ts';
-import { forgetCredentials, loadCredentials, saveCredentials } from './navidrome/session.ts';
+import { forgetCredentials, loadCredentials, saveCredentials, watchCredentials } from './navidrome/session.ts';
 
 export const session = $state<{ credentials: Credentials | null; expired: boolean }>({
 	credentials: loadCredentials(),
@@ -18,7 +18,22 @@ export function signedIn(credentials: Credentials) {
 export function renewToken(token: string) {
 	if (!session.credentials || session.credentials.token === token) return;
 	session.credentials = { ...session.credentials, token };
-	saveCredentials(session.credentials);
+	// Another tab may have signed out, or in as someone else, while this request was under way;
+	// saving now would undo that.
+	if (loadCredentials()?.userId === session.credentials.userId) saveCredentials(session.credentials);
+}
+
+// Tabs share the stored credentials, so each follows what the others do with them. A tab left
+// open used to undo a sign-out made in another one by saving its next token. And only the leading
+// tab syncs, so only its token is renewed: the others take it over here, or theirs runs out.
+export function followOtherTabs() {
+	watchCredentials((stored) => {
+		const mine = session.credentials;
+		if (!mine) return;
+		// Signed out, or in as someone else: start over, like signOut does.
+		if (stored?.userId !== mine.userId) location.reload();
+		else session.credentials = stored;
+	});
 }
 
 export function sessionExpired() {
