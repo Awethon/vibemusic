@@ -168,7 +168,9 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	if (level === 'popups') addEventListener(PLAYER_RENDERED, markDirty);
 
 	// Web Animations (FLIP, queue motion) move things without mutating the DOM, so while any run
-	// below this layer the backdrop is repainted every frame.
+	// below this layer the backdrop is repainted every frame. Animations of pseudo-elements don't
+	// count: the backdrop is painted from elements only (backdrop.ts), so they can't change it, and
+	// one of them never ends (the equaliser on the playing track).
 	const pageAnimating = () =>
 		document
 			.getAnimations()
@@ -176,6 +178,7 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 				(animation) =>
 					animation.playState === 'running' &&
 					animation.effect instanceof KeyframeEffect &&
+					animation.effect.pseudoElement === null &&
 					animation.effect.target instanceof Element &&
 					!animation.effect.target.closest(above)
 			);
