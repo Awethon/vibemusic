@@ -165,15 +165,41 @@ impl Account {
         let mut query = self.subsonic.clone();
         query.push(("id", id.to_owned()));
         query.push(("size", size.to_string()));
+        // This address carries the account's Subsonic token and salt, and reqwest names the address
+        // in its errors, which end up in the log. The errors are passed on without it.
+        let without_address = |error: reqwest::Error| AccountError(error.without_url().to_string());
         Ok(self
             .client
             .get(format!("{}/rest/getCoverArt", self.url))
             .query(&query)
             .send()
-            .await?
-            .error_for_status()?
+            .await
+            .and_then(reqwest::Response::error_for_status)
+            .map_err(without_address)?
             .bytes()
-            .await?
+            .await
+            .map_err(without_address)?
             .to_vec())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cover_errors_leave_out_the_address_with_the_token() {
+        let account = Account {
+            client: reqwest::Client::new(),
+            // Nothing listens on port 9 here, so the request fails.
+            url: "http://127.0.0.1:9".to_owned(),
+            id: String::new(),
+            token: String::new(),
+            subsonic: vec![("t", "secret-token".to_owned()), ("s", "secret-salt".to_owned())],
+        };
+        let error = account.cover_art("al-1", 300).await.unwrap_err().to_string();
+        assert!(!error.is_empty());
+        assert!(!error.contains("secret"), "{error}");
+        assert!(!error.contains("getCoverArt"), "{error}");
     }
 }
