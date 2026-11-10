@@ -15,11 +15,17 @@ type Deck = {
 	blocked: boolean;
 	pausedAt: number | null;
 	played: boolean;
+	// The element reported an error for its current source; cleared when a source is loaded again.
+	failed: boolean;
 };
+
+// network: the connection dropped while the track was loading or playing, so the file itself is
+// fine. playing: the failure interrupted playback or a play attempt, not a paused track.
+export type PlaybackFailure = { message: string; network: boolean; playing: boolean };
 
 export type EngineListener = {
 	ended(): void;
-	failed(message: string): void;
+	failed(failure: PlaybackFailure): void;
 	changed(): void;
 };
 
@@ -60,7 +66,8 @@ export class AudioEngine {
 			pendingSeek: null,
 			blocked: false,
 			pausedAt: null,
-			played: false
+			played: false,
+			failed: false
 		};
 		// The start position is applied once playback actually starts: Safari loads nothing before
 		// the first gesture, and iOS Safari accepts a seek on a never-played element but then plays
@@ -83,10 +90,16 @@ export class AudioEngine {
 			'ended',
 			fromActive(() => this.listener.ended())
 		);
-		element.addEventListener(
-			'error',
-			fromActive(() => this.listener.failed(element.error?.message || 'Playback failed'))
-		);
+		// Remembered for the standby deck as well: a preload that failed must not be swapped in later.
+		element.addEventListener('error', () => {
+			deck.failed = true;
+			if (this.decks[this.activeDeck] !== deck) return;
+			this.listener.failed({
+				message: element.error?.message || 'Playback failed',
+				network: element.error?.code === MediaError.MEDIA_ERR_NETWORK,
+				playing: !element.paused
+			});
+		});
 		for (const name of ['play', 'pause', 'playing', 'waiting', 'durationchange', 'seeked'])
 			element.addEventListener(
 				name,
@@ -153,6 +166,11 @@ export class AudioEngine {
 		return Number.isFinite(duration) ? duration : 0;
 	}
 
+	// The loaded track can't be played as it is; loading it again (load) may fix that.
+	get failed() {
+		return this.active.failed;
+	}
+
 	get buffering() {
 		return this.playing && this.active.element.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
 	}
@@ -161,12 +179,13 @@ export class AudioEngine {
 		if (options.autoplay) this.ensureGraph();
 		const previous = this.active;
 		// Gapless path: the standby deck already preloaded this track, so just swap decks.
-		if (this.standby.trackId === trackId && this.standby.element.src.endsWith(url)) {
+		if (this.standby.trackId === trackId && !this.standby.failed && this.standby.element.src.endsWith(url)) {
 			this.activeDeck = 1 - this.activeDeck;
 		} else {
 			this.active.trackId = trackId;
 			this.active.element.src = url;
 			this.active.played = false;
+			this.active.failed = false;
 		}
 		const deck = this.active;
 		if (previous !== deck) {
@@ -175,6 +194,7 @@ export class AudioEngine {
 			previous.element.removeAttribute('src');
 			previous.element.load();
 			previous.trackId = '';
+			previous.failed = false;
 		}
 		this.analysis?.reset();
 		deck.startAt = null;
@@ -196,11 +216,14 @@ export class AudioEngine {
 				deck.element.removeAttribute('src');
 				deck.element.load();
 				deck.trackId = '';
+				deck.failed = false;
 			}
 			return;
 		}
-		if (deck.trackId === trackId) return;
+		// A preload that failed (the server was away for a moment) is tried again.
+		if (deck.trackId === trackId && !deck.failed) return;
 		deck.trackId = trackId;
+		deck.failed = false;
 		deck.element.src = url;
 		deck.element.load();
 	}
@@ -251,6 +274,7 @@ export class AudioEngine {
 			deck.startAt ??= element.currentTime;
 			deck.blocked = false;
 			deck.played = false;
+			deck.failed = false;
 			this.dropPendingSeek(deck);
 			element.load();
 		}
@@ -261,7 +285,7 @@ export class AudioEngine {
 			if (error instanceof DOMException && error.name === 'AbortError') return 'stopped';
 			// NotAllowedError: autoplay policy wants a user gesture; the player shows "tap to play".
 			if (error instanceof DOMException && error.name === 'NotAllowedError') return this.markBlocked(deck);
-			this.listener.failed(error instanceof Error ? error.message : String(error));
+			this.listener.failed({ message: error instanceof Error ? error.message : String(error), network: false, playing: true });
 			return 'stopped';
 		}
 		if (!context) return 'playing';

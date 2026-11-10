@@ -9,7 +9,7 @@ import { requireCredentials } from '../session.svelte.ts';
 import { CONNECTION, PLAYBACK, SAVED_QUEUE } from '../tuning.ts';
 import { showToast } from '../ui/state.svelte.ts';
 import { applyToQueue, type Command } from './commands.ts';
-import { AudioEngine } from './engine.ts';
+import { AudioEngine, type PlaybackFailure } from './engine.ts';
 import { installMediaSession, updateMediaSession, type MediaHandlers } from './mediaSession.ts';
 import * as queue from './queue.ts';
 import { pollRadio } from './radioNow.svelte.ts';
@@ -25,11 +25,13 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastTickAt = 0;
 let failedInRow = 0;
 let handlingFailure = false;
+// Where the current track was last loaded again after a dropped connection.
+let retried = { trackId: '', position: 0 };
 let resumeAt = { trackId: '', position: 0 };
 
 const engine = new AudioEngine({
 	ended: () => apply(queue.playNext(queueState)),
-	failed: (message) => void playbackFailed(message),
+	failed: (failure) => void playbackFailed(failure),
 	changed: () => refreshPlayback()
 });
 
@@ -37,23 +39,42 @@ export function connectRemote(hooks: RemoteHooks) {
 	remote = hooks;
 }
 
-async function playbackFailed(message: string) {
+async function playbackFailed(failure: PlaybackFailure) {
 	if (handlingFailure) return;
 	handlingFailure = true;
 	try {
-		await recoverFromFailure(message);
+		await recoverFromFailure(failure);
 	} finally {
 		handlingFailure = false;
 	}
 }
 
-async function recoverFromFailure(message: string) {
+async function recoverFromFailure({ message, network, playing }: PlaybackFailure) {
+	// While this tab mirrors another device its own deck is idle and `player` shows that device.
+	// Pressing play here later loads the track again (engine.failed in togglePlay).
+	if (remote.mirroring()) return;
 	const track = currentTrack();
+	const trackId = queueState.currentTrackId;
+	const position = engine.position;
 	player.error = message;
+	// A paused track has nothing to recover right now, and skipping it would start the next one
+	// unasked. Pressing play loads it again.
+	if (!playing) return;
 	const title = track ? `“${track.title}”` : 'this track';
-	if (!(await checkConnection())) {
+	const reachable = await checkConnection();
+	// Something else was started while the connection was checked; this failure is no longer its concern.
+	if (queueState.currentTrackId !== trackId) return;
+	if (!reachable) {
 		engine.pause();
 		showToast(`Couldn’t play ${title} — Navidrome isn’t reachable`);
+		return;
+	}
+	// The connection dropped mid-track but Navidrome answers, so the file is fine: load it again and
+	// carry on from the same place. Not when it broke at the same spot as last time: a stream that
+	// always ends there is skipped below instead of retried forever.
+	if (network && (retried.trackId !== trackId || Math.abs(position - retried.position) > PLAYBACK.sameFailureWithinSeconds)) {
+		retried = { trackId, position };
+		await loadCurrent(true, isRadio(trackId) ? 0 : position);
 		return;
 	}
 	failedInRow += 1;
@@ -93,15 +114,23 @@ function prepareNext() {
 	engine.prepare(next?.trackId ?? null, next ? streamUrl(requireCredentials(), next.trackId) : null);
 }
 
-export async function startCurrent(autoplay = true, startAt = 0) {
+// Loads the current track into the engine. startCurrent is the usual way in; a retry after a
+// dropped connection calls this directly, so the time listened so far still counts for the scrobble.
+async function loadCurrent(autoplay: boolean, startAt: number) {
 	const trackId = queueState.currentTrackId;
-	if (!trackId) return;
 	player.error = '';
-	resetListening();
 	const started = await engine.load(trackId, streamUrl(requireCredentials(), trackId), { autoplay, startAt });
 	if (started === 'blocked') waitForTap();
 	prepareNext();
 	refreshPlayback();
+}
+
+export async function startCurrent(autoplay = true, startAt = 0) {
+	const trackId = queueState.currentTrackId;
+	if (!trackId) return;
+	resetListening();
+	retried = { trackId: '', position: 0 };
+	await loadCurrent(autoplay, startAt);
 	if (autoplay && !isRadio(trackId)) announceNowPlaying(trackId);
 }
 
@@ -164,7 +193,7 @@ export function runLocally(command: Command) {
 			if (engine.playing) {
 				engine.pause();
 				saveNow();
-			} else if (loaded && !player.error && !isRadio(engine.trackId)) void resumeEngine();
+			} else if (loaded && !player.error && !engine.failed && !isRadio(engine.trackId)) void resumeEngine();
 			else if (isRadio(queueState.currentTrackId)) void startCurrent(true);
 			else void startCurrent(true, loaded ? engine.position : resumeAt.trackId === queueState.currentTrackId ? resumeAt.position : 0);
 			return;

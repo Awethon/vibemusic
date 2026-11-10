@@ -254,7 +254,11 @@ export const PLAYBACK = Object.freeze({
 	startToleranceSeconds: 1,
 	contextResumeTimeoutMs: 1500,
 	// iPhone only: a pause longer than this reloads the track on resume (see AudioEngine.resume).
-	reloadAfterPauseMs: 20_000
+	reloadAfterPauseMs: 20_000,
+	// A track whose connection dropped is loaded again where it stopped. Two drops within this many
+	// seconds of each other count as the same broken spot, and the track is skipped instead
+	// (see recoverFromFailure in playback.svelte.ts).
+	sameFailureWithinSeconds: 2
 });
 
 // Album colour palettes and how fast the background follows them. *Rate values are exponential
