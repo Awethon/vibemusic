@@ -227,7 +227,12 @@ pub fn through_local_proxy(url: &str, proxy: Option<&str>) -> (String, Option<St
         Some(port) => format!("{host}:{port}"),
         None => host.to_owned(),
     };
-    let rest = &url[parsed.origin().ascii_serialization().len()..];
+    // The path and query as parsed, not `url` cut at the length of its origin: the two differ when
+    // the address spells out a default port, carries a login or has a host name outside ASCII.
+    let rest = match parsed.query() {
+        Some(query) => format!("{}?{query}", parsed.path()),
+        None => parsed.path().to_owned(),
+    };
     (format!("{proxy}{rest}"), Some(host))
 }
 
@@ -252,6 +257,24 @@ mod tests {
             through_local_proxy("http://music.local/opus", None),
             ("http://music.local/opus".to_owned(), None)
         );
+    }
+
+    #[test]
+    fn keeps_the_station_path_however_its_address_is_written() {
+        let through = |url: &str| through_local_proxy(url, Some("http://caddy"));
+        // An explicit default port: the address Navidrome stores is longer than its origin.
+        assert_eq!(
+            through("http://music.local:80/opus?quality=high"),
+            (
+                "http://caddy/opus?quality=high".to_owned(),
+                Some("music.local".to_owned())
+            )
+        );
+        // A host name outside ASCII, with and without a path.
+        let (kitchen, host) = through("http://кухня.local:8000/эфир");
+        assert_eq!(kitchen, "http://caddy/%D1%8D%D1%84%D0%B8%D1%80");
+        assert_eq!(host.as_deref(), Some("xn--j1agri5c.local:8000"));
+        assert_eq!(through("http://кухня.local").0, "http://caddy/");
     }
 
     #[test]
