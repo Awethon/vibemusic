@@ -387,7 +387,9 @@ export const SCROBBLE = Object.freeze({
 	// Scrobble after half the track or this many seconds, whichever comes first.
 	afterSeconds: 240,
 	// Most listening time credited per player tick, so seeks and stalls don't count as listening.
-	maxTickSeconds: 1
+	maxTickSeconds: 1,
+	// Listening time between two tries when Navidrome refuses a scrobble.
+	retryAfterSeconds: 30
 });
 
 // Saving the play queue to Navidrome.
