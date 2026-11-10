@@ -10,7 +10,7 @@
 //! does not hold up the others. New results are broadcast to all sockets as `enrichment` messages.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -279,6 +279,14 @@ fn valid_mbid(id: &str) -> bool {
         && id
             .chars()
             .all(|character| character.is_ascii_hexdigit() || character == '-')
+}
+
+/// Write then rename, so a crash mid-write never leaves a truncated cache. The rename only happens
+/// after a complete write: a half-written file must not replace the cache.
+async fn save(path: &Path, bytes: Vec<u8>) -> std::io::Result<()> {
+    let temporary = path.with_extension("tmp");
+    tokio::fs::write(&temporary, bytes).await?;
+    tokio::fs::rename(&temporary, path).await
 }
 
 fn clip(text: &str) -> String {
@@ -734,14 +742,7 @@ impl Enricher {
             }
             if let (Some(bytes), Some(path)) = (snapshot, &self.path) {
                 last_save = tokio::time::Instant::now();
-                // Write then rename, so a crash mid-write never leaves a truncated cache. The rename
-                // only happens after a complete write: a half-written file must not replace the cache.
-                let temporary = path.with_extension("tmp");
-                let saved = match tokio::fs::write(&temporary, bytes).await {
-                    Ok(()) => tokio::fs::rename(&temporary, path).await,
-                    Err(error) => Err(error),
-                };
-                if let Err(error) = saved {
+                if let Err(error) = save(path, bytes).await {
                     tracing::warn!(%error, path = %path.display(), "could not save the enrichment cache");
                     // Try again at the next save time instead of waiting for the next lookup.
                     self.state.lock().unwrap().unsaved = true;
@@ -851,5 +852,25 @@ mod tests {
         assert!(state.musicbrainz.is_empty());
         state.answer(request(0), MISSING_FRESH_MS + 1);
         assert_eq!(state.musicbrainz.len(), 1);
+    }
+
+    // Unix only: the failing write is staged with a symbolic link.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_failed_save_keeps_the_cache_that_was_there() {
+        let folder = std::env::temp_dir().join(format!("vibemusic-relay-save-test-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let cache = folder.join("enrichment.json");
+        save(&cache, b"the good cache".to_vec()).await.unwrap();
+        assert_eq!(std::fs::read(&cache).unwrap(), b"the good cache");
+        assert!(!folder.join("enrichment.tmp").exists());
+
+        // A temporary file is in the way that cannot be written: a link into a folder that does
+        // not exist. Renaming it over the cache anyway is what used to destroy the cache.
+        std::os::unix::fs::symlink(folder.join("missing/enrichment.tmp"), folder.join("enrichment.tmp")).unwrap();
+        assert!(save(&cache, b"the next cache".to_vec()).await.is_err());
+        let kept = std::fs::read(&cache);
+        std::fs::remove_dir_all(&folder).unwrap();
+        assert_eq!(kept.unwrap(), b"the good cache");
     }
 }
