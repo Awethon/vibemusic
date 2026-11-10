@@ -48,6 +48,8 @@
 		let lastFrame = performance.now();
 		let lastDraw = 0;
 		let intensity: number = FIELD.initialIntensity;
+		// Caustics doesn't move with the music, so the audio isn't analysed for it.
+		let followsMusic = style !== 'amber';
 		const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 		const loop = (now: number) => {
 			frame = requestAnimationFrame(loop);
@@ -59,7 +61,7 @@
 				document.documentElement.style.setProperty('--accent', `rgb(${accent.map(Math.round).join(' ')})`);
 			}
 			if (!field) return;
-			const features = audioLive() ? sampleAudio(now) : null;
+			const features = followsMusic && audioLive() ? sampleAudio(now) : null;
 			const target = idle.isIdle || ui.fullScreen ? FIELD.focusedIntensity : FIELD.browsingIntensity;
 			intensity += (target - intensity) * (1 - Math.exp(-seconds * FIELD.intensityFollowRate));
 			if (reducedMotion.matches && now - lastDraw <= FIELD.reducedMotionFrameIntervalMs) return;
@@ -79,7 +81,11 @@
 		const onVisibility = () => (document.hidden ? stop() : start());
 		const onResize = () => field?.resize();
 		const surface = canvas;
-		void (style === 'amber' ? createAmber(surface).catch(() => createField(surface)) : createField(surface))
+		const fieldInstead = () => {
+			followsMusic = true;
+			return createField(surface);
+		};
+		void (style === 'amber' ? createAmber(surface).catch(fieldInstead) : createField(surface))
 			.then((created) => {
 				if (destroyed) return created.destroy();
 				field = created;
