@@ -492,5 +492,8 @@
 	*::after {
 		transition-duration: 0.01ms !important;
 		animation-duration: 0.01ms !important;
+		/* Without this an endless animation (the equaliser on the playing track) runs at that
+		   speed for good, which is a strobe. Once is enough: it ends on its resting look. */
+		animation-iteration-count: 1 !important;
 	}
 }
