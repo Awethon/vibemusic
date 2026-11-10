@@ -170,18 +170,19 @@ export function startGlassLayer(canvas: HTMLCanvasElement, level: GlassLevel, pa
 	// Web Animations (FLIP, queue motion) move things without mutating the DOM, so while any run
 	// below this layer the backdrop is repainted every frame. Animations of pseudo-elements don't
 	// count: the backdrop is painted from elements only (backdrop.ts), so they can't change it, and
-	// one of them never ends (the equaliser on the playing track).
-	const pageAnimating = () =>
-		document
-			.getAnimations()
-			.some(
-				(animation) =>
-					animation.playState === 'running' &&
-					animation.effect instanceof KeyframeEffect &&
-					animation.effect.pseudoElement === null &&
-					animation.effect.target instanceof Element &&
-					!animation.effect.target.closest(above)
-			);
+	// one of them never ends (the equaliser on the playing track). Nor do animations inside the main
+	// view while it scrolls: every tile that passes under the pointer starts a hover transition, so
+	// one is always running and each frame would be a full repaint instead of a shift. Like the
+	// mutations there, they wait for the repaint at settle.
+	const pageAnimating = () => {
+		const mainScrolls = scrolling();
+		return document.getAnimations().some((animation) => {
+			if (animation.playState !== 'running' || !(animation.effect instanceof KeyframeEffect) || animation.effect.pseudoElement)
+				return false;
+			const target = animation.effect.target;
+			return target instanceof Element && !target.closest(above) && !(mainScrolls && target.closest(SCROLLER));
+		});
+	};
 
 	const tick = () => {
 		frame = requestAnimationFrame(tick);
