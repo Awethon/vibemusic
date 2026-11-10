@@ -101,7 +101,7 @@ export const editQueue = (edit: queue.QueueEdit) => perform({ kind: 'edit', edit
 export async function toggleLike(track: Track) {
 	const starred = !track.starred;
 	await navidrome().subsonic(starred ? 'star' : 'unstar', { id: track.id });
-	await patchLibrary('update track set starred = ? where id = ?', [starred ? 1 : 0, track.id]);
+	await patchLibrary('track', 'update track set starred = ? where id = ?', [starred ? 1 : 0, track.id]);
 	setStarred(track.id, starred);
 	perform({ kind: 'liked', trackId: track.id, starred });
 }
@@ -109,7 +109,7 @@ export async function toggleLike(track: Track) {
 export async function toggleDislike(track: Track) {
 	const disliked = !track.disliked;
 	await navidrome().subsonic('setRating', { id: track.id, rating: disliked ? 1 : 0 });
-	await patchLibrary('update track set rating = ? where id = ?', [disliked ? 1 : 0, track.id]);
+	await patchLibrary('track', 'update track set rating = ? where id = ?', [disliked ? 1 : 0, track.id]);
 }
 
 export const audioLive = () => !isMirroring() && localAudioLive();

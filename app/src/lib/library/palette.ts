@@ -54,7 +54,7 @@ export function albumPalette(albumId: string): Promise<string[]> {
 		if (saved) return saved;
 		const colors = await extract(albumId);
 		if (colors.length)
-			await patchLibrary('insert or replace into palette values (?, ?)', [albumId + PALETTE_KEY_SUFFIX, JSON.stringify(colors)]);
+			await patchLibrary('palette', 'insert or replace into palette values (?, ?)', [albumId + PALETTE_KEY_SUFFIX, JSON.stringify(colors)]);
 		return colors;
 	})();
 	inFlight.set(albumId, loading);

@@ -23,15 +23,22 @@ type Status = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 // need-snapshot: a new tab has nothing saved yet and asks the leader to save.
 type ChannelMessage =
 	| { kind: 'snapshot'; version: string }
-	| { kind: 'patch'; sql: string; params: SqlParam[] }
+	| { kind: 'patch'; sql: string; params: SqlParam[]; table?: PatchedTable }
 	| { kind: 'resync'; full: boolean }
 	| { kind: 'need-snapshot' };
+
+// The tables patchLibrary edits. Each has its own counter, so a view re-runs its queries only
+// for edits to tables it reads: a palette saved on the first hover over a cover is no reason to
+// query the albums again.
+export type PatchedTable = 'track' | 'album' | 'palette';
 
 export const library = $state<{
 	status: Status;
 	meta: LibraryMeta | null;
-	// Bumped on every change to the data; views re-run their queries when it changes.
+	// Bumped when the library is synced or reloaded; every view re-runs its queries.
 	revision: number;
+	// Bumped per table by a local edit, in this tab or another one.
+	patched: Record<PatchedTable, number>;
 	leader: boolean;
 	error: string;
 	openMs: number;
@@ -41,6 +48,7 @@ export const library = $state<{
 	status: 'idle',
 	meta: null,
 	revision: 0,
+	patched: { track: 0, album: 0, palette: 0 },
 	leader: false,
 	error: '',
 	openMs: 0,
@@ -291,7 +299,9 @@ async function onChannelMessage(event: MessageEvent<ChannelMessage>) {
 	} else {
 		// Keeps this tab's in-memory copy in step without waiting for the leader's next save.
 		await call({ kind: 'run', sql: message.sql, params: message.params, persist: library.leader });
-		library.revision += 1;
+		// A tab running an older version doesn't say which table; then it may be any of them.
+		const tables = message.table ? [message.table] : (Object.keys(library.patched) as PatchedTable[]);
+		for (const table of tables) library.patched[table] += 1;
 	}
 }
 
@@ -351,8 +361,8 @@ export async function query<Row>(sql: string, params: SqlParam[] = []): Promise<
  * Applies a small local edit (star, play count, palette) to this tab's database and broadcasts
  * the same SQL to other tabs. The leader also saves it; the server is updated separately.
  */
-export async function patchLibrary(sql: string, params: SqlParam[]) {
+export async function patchLibrary(table: PatchedTable, sql: string, params: SqlParam[]) {
 	await call({ kind: 'run', sql, params, persist: library.leader });
-	channel?.postMessage({ kind: 'patch', sql, params } satisfies ChannelMessage);
-	library.revision += 1;
+	channel?.postMessage({ kind: 'patch', sql, params, table } satisfies ChannelMessage);
+	library.patched[table] += 1;
 }

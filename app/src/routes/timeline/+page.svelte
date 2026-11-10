@@ -12,8 +12,8 @@
 	import { openMenu } from '#lib/ui/menu.svelte.ts';
 	import { timelineAvailable } from '#lib/ui/sections.svelte.ts';
 
-	const albums = live(timelineAlbums, []);
-	const leads = live(paletteLeads, new Map<string, string>());
+	const albums = live(timelineAlbums, [], []);
+	const leads = live(paletteLeads, new Map<string, string>(), ['palette']);
 	let scroller = $state<HTMLDivElement>();
 	let minimap = $state<HTMLCanvasElement>();
 	let scrollLeft = $state(0);

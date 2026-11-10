@@ -22,7 +22,7 @@
 	] as const satisfies readonly (readonly [ArtistSort, string])[];
 
 	const rowMeasure = fixedRowMeasure(LAYOUT.artistRowHeightPx);
-	const artists = live(() => artistList(ui.artistSort, ui.filters), []);
+	const artists = live(() => artistList(ui.artistSort, ui.filters), [], []);
 	const alphabetEntries = $derived(
 		ui.artistSort === 'az' ? alphabetEntriesFor(artists.value, (artist) => alphabetBucket(withoutLeadingThe(artist.name))) : null
 	);

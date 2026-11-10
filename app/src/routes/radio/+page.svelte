@@ -14,8 +14,8 @@
 
 	type Draft = { id: string | null; name: string; streamUrl: string; homePageUrl: string };
 
-	const stations = live(radioTracks, []);
-	const details = live(radioStations, []);
+	const stations = live(radioTracks, [], []);
+	const details = live(radioStations, [], []);
 	const admin = $derived(!!session.credentials?.isAdmin);
 	let draft = $state<Draft | null>(null);
 	let saving = $state(false);

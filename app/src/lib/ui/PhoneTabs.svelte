@@ -8,7 +8,7 @@
 	import { ui } from './state.svelte.ts';
 
 	const section = $derived(sectionFor(page.route.id));
-	const stations = live(radioStations, []);
+	const stations = live(radioStations, [], []);
 </script>
 
 <nav id="tabs" aria-label="Sections">

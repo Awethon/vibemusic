@@ -40,11 +40,11 @@ async function sendScrobble(scrobble: PendingScrobble) {
 	// has the play by now, so a failure here must not look like a failed scrobble: sending it again
 	// would count the play twice. The next sync brings the right count.
 	try {
-		await patchLibrary('update track set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
+		await patchLibrary('track', 'update track set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
 			playedAt,
 			scrobble.trackId
 		]);
-		await patchLibrary('update album set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
+		await patchLibrary('album', 'update album set play_count = play_count + 1, play_date = max(play_date, ?) where id = ?', [
 			playedAt,
 			scrobble.albumId
 		]);

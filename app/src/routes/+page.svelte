@@ -45,8 +45,8 @@
 		newest: (album) => decadeLabel(album.year)
 	};
 
-	const wall = live(() => albumWall(ui.albumSort, ui.filters), []);
-	const strip = live(() => artistStrip(ui.filters, HOME.artistStripCount), []);
+	const wall = live(() => albumWall(ui.albumSort, ui.filters), [], ['album']);
+	const strip = live(() => artistStrip(ui.filters, HOME.artistStripCount), [], []);
 	const playlists = live(allPlaylists, []);
 	const jumpBackIn = live(async () => {
 		const entries = await Promise.all(

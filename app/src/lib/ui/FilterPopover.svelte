@@ -7,8 +7,8 @@
 	import { live } from './live.svelte.ts';
 	import { ui } from './state.svelte.ts';
 
-	const genres = live(genreCounts, []);
-	const decades = live(decadeCounts, []);
+	const genres = live(genreCounts, [], []);
+	const decades = live(decadeCounts, [], []);
 	let element = $state<HTMLElement | null>(null);
 	let position = $state({ left: 0, top: 0, above: false });
 
