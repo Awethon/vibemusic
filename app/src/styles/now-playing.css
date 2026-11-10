@@ -8,15 +8,24 @@
 	flex-direction: column;
 	padding: 22px 40px 110px;
 	opacity: 0;
+	/* Closed, its buttons must be out of Tab's reach as well. The fade is the one from shell.css;
+	   the view is hidden for real once it is over. */
+	visibility: hidden;
 	pointer-events: none;
 	transform: scale(1.015);
 	background: radial-gradient(120% 80% at 30% 40%, rgba(6, 5, 9, 0.05), rgba(6, 5, 9, 0.4));
+	transition:
+		opacity 1.1s var(--ease),
+		transform 1.1s var(--ease),
+		visibility 0s 1.1s;
 }
 
 body.now-open.fs-classic #classic {
 	opacity: 1;
+	visibility: visible;
 	pointer-events: auto;
 	transform: none;
+	transition-delay: 0s;
 }
 
 body.now-open.fs-classic.idle #classic {

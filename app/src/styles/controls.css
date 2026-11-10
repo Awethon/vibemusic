@@ -172,18 +172,24 @@
 	backdrop-filter: blur(24px) saturate(1.3);
 	box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6);
 	opacity: 0;
+	/* Opacity alone leaves the controls inside reachable with Tab and read out by screen readers.
+	   The delay lets the fade finish before a closed popover is hidden for real. */
+	visibility: hidden;
 	transform: translateY(6px) scale(0.98);
 	pointer-events: none;
 	transition:
 		opacity 0.16s var(--ease),
-		transform 0.16s var(--ease);
+		transform 0.16s var(--ease),
+		visibility 0s 0.16s;
 }
 
 .pop.open,
 .menu.open {
 	opacity: 1;
+	visibility: visible;
 	transform: none;
 	pointer-events: auto;
+	transition-delay: 0s;
 }
 
 .pop-title {
@@ -263,13 +269,19 @@
 	padding-top: 14vh;
 	background: rgba(5, 4, 8, 0.35);
 	opacity: 0;
+	/* As for popovers: out of Tab's reach once the fade is over. */
+	visibility: hidden;
 	pointer-events: none;
-	transition: opacity 0.18s var(--ease);
+	transition:
+		opacity 0.18s var(--ease),
+		visibility 0s 0.18s;
 }
 
 #palette.open {
 	opacity: 1;
+	visibility: visible;
 	pointer-events: auto;
+	transition-delay: 0s;
 }
 
 .pal-box {
