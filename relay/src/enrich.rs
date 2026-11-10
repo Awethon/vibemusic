@@ -734,13 +734,17 @@ impl Enricher {
             }
             if let (Some(bytes), Some(path)) = (snapshot, &self.path) {
                 last_save = tokio::time::Instant::now();
-                // Write then rename, so a crash mid-write never leaves a truncated cache.
+                // Write then rename, so a crash mid-write never leaves a truncated cache. The rename
+                // only happens after a complete write: a half-written file must not replace the cache.
                 let temporary = path.with_extension("tmp");
-                if let Err(error) = tokio::fs::write(&temporary, bytes)
-                    .await
-                    .and(tokio::fs::rename(&temporary, path).await)
-                {
+                let saved = match tokio::fs::write(&temporary, bytes).await {
+                    Ok(()) => tokio::fs::rename(&temporary, path).await,
+                    Err(error) => Err(error),
+                };
+                if let Err(error) = saved {
                     tracing::warn!(%error, path = %path.display(), "could not save the enrichment cache");
+                    // Try again at the next save time instead of waiting for the next lookup.
+                    self.state.lock().unwrap().unsaved = true;
                 }
             }
         }
