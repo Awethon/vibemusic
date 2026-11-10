@@ -248,15 +248,29 @@ function queueEventSync({ albums, artists }: RefreshedIds) {
 	eventTimer = setTimeout(() => void checkForChanges(), LIBRARY_SYNC.eventDebounceMs);
 }
 
-function lead() {
+// Returns a function that stops leading, for lease.ts; a Web Lock is never given up.
+function lead(): () => void {
 	library.leader = true;
+	// Tabs that don't lead never save. If this one changed its copy while loading (new genre rules,
+	// see loadSnapshot in the worker), that is saved now. No library yet: the first sync saves.
+	if (library.meta) void call({ kind: 'persist' }).catch(() => {});
 	void checkForChanges().then(() => requestEnrichment(true));
-	listenToNavidrome(() => requireCredentials().token, { changed: queueEventSync, live: (live) => (eventsLive = live) });
+	const stopListening = listenToNavidrome(() => requireCredentials().token, {
+		changed: queueEventSync,
+		live: (live) => (eventsLive = live)
+	});
 	// Polling is the fallback; while the event stream is live it only runs every livePollIntervalMs.
-	setInterval(() => {
+	const polling = setInterval(() => {
 		const due = !eventsLive || Date.now() - lastSyncAt >= LIBRARY_SYNC.livePollIntervalMs;
 		void (due ? checkForChanges() : Promise.resolve()).then(() => requestEnrichment());
 	}, LIBRARY_SYNC.pollIntervalMs);
+	return () => {
+		library.leader = false;
+		stopListening();
+		clearInterval(polling);
+		clearTimeout(eventTimer);
+		eventsLive = false;
+	};
 }
 
 async function onChannelMessage(event: MessageEvent<ChannelMessage>) {

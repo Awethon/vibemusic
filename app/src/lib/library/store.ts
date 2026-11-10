@@ -7,8 +7,7 @@ const DATABASE = 'vibemusic-library';
 const MANIFESTS = 'manifest';
 const CHUNKS = 'chunk';
 
-export type Saved = { chunkSize: number; hashes: string[] };
-type Manifest = Saved & { name: string; size: number };
+type Manifest = { name: string; size: number; chunkSize: number; hashes: string[] };
 
 let opened: Promise<IDBDatabase> | null = null;
 
@@ -41,42 +40,45 @@ function store(): Promise<IDBDatabase> {
 const chunksOf = (name: string, from = 0) => IDBKeyRange.bound([name, from], [name, Infinity]);
 
 // Returns null when the file is missing or incomplete; callers then sync from scratch.
-export async function readFile(name: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; saved: Saved } | null> {
+export async function readFile(name: string): Promise<Uint8Array<ArrayBuffer> | null> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readonly');
 	const [manifest, parts] = await Promise.all([
 		settle<Manifest | undefined>(transaction.objectStore(MANIFESTS).get(name)),
 		settle<Blob[]>(transaction.objectStore(CHUNKS).getAll(chunksOf(name)))
 	]);
 	if (!manifest || parts.length !== manifest.hashes.length) return null;
-	const bytes = joinChunks(await Promise.all(parts.map(async (part) => new Uint8Array(await part.arrayBuffer()))), manifest.size);
-	return { bytes, saved: { chunkSize: manifest.chunkSize, hashes: manifest.hashes } };
+	return joinChunks(await Promise.all(parts.map(async (part) => new Uint8Array(await part.arrayBuffer()))), manifest.size);
 }
 
 /**
- * Saves `name`, writing only the chunks whose hash differs from `previous` (the result of the last
- * save of this file). Everything happens in one transaction, so a crash never leaves a manifest
- * that points at a mix of old and new chunks.
+ * Saves `name`, writing only the chunks whose hash differs from the stored ones. Everything
+ * happens in one transaction, so a crash never leaves a manifest that points at a mix of old and
+ * new chunks.
+ *
+ * The stored hashes are read inside that transaction, not remembered from this tab's last save:
+ * another tab may have saved since, and skipping chunks it rewrote would leave a mix of both
+ * tabs' files. The browser runs write transactions on these stores one after another, across
+ * tabs, so the file always ends up as exactly the bytes of whoever saved last.
  */
-export async function writeFile(
-	name: string,
-	snapshot: () => Uint8Array,
-	chunkSize: number,
-	previous: Saved | null
-): Promise<{ saved: Saved; size: number; written: number }> {
+export async function writeFile(name: string, snapshot: () => Uint8Array, chunkSize: number): Promise<{ size: number; written: number }> {
 	const transaction = (await store()).transaction([MANIFESTS, CHUNKS], 'readwrite');
 	const done = finish(transaction);
-	// Taken only after the await above and used without awaiting: the bytes may be a live view of
+	// A failed read below also aborts the transaction; the read reports that failure itself.
+	done.catch(() => {});
+	const manifests = transaction.objectStore(MANIFESTS);
+	const stored = await settle<Manifest | undefined>(manifests.get(name));
+	// Taken only after the awaits above and used without awaiting: the bytes may be a live view of
 	// the database's memory, which could change while another worker request runs.
 	const bytes = snapshot();
 	const hashes = chunkHashes(bytes, chunkSize);
-	const changed = changedChunks(previous?.chunkSize === chunkSize ? previous.hashes : null, hashes);
+	const changed = changedChunks(stored?.chunkSize === chunkSize ? stored.hashes : null, hashes);
 	const chunks = transaction.objectStore(CHUNKS);
 	for (const index of changed) chunks.put(new Blob([bytes.slice(index * chunkSize, (index + 1) * chunkSize)]), [name, index]);
 	// The database may have shrunk: drop chunks past the new end.
 	chunks.delete(chunksOf(name, hashes.length));
-	transaction.objectStore(MANIFESTS).put({ name, size: bytes.length, chunkSize, hashes } satisfies Manifest);
+	manifests.put({ name, size: bytes.length, chunkSize, hashes } satisfies Manifest);
 	await done;
-	return { saved: { chunkSize, hashes }, size: bytes.length, written: changed.length };
+	return { size: bytes.length, written: changed.length };
 }
 
 export async function listFiles(): Promise<string[]> {

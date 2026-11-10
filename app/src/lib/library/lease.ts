@@ -8,12 +8,15 @@ type Lease = { owner: string; until: number };
 
 /**
  * Calls `lead` once this tab wins the lease, then keeps renewing it until the page goes away.
- * Never gives leadership back while the tab is alive, matching the Web Lock path.
+ * `lead` returns a function that stops leading. It is called in one case only: this tab could not
+ * renew for longer than the lease lasts (the computer slept, the tab was frozen) and another tab
+ * took over meanwhile. Without that there would be two leaders from then on.
  */
-export function leadWhenFree(name: string, lead: () => void) {
+export function leadWhenFree(name: string, lead: () => () => void) {
 	const key = `vibemusic.lease:${name}`;
 	const me = randomId();
-	let leading = false;
+	// Set while this tab leads.
+	let stop: (() => void) | null = null;
 	const read = (): Lease | null => {
 		try {
 			return JSON.parse(localStorage.getItem(key) ?? 'null') as Lease | null;
@@ -24,18 +27,21 @@ export function leadWhenFree(name: string, lead: () => void) {
 	const claim = () => localStorage.setItem(key, JSON.stringify({ owner: me, until: Date.now() + LEADER_LEASE.ttlMs } satisfies Lease));
 	const attempt = () => {
 		const lease = read();
-		if (leading) {
-			claim();
+		const taken = !!lease && lease.owner !== me && lease.until > Date.now();
+		if (stop) {
+			if (taken) {
+				stop();
+				stop = null;
+			} else claim();
 			return;
 		}
-		if (lease && lease.owner !== me && lease.until > Date.now()) return;
+		if (taken) return;
 		claim();
 		// localStorage has no compare-and-set: two tabs can claim at the same moment. Wait, then
 		// re-read; only the tab whose write survived becomes leader.
 		setTimeout(() => {
-			if (leading || read()?.owner !== me) return;
-			leading = true;
-			lead();
+			if (stop || read()?.owner !== me) return;
+			stop = lead();
 		}, LEADER_LEASE.settleMs);
 	};
 	attempt();
@@ -46,10 +52,11 @@ export function leadWhenFree(name: string, lead: () => void) {
 		if (event.key === key && !event.newValue) attempt();
 	});
 	addEventListener('pagehide', () => {
-		if (leading && read()?.owner === me) localStorage.removeItem(key);
+		if (stop && read()?.owner === me) localStorage.removeItem(key);
 	});
-	// Restored from the back/forward cache: we still think we lead, so take the lease back.
+	// Restored from the back/forward cache: we still think we lead, so take the lease back, unless
+	// another tab has it by now.
 	addEventListener('pageshow', (event) => {
-		if (event.persisted && leading) claim();
+		if (event.persisted && stop) attempt();
 	});
 }

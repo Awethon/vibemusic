@@ -21,7 +21,7 @@ import { SCHEMA_VERSION } from './schema.ts';
 import { fetchChanges, fetchLibrary } from './fetch.ts';
 import type { SyncTimings, WorkerEnvelope, WorkerReply, WorkerRequest, WorkerResults } from './protocol.ts';
 import type { LibraryMeta, LibrarySnapshot } from './snapshot.ts';
-import { listFiles, readFile, removeFile, writeFile, type Saved } from './store.ts';
+import { listFiles, readFile, removeFile, writeFile } from './store.ts';
 
 let sqlite: Sqlite3Static;
 let db: Database | null = null;
@@ -32,8 +32,6 @@ let userId = '';
 let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
 // Saves run one at a time; each waits for the previous one.
 let writing: Promise<unknown> = Promise.resolve();
-// Chunk hashes from the last save of each database, so the next save writes only changed chunks.
-const savedState = new WeakMap<Database, Saved>();
 
 // The page sends the instance config (/config.json) as its first request; nothing else runs before it.
 let configure: (config: GenrePlaylistConfig) => void = () => {};
@@ -106,8 +104,7 @@ function liveBytes(database: Database): Uint8Array {
 
 function writeSnapshot(database: Database): Promise<number> {
 	const next = writing.then(async () => {
-		const result = await writeFile(snapshotName(), () => liveBytes(database), LIBRARY_STORE.chunkBytes, savedState.get(database) ?? null);
-		savedState.set(database, result.saved);
+		const result = await writeFile(snapshotName(), () => liveBytes(database), LIBRARY_STORE.chunkBytes);
 		return result.size;
 	});
 	// A failed save must not block the ones after it.
@@ -136,7 +133,7 @@ async function loadOutdatedSnapshot(): Promise<Database | null> {
 	try {
 		const name = (await listFiles()).find(isOutdated);
 		const stored = name ? await readFile(name) : null;
-		if (stored) return databaseFrom(stored.bytes);
+		if (stored) return databaseFrom(stored);
 	} catch {
 		return null;
 	}
@@ -161,7 +158,7 @@ function replaceDatabase(next: Database | null) {
 async function loadSnapshot() {
 	const stored = await readFile(snapshotName()).catch(() => null);
 	const legacy = stored ? null : await readLegacy((name) => name === snapshotName());
-	const bytes = stored?.bytes ?? legacy;
+	const bytes = stored ?? legacy;
 	if (!bytes) return null;
 	try {
 		const database = databaseFrom(bytes);
@@ -171,12 +168,15 @@ async function loadSnapshot() {
 			database.close();
 			return null;
 		}
-		if (stored) savedState.set(database, stored.saved);
 		replaceDatabase(database);
 		// Genre/playlist rules may have changed since this file was saved (see derivedRules() in build.ts).
+		// That refresh stays in memory here: every tab loads snapshots, but only the leader saves
+		// (it saves once when it starts leading, see lead() in library.svelte.ts).
 		const refreshed = refreshDerived(database, meta);
-		if (refreshed || legacy) await writeSnapshot(database);
-		if (legacy) void removeLegacy();
+		if (legacy) {
+			await writeSnapshot(database);
+			void removeLegacy();
+		}
 		return refreshed ?? meta;
 	} catch {
 		return null;
