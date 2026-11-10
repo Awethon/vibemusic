@@ -32,14 +32,25 @@ function closeTopmost() {
 	return false;
 }
 
+// Space presses the control that Tab moved focus to. A button clicked with the mouse keeps focus
+// too, and there Space still means play or pause. :focus-visible can't tell the two apart: it
+// starts to match a clicked button as soon as any key is pressed.
+let focusByTab = false;
+
+const pressesControl = (target: EventTarget | null) =>
+	focusByTab && target instanceof Element && target.matches('button, select, summary, [role="button"]');
+
 function onKeydown(event: KeyboardEvent) {
+	if (event.key === 'Tab') focusByTab = true;
 	if (event.key === 'Escape' && closeTopmost()) return;
 	// Leave typing and the browser's own Cmd/Ctrl shortcuts alone.
 	if ((event.target instanceof Element && event.target.matches('input, textarea')) || event.metaKey || event.ctrlKey || ui.searchOpen)
 		return;
 	if (event.key === '/') ui.searchOpen = true;
-	else if (event.code === 'Space') togglePlay();
-	else if (event.shiftKey && event.key === 'ArrowRight') playNextTrack();
+	else if (event.code === 'Space') {
+		if (pressesControl(event.target)) return;
+		togglePlay();
+	} else if (event.shiftKey && event.key === 'ArrowRight') playNextTrack();
 	else if (event.shiftKey && event.key === 'ArrowLeft') playPreviousTrack();
 	else if (event.altKey && event.key === 'ArrowRight') seekBy(PLAYBACK.seekStepSeconds);
 	else if (event.altKey && event.key === 'ArrowLeft') seekBy(-PLAYBACK.seekStepSeconds);
@@ -50,7 +61,15 @@ function onKeydown(event: KeyboardEvent) {
 	event.preventDefault();
 }
 
+const onPointerDown = () => {
+	focusByTab = false;
+};
+
 export function installKeyboard(): () => void {
 	addEventListener('keydown', onKeydown);
-	return () => removeEventListener('keydown', onKeydown);
+	addEventListener('pointerdown', onPointerDown, true);
+	return () => {
+		removeEventListener('keydown', onKeydown);
+		removeEventListener('pointerdown', onPointerDown, true);
+	};
 }
