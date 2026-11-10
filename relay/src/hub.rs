@@ -271,7 +271,9 @@ fn log_message(room: &Room, device_id: &str, is_active: bool, message: &ClientMe
     if matches!(message, ClientMessage::Ping) {
         return;
     }
-    let short = |id: &str| id[..id.len().min(8)].to_owned();
+    // Cut by characters, not bytes: ids are text the client chose, and a byte cut that lands inside
+    // a multi-byte character panics while the hub is locked.
+    let short = |id: &str| id.chars().take(8).collect::<String>();
     let (playback, command) = match message {
         ClientMessage::Playback { playback } | ClientMessage::Handoff { playback, .. } => (playback, &Value::Null),
         ClientMessage::Command { command } => (&Value::Null, command),
@@ -515,5 +517,280 @@ mod tests {
         let welcome = drain(&mut fresh);
         assert_eq!(welcome[0]["active"], "tab");
         assert_eq!(welcome[0]["devices"][0]["online"], true);
+    }
+
+    #[test]
+    fn a_player_that_closes_mid_handoff_does_not_strand_playback() {
+        let mut hub = Hub::default();
+        let (player_connection, mut player) = connect(&mut hub, "u", "player");
+        let (_, mut target) = connect(&mut hub, "u", "target");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "player", message(json!({ "type": "queue", "queue": ["q"] })));
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        assert_eq!(drain(&mut player).pop().unwrap()["type"], "release");
+        hub.leave("u", "player", player_connection);
+        drain(&mut target);
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        let received = drain(&mut target);
+        assert_eq!(types(&received), ["takeover", "devices"]);
+        assert_eq!(received[0]["queue"], json!(["q"]));
+        let only_target = json!([{ "id": "target", "name": "target", "online": true }]);
+        assert_eq!(
+            received[1],
+            json!({ "type": "devices", "active": "target", "devices": only_target })
+        );
+    }
+
+    #[test]
+    fn a_target_that_vanishes_mid_handoff_leaves_the_player_active_with_its_final_state() {
+        let mut hub = Hub::default();
+        let (_, mut player) = connect(&mut hub, "u", "player");
+        let (target_connection, _target) = connect(&mut hub, "u", "target");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        hub.leave("u", "target", target_connection);
+        drain(&mut player);
+        hub.receive(
+            "u",
+            "player",
+            message(json!({ "type": "handoff", "to": "target", "queue": ["q"], "playback": { "position": 42 } })),
+        );
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        // The player paused itself to hand over; this list is what tells it that it still owns playback.
+        let only_player = json!([{ "id": "player", "name": "player", "online": true }]);
+        assert_eq!(
+            drain(&mut player),
+            [json!({ "type": "devices", "active": "player", "devices": only_player })]
+        );
+        let (_, mut later) = connect(&mut hub, "u", "later");
+        let welcome = drain(&mut later);
+        assert_eq!(welcome[0]["queue"], json!(["q"]));
+        assert_eq!(welcome[0]["playback"]["position"], 42);
+    }
+
+    #[test]
+    fn a_claim_during_a_pending_handoff_wins_and_the_old_handoff_cannot_undo_it() {
+        let mut hub = Hub::default();
+        let (_, mut player) = connect(&mut hub, "u", "player");
+        let (_, mut target) = connect(&mut hub, "u", "target");
+        let (_, mut claimer) = connect(&mut hub, "u", "claimer");
+        hub.receive("u", "player", message(json!({ "type": "claim" })));
+        hub.receive("u", "target", message(json!({ "type": "transfer", "to": "target" })));
+        hub.receive("u", "claimer", message(json!({ "type": "claim" })));
+        drain(&mut target);
+        hub.receive(
+            "u",
+            "player",
+            message(json!({ "type": "handoff", "to": "target", "queue": ["stale"], "playback": { "position": 9 } })),
+        );
+        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+        assert!(
+            drain(&mut target).is_empty(),
+            "the target must not start playing as well"
+        );
+        let releases: Vec<Value> = drain(&mut player)
+            .into_iter()
+            .filter(|message| message["type"] == "release")
+            .collect();
+        assert_eq!(releases.last().unwrap()["to"], "claimer");
+        assert_eq!(drain(&mut claimer).pop().unwrap()["active"], "claimer");
+        let (_, mut later) = connect(&mut hub, "u", "later");
+        assert_eq!(drain(&mut later)[0]["queue"], Value::Null);
+    }
+
+    #[test]
+    fn debug_logging_copes_with_device_ids_in_any_script() {
+        let logs = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(std::io::sink)
+            .finish();
+        tracing::subscriber::with_default(logs, || {
+            let mut hub = Hub::default();
+            // The eighth byte of each id falls inside a two- or four-byte character.
+            for device in ["aдддд", "abcdef🎧"] {
+                let (_, mut tab) = connect(&mut hub, "u", device);
+                hub.receive("u", device, message(json!({ "type": "claim" })));
+                assert_eq!(drain(&mut tab).pop().unwrap()["active"], device);
+            }
+        });
+    }
+
+    const TABS: [&str; 4] = ["tab-0", "tab-1", "tab-2", "tab-3"];
+
+    /// A tab as the app behaves, as far as the relay is concerned: it shows the last device list
+    /// it was sent, plays once it claims or is handed playback, and stops when released.
+    #[derive(Default)]
+    struct Tab {
+        socket: Option<(u64, UnboundedReceiver<String>)>,
+        // Sockets a reconnect replaced, which have not closed yet.
+        replaced: Vec<u64>,
+        shown: Option<Value>,
+        plays: bool,
+    }
+
+    /// Hands every tab what the hub sent it, until nobody has anything left to say. A released tab
+    /// answers with its handoff when `answers` says so; otherwise it is the laptop that fell asleep.
+    fn deliver(hub: &mut Hub, tabs: &mut [Tab], answers: &mut impl FnMut() -> bool) {
+        loop {
+            let mut handoffs = Vec::new();
+            for (index, tab) in tabs.iter_mut().enumerate() {
+                let Some((_, inbox)) = &mut tab.socket else { continue };
+                for message in drain(inbox) {
+                    match message["type"].as_str().unwrap() {
+                        "welcome" | "devices" => {
+                            if message["type"] == "welcome" && message["active"] != TABS[index] {
+                                tab.plays = false;
+                            }
+                            tab.shown = Some(json!({ "active": message["active"], "devices": message["devices"] }));
+                        }
+                        "takeover" => tab.plays = true,
+                        "release" => {
+                            tab.plays = false;
+                            if message["handoff"] == true && answers() {
+                                handoffs.push((index, message["to"].clone()));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            if handoffs.is_empty() {
+                return;
+            }
+            for (index, to) in handoffs {
+                let handoff = json!({ "type": "handoff", "to": to, "queue": ["q"], "playback": { "position": 1 } });
+                hub.receive("u", TABS[index], message(handoff));
+            }
+        }
+    }
+
+    /// What must hold whenever the room is at rest, or a user would see two tabs playing at once
+    /// or a device list that is not the real one.
+    fn check_room(hub: &Hub, tabs: &[Tab], history: &[String]) {
+        let Some(room) = hub.rooms.get("u") else {
+            assert!(
+                tabs.iter().all(|tab| tab.socket.is_none()),
+                "room gone with tabs connected: {history:?}"
+            );
+            return;
+        };
+        let actual = json!({ "active": room.active, "devices": room.device_infos() });
+        for (index, tab) in tabs.iter().enumerate() {
+            if tab.socket.is_none() {
+                continue;
+            }
+            let id = TABS[index];
+            assert_eq!(
+                tab.shown.as_ref(),
+                Some(&actual),
+                "{id} shows a stale device list: {history:?}"
+            );
+            assert!(
+                !tab.plays || room.active.as_deref() == Some(id),
+                "{id} still plays although {:?} is active: {history:?}",
+                room.active
+            );
+        }
+        for device in &room.devices {
+            assert!(
+                device.connection.is_some() || room.active.as_deref() == Some(device.id.as_str()),
+                "{} is listed offline without being the player: {history:?}",
+                device.id
+            );
+        }
+        if let Some(active) = &room.active {
+            assert!(
+                room.device(active).is_some(),
+                "the player {active} is not listed: {history:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn whatever_tabs_do_they_agree_on_one_player_and_play_here_always_works() {
+        for seed in 0..60u64 {
+            // A small xorshift generator: the same runs every time, and no dependency for it.
+            let mut state = seed * 2 + 1;
+            let mut random = move |below: usize| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state % below as u64) as usize
+            };
+            let mut hub = Hub::default();
+            let mut tabs: [Tab; 4] = Default::default();
+            let mut history = vec![format!("seed {seed}")];
+            for _ in 0..80 {
+                let index = random(TABS.len());
+                let (id, tab) = (TABS[index], &mut tabs[index]);
+                let online = tab.socket.is_some();
+                match random(9) {
+                    0 => {
+                        let (outbox, inbox) = unbounded_channel();
+                        let connection = hub.join("u", id, id, outbox);
+                        tab.replaced
+                            .extend(tab.socket.replace((connection, inbox)).map(|old| old.0));
+                        history.push(format!("{id} connects"));
+                    }
+                    1 if online => {
+                        let (connection, _) = tab.socket.take().unwrap();
+                        hub.leave("u", id, connection);
+                        history.push(format!("{id} closes"));
+                    }
+                    2 if !tab.replaced.is_empty() => {
+                        hub.leave("u", id, tab.replaced.remove(0));
+                        history.push(format!("{id}'s replaced socket closes"));
+                    }
+                    3 if online => {
+                        tab.plays = true;
+                        hub.receive("u", id, message(json!({ "type": "claim" })));
+                        history.push(format!("{id} claims"));
+                    }
+                    4 | 5 if online => {
+                        let to = TABS[random(TABS.len())];
+                        hub.receive("u", id, message(json!({ "type": "transfer", "to": to })));
+                        history.push(format!("{id} asks to play on {to}"));
+                    }
+                    6 if online => {
+                        hub.receive("u", id, message(json!({ "type": "queue", "queue": [id] })));
+                        hub.receive(
+                            "u",
+                            id,
+                            message(json!({ "type": "playback", "playback": { "position": 1 } })),
+                        );
+                        hub.receive(
+                            "u",
+                            id,
+                            message(json!({ "type": "command", "command": { "kind": "next" } })),
+                        );
+                        history.push(format!("{id} sends queue, playback and a command"));
+                    }
+                    7 => {
+                        hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+                        history.push("handoffs expire".to_owned());
+                    }
+                    _ => continue,
+                }
+                deliver(&mut hub, &mut tabs, &mut || random(4) > 0);
+                check_room(&hub, &tabs, &history);
+            }
+            // From wherever that ended: "Play here" on a connected tab moves playback there, at the
+            // latest once the handoff expires.
+            let Some(index) = tabs.iter().position(|tab| tab.socket.is_some()) else {
+                continue;
+            };
+            let id = TABS[index];
+            hub.receive("u", id, message(json!({ "type": "transfer", "to": id })));
+            history.push(format!("{id} asks to play here"));
+            deliver(&mut hub, &mut tabs, &mut || random(2) > 0);
+            hub.expire_handoffs(Instant::now() + HANDOFF_TIMEOUT);
+            deliver(&mut hub, &mut tabs, &mut || false);
+            check_room(&hub, &tabs, &history);
+            assert_eq!(
+                hub.rooms["u"].active.as_deref(),
+                Some(id),
+                "play here did nothing: {history:?}"
+            );
+        }
     }
 }
