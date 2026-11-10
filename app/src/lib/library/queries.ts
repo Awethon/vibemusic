@@ -90,9 +90,12 @@ const ALBUM_COLUMNS = `album.id, album.name, album.artist_id as artistId, album.
 const TRACK_COLUMNS = `track.id, track.album_id as albumId, album.name as album, track.title, track.artist, track.artist_id as artistId,
 	album.artist_id as albumArtistId, track.track_no as trackNo, track.disc_no as discNo, track.duration, track.starred, track.rating = 1 as disliked`;
 
+// The covers start from album_credit, which is keyed by artist. Starting from album instead scans
+// every album for every artist, about a second for the artists page of a 3,000-album library.
 const ARTIST_COLUMNS = `artist.id, artist.name, artist.album_count as albumCount, artist.track_count as trackCount, artist.first_year as firstYear,
 	artist.newest_album_id as newestAlbumId,
-	(select json_group_array(id) from (select id from album where album.image_hash != '' and exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) order by year desc, created desc limit 4)) as coverAlbumIds`;
+	(select json_group_array(id) from (select cover.id from album_credit cover_credit join album cover on cover.id = cover_credit.album_id
+		where cover_credit.artist_id = artist.id and cover.image_hash != '' order by cover.year desc, cover.created desc limit 4)) as coverAlbumIds`;
 
 const PLAYLIST_COLUMNS = `playlist.id, playlist.name, playlist.kind, playlist.owner_id as ownerId, playlist.genre, playlist.album_count as albumCount,
 	playlist.song_count as songCount, playlist.duration, playlist.updated, playlist.image_hash as imageHash, playlist.readonly, playlist.artist_id as artistId,
@@ -173,7 +176,7 @@ export function artistList(sort: ArtistSort, filters: Filters) {
 	const where =
 		filter.sql === '1'
 			? ''
-			: `where exists (select 1 from album where exists (select 1 from album_credit where album_credit.album_id = album.id and album_credit.artist_id = artist.id) and ${filter.sql})`;
+			: `where exists (select 1 from album_credit join album on album.id = album_credit.album_id where album_credit.artist_id = artist.id and ${filter.sql})`;
 	return artists(
 		`select ${ARTIST_COLUMNS}, artist.name_order as nameOrder from artist ${where} order by ${ARTIST_ORDER[sort]}`,
 		filter.params
