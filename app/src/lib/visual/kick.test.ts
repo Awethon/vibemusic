@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createKickDetector, KICK_TUNING } from './kick';
+import { createKickDetector, KICK_TUNING, unseenBlocks } from './kick';
 
 const sampleRate = 48000;
 const chunkSize = KICK_TUNING.blockSize * 6;
@@ -67,5 +67,40 @@ describe('createKickDetector', () => {
 		detector.reset();
 		detector.process(sub, 0, sub.length - (sub.length % KICK_TUNING.blockSize), null, null);
 		expect(detector.hits).toBe(2);
+	});
+});
+
+describe('unseenBlocks', () => {
+	const bufferLength = 2048;
+
+	// Feeds a stream frame by frame, as the analysis does, and returns the stream positions of
+	// the samples each frame handed to the detector.
+	function handedOver(framesPerSecond: number, seconds: number): [number, number][] {
+		const perFrame = sampleRate / framesPerSecond;
+		const ranges: [number, number][] = [];
+		let unseen = 0;
+		for (let frame = 1; frame <= framesPerSecond * seconds; frame++) {
+			const end = Math.round(frame * perFrame);
+			const fresh = unseenBlocks(unseen + perFrame, bufferLength);
+			unseen = fresh.left;
+			if (fresh.to > fresh.from) ranges.push([end - (bufferLength - fresh.from), end - (bufferLength - fresh.to)]);
+		}
+		return ranges;
+	}
+
+	it.each([60, 120, 144, 240])('hands over every sample once at %i frames a second', (framesPerSecond) => {
+		const ranges = handedOver(framesPerSecond, 2);
+		const total = ranges.reduce((sum, [from, to]) => sum + (to - from), 0);
+		expect(total).toBeGreaterThan(2 * sampleRate - 2 * KICK_TUNING.blockSize);
+		expect(total).toBeLessThanOrEqual(2 * sampleRate);
+		for (let index = 1; index < ranges.length; index++) {
+			// A rounded frame length may shift a boundary by a sample, never by a block.
+			expect(Math.abs(ranges[index][0] - ranges[index - 1][1])).toBeLessThanOrEqual(1);
+		}
+		for (const [from, to] of ranges) expect((to - from) % KICK_TUNING.blockSize).toBe(0);
+	});
+
+	it('takes the newest whole blocks after a frame longer than the buffer', () => {
+		expect(unseenBlocks(5000, bufferLength)).toEqual({ from: 0, to: bufferLength, left: 0 });
 	});
 });

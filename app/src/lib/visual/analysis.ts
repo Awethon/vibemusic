@@ -3,7 +3,7 @@
 // spectrum). The audible output is delayed by OUTPUT_DELAY_SECONDS so these features, especially
 // kicks, are ready by the time the listener hears the sound.
 
-import { createBandFilter, createKickDetector, createKickFilter, KICK_TUNING } from './kick';
+import { createBandFilter, createKickDetector, createKickFilter, KICK_TUNING, unseenBlocks } from './kick';
 
 export const ANALYSIS_TUNING = Object.freeze({
 	fftSize: 2048,
@@ -138,6 +138,8 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 	let spectrumReference: number = tuning.spectrumReferenceFloor;
 	let shortPower = 0;
 	let longPower = 0;
+	// Samples at the end of the kick buffer that the detector has not had yet (see unseenBlocks).
+	let unseenSamples = 0;
 
 	function bandAverage(from: number, to: number): number {
 		let sum = 0;
@@ -179,14 +181,15 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 		if (playing) {
 			kickAnalyser.getFloatTimeDomainData(kickWave);
 			// The analyser returns its whole buffer; only the samples new since the last frame go to
-			// the detector so no block is counted twice.
-			const fresh = Math.min(kickWave.length, Math.round(context.sampleRate * dt));
+			// the detector, so no block is counted twice and none is left out.
+			const fresh = unseenBlocks(unseenSamples + context.sampleRate * dt, kickWave.length);
+			unseenSamples = fresh.left;
 			const hitsBefore = kickDetector.hits;
 			analyser.getFloatTimeDomainData(wave);
 			midAnalyser.getFloatTimeDomainData(midWave);
-			impulse = kickDetector.process(kickWave, kickWave.length - fresh, kickWave.length, wave, midWave);
+			impulse = kickDetector.process(kickWave, fresh.from, fresh.to, wave, midWave);
 			features.beats += kickDetector.hits - hitsBefore;
-		}
+		} else unseenSamples = 0;
 
 		const gate = Math.min(1, Math.max(0, (level - tuning.gateFloor) / tuning.gateRange));
 		// Intensity is short-term vs long-term power: loud and quiet parts within a track, whatever
@@ -224,6 +227,7 @@ export function createAnalysis(context: BaseAudioContext, input: AudioNode): Ana
 		// On track change, so the new track isn't measured against the previous one.
 		reset() {
 			longPower = 0;
+			unseenSamples = 0;
 			kickDetector.reset();
 		},
 		disconnect() {

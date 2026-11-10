@@ -150,6 +150,18 @@ export function createKickDetector(sampleRate: number): KickDetector {
 	};
 }
 
+/**
+ * The part of an analyser buffer that goes to the detector this frame. The last `unseen` samples
+ * of the buffer are the ones it has not had yet. It takes whole blocks, the oldest first; the
+ * `left` over (less than a block) waits for the next frame. Dropping them instead lost a third of
+ * the audio at 240 frames a second, which also made the detector's clock run that much slow.
+ */
+export function unseenBlocks(unseen: number, bufferLength: number): { from: number; to: number; left: number } {
+	const from = bufferLength - Math.min(bufferLength, Math.round(unseen));
+	const to = from + Math.floor((bufferLength - from) / KICK_TUNING.blockSize) * KICK_TUNING.blockSize;
+	return { from, to, left: bufferLength - to };
+}
+
 // Two stages per side give a steeper slope than a single biquad.
 export function createBandFilter(context: BaseAudioContext, input: AudioNode, lowHz: number, highHz: number): AudioNode {
 	const stages: [BiquadFilterType, number][] = [
