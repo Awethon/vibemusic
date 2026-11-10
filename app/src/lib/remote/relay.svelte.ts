@@ -2,8 +2,9 @@
 // and the active device id, reconnects with backoff, and passes messages to the player.
 // Devices are grouped per Navidrome user.
 
-import { session } from '../session.svelte.ts';
+import { navidrome, session, sessionExpired } from '../session.svelte.ts';
 import type { Enrichment, EnrichmentRequest } from '../library/snapshot.ts';
+import { SessionExpiredError } from '../navidrome/credentials.ts';
 import { randomId } from '../randomId.ts';
 import { REMOTE } from '../tuning.ts';
 
@@ -122,9 +123,27 @@ async function claimDeviceId(): Promise<string> {
 	return id;
 }
 
+// The relay asks Navidrome about the token and answers `unauthorized` unless Navidrome says yes,
+// so that also happens while Navidrome is down. Asking Navidrome from here tells the cases apart:
+// it renews the token (the next attempt connects), ends the session (the sign-in page shows), or
+// can't be reached (keep trying).
+let tokenCheck: Promise<void> = Promise.resolve();
+
+async function checkToken() {
+	try {
+		await navidrome().native('keepalive/keepalive');
+	} catch (error) {
+		if (error instanceof SessionExpiredError) sessionExpired();
+	}
+}
+
 function connect() {
 	const token = session.credentials?.token;
-	if (!token) return;
+	// Signed out of this tab until someone signs in again; look again later.
+	if (!token || session.expired) {
+		setTimeout(connect, REMOTE.reconnectMaxMs);
+		return;
+	}
 	const url = new URL('/relay', location.href);
 	url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 	const current = new WebSocket(url);
@@ -134,6 +153,7 @@ function connect() {
 	});
 	current.addEventListener('message', (event) => {
 		const message = JSON.parse(event.data as string) as RelayMessage;
+		if (message.type === 'unauthorized') tokenCheck = checkToken();
 		if (message.type === 'welcome') {
 			relay.connected = true;
 			retryMs = REMOTE.reconnectMinMs;
@@ -149,8 +169,9 @@ function connect() {
 		if (socket !== current) return;
 		socket = null;
 		relay.connected = false;
-		setTimeout(connect, retryMs);
+		const delay = retryMs;
 		retryMs = Math.min(REMOTE.reconnectMaxMs, retryMs * 2);
+		void tokenCheck.then(() => setTimeout(connect, delay));
 	});
 }
 
