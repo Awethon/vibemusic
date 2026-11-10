@@ -2,6 +2,7 @@
 # publishes them to GitHub's container registry:
 #   push to main  -> :edge and :sha-<commit>
 #   tag vX.Y.Z    -> :X.Y.Z, :X.Y and :latest, plus a GitHub release with generated notes
+# The images are built while the checks (ci.yml) run, and get their names only if those pass.
 name: Images
 
 on:
@@ -19,6 +20,9 @@ env:
   REGISTRY: ghcr.io/awethon
 
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   build:
     strategy:
       fail-fast: false
@@ -62,8 +66,10 @@ jobs:
           path: /tmp/digests/*
           retention-days: 1
 
+  # A build pushes its image under its digest only, which nothing pulls. The names people use
+  # (edge, latest, versions) are given here, so a commit that fails the checks is never published.
   publish:
-    needs: build
+    needs: [checks, build]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
