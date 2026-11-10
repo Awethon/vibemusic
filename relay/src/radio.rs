@@ -140,11 +140,10 @@ impl Radio {
                 return StatusCode::BAD_GATEWAY.into_response();
             }
         };
-        let content_type = upstream
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .cloned()
-            .unwrap_or(HeaderValue::from_static("audio/mpeg"));
+        let Some(content_type) = audio_type(upstream.headers().get(header::CONTENT_TYPE)) else {
+            tracing::warn!(id, kind = ?upstream.headers().get(header::CONTENT_TYPE), "radio station did not send audio");
+            return StatusCode::BAD_GATEWAY.into_response();
+        };
         let every = upstream
             .headers()
             .get("icy-metaint")
@@ -175,11 +174,27 @@ impl Radio {
         });
         let mut response = Body::from_stream(body).into_response();
         response.headers_mut().insert(header::CONTENT_TYPE, content_type);
+        // Keeps a browser from deciding by itself that the bytes are a page after all.
+        response
+            .headers_mut()
+            .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
         response
             .headers_mut()
             .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         response
     }
+}
+
+/// The content type to answer with: the station's own when it names audio, `audio/mpeg` when it
+/// names none, and `None` for anything else. The stream is served from the app's own address, so a
+/// station (or whoever answers in its place) that sent `text/html` would get a page there, with
+/// the listener's stored sign-in within its reach.
+fn audio_type(sent: Option<&HeaderValue>) -> Option<HeaderValue> {
+    let Some(sent) = sent else {
+        return Some(HeaderValue::from_static("audio/mpeg"));
+    };
+    let kind = sent.to_str().ok()?.split(';').next()?.trim().to_ascii_lowercase();
+    (kind.starts_with("audio/") || kind == "application/ogg").then(|| sent.clone())
 }
 
 impl Radio {
@@ -237,5 +252,23 @@ mod tests {
             through_local_proxy("http://music.local/opus", None),
             ("http://music.local/opus".to_owned(), None)
         );
+    }
+
+    #[test]
+    fn passes_on_audio_types_only() {
+        let sent = |kind: &'static str| audio_type(Some(&HeaderValue::from_static(kind)));
+        for kind in ["audio/mpeg", "audio/aacp", "Audio/Ogg; codecs=opus", "application/ogg"] {
+            assert_eq!(sent(kind), Some(HeaderValue::from_static(kind)));
+        }
+        for kind in [
+            "text/html",
+            "text/html; charset=utf-8",
+            "application/octet-stream",
+            "image/svg+xml",
+            "",
+        ] {
+            assert_eq!(sent(kind), None, "{kind}");
+        }
+        assert_eq!(audio_type(None), Some(HeaderValue::from_static("audio/mpeg")));
     }
 }
