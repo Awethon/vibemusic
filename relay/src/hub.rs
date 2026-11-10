@@ -134,6 +134,11 @@ impl Hub {
         let room = self.rooms.entry(user.to_owned()).or_default();
         match room.devices.iter_mut().find(|device| device.id == device_id) {
             Some(device) => {
+                // The socket this one takes over from is told, and `serve` closes it (see
+                // `ServerMessage::Replaced`).
+                if let Some(older) = &device.connection {
+                    let _ = older.outbox.send(ServerMessage::Replaced.to_text());
+                }
                 device.name = name.to_owned();
                 device.connection = Some(connection);
             }
@@ -509,9 +514,10 @@ mod tests {
     #[test]
     fn a_reload_replaces_the_connection_and_the_old_close_is_ignored() {
         let mut hub = Hub::default();
-        let (old_connection, _old) = connect(&mut hub, "u", "tab");
+        let (old_connection, mut old) = connect(&mut hub, "u", "tab");
         hub.receive("u", "tab", message(json!({ "type": "claim" })));
         let (_, mut fresh) = connect(&mut hub, "u", "tab");
+        assert_eq!(drain(&mut old).pop().unwrap()["type"], "replaced");
         hub.leave("u", "tab", old_connection);
         hub.receive("u", "tab", message(json!({ "type": "queue", "queue": ["q"] })));
         let welcome = drain(&mut fresh);

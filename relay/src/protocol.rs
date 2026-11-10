@@ -95,6 +95,11 @@ pub struct DeviceInfo {
 pub enum ServerMessage {
     /// The token in `Hello` was not accepted; the socket closes after this.
     Unauthorized,
+    /// A newer socket said `Hello` with this socket's device id and has taken its place; the
+    /// socket closes after this. After a reload nobody is left to hear it. A second tab that
+    /// ended up with the same id does, and comes back under a new one: tabs can't always tell
+    /// that an id is taken (without Web Locks, on plain http, two can start with the same one).
+    Replaced,
     /// First reply to `Hello`: the room as it is now.
     #[serde(rename_all = "camelCase")]
     Welcome {

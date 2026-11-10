@@ -34,7 +34,8 @@ export type RelayMessage =
 	| { type: 'release'; to: string; handoff: boolean }
 	| { type: 'takeover'; queue: unknown; playback: unknown; ageMs: number }
 	| ({ type: 'enrichment' } & Enrichment)
-	| { type: 'unauthorized' };
+	| { type: 'unauthorized' }
+	| { type: 'replaced' };
 
 const DEVICE_KEY = 'vibemusic.device';
 const DEVICE_CHANNEL = 'vibemusic-devices';
@@ -116,8 +117,9 @@ async function announcedDeviceId(stored: string | null): Promise<string> {
 	return id;
 }
 
-async function claimDeviceId(): Promise<string> {
-	const stored = sessionStorage.getItem(DEVICE_KEY);
+// `fresh` skips the stored id: the relay said another tab holds it now.
+async function claimDeviceId(fresh = false): Promise<string> {
+	const stored = fresh ? null : sessionStorage.getItem(DEVICE_KEY);
 	const id = navigator.locks ? await lockedDeviceId(stored) : await announcedDeviceId(stored);
 	sessionStorage.setItem(DEVICE_KEY, id);
 	return id;
@@ -127,7 +129,8 @@ async function claimDeviceId(): Promise<string> {
 // so that also happens while Navidrome is down. Asking Navidrome from here tells the cases apart:
 // it renews the token (the next attempt connects), ends the session (the sign-in page shows), or
 // can't be reached (keep trying).
-let tokenCheck: Promise<void> = Promise.resolve();
+// The next reconnect waits for this: the answer about the token, or a new device id (`replaced`).
+let beforeReconnect: Promise<void> = Promise.resolve();
 
 async function checkToken() {
 	try {
@@ -153,7 +156,16 @@ function connect() {
 	});
 	current.addEventListener('message', (event) => {
 		const message = JSON.parse(event.data as string) as RelayMessage;
-		if (message.type === 'unauthorized') tokenCheck = checkToken();
+		if (message.type === 'unauthorized') beforeReconnect = checkToken();
+		// Another tab connected under this tab's device id (claimDeviceId can miss that when two
+		// tabs start at the same moment) and the relay keeps that one. Coming back under the same id
+		// would throw the other tab out in turn, for ever, so this tab becomes a device of its own.
+		// The relay closes this socket next; the reconnect waits for the new id.
+		if (message.type === 'replaced')
+			beforeReconnect = claimDeviceId(true).then(
+				(id) => void (relay.deviceId = id),
+				() => {}
+			);
 		if (message.type === 'welcome') {
 			relay.connected = true;
 			retryMs = REMOTE.reconnectMinMs;
@@ -171,7 +183,7 @@ function connect() {
 		relay.connected = false;
 		const delay = retryMs;
 		retryMs = Math.min(REMOTE.reconnectMaxMs, retryMs * 2);
-		void tokenCheck.then(() => setTimeout(connect, delay));
+		void beforeReconnect.then(() => setTimeout(connect, delay));
 	});
 }
 

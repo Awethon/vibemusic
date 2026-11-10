@@ -6,7 +6,7 @@ class FakeSocket extends EventTarget {
 	static OPEN = 1;
 	static all: FakeSocket[] = [];
 	readyState = 0;
-	sent: { type: string; token?: string }[] = [];
+	sent: { type: string; token?: string; deviceId?: string }[] = [];
 
 	constructor(public url: URL) {
 		super();
@@ -142,6 +142,23 @@ describe('the relay connection', () => {
 		expect(FakeSocket.all).toHaveLength(2);
 		latest().open();
 		expect(helloToken(latest())).toBe('signed-in-again');
+	});
+
+	// Two tabs can end up with one device id (without Web Locks, when they start together). The
+	// relay keeps the newer one; if the older came back under the same id, they would throw each
+	// other out about once a second.
+	it('comes back as a device of its own when another tab has taken its device id', async () => {
+		const client = await connected();
+		const before = latest().sent.find((message) => message.type === 'hello')?.deviceId;
+		latest().receive({ type: 'replaced' });
+		latest().drop();
+		await vi.advanceTimersByTimeAsync(REMOTE.reconnectMinMs);
+		expect(FakeSocket.all).toHaveLength(2);
+		latest().open();
+		const after = latest().sent.find((message) => message.type === 'hello')?.deviceId;
+		expect(after).toBeTruthy();
+		expect(after).not.toBe(before);
+		expect(client.relay.deviceId).toBe(after);
 	});
 
 	it('keeps trying with the same token while Navidrome can’t be reached to check it', async () => {

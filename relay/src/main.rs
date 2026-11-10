@@ -236,29 +236,44 @@ async fn serve(app: App, mut socket: WebSocket) {
     let connection = app.hub.lock().unwrap().join(&user, &hello.device_id, &name, outbox);
     tracing::info!(user, device = hello.device_id, name, "device connected");
     let (mut sink, mut stream) = socket.split();
-    let writer = tokio::spawn(async move {
+    // The hub's last word to a socket that a newer one of the same device has replaced.
+    let replaced = ServerMessage::Replaced.to_text();
+    // Ends with the reason when the socket can no longer be written to or was replaced.
+    let mut writer = tokio::spawn(async move {
         let mut ping = tokio::time::interval(PING_EVERY);
         loop {
             tokio::select! {
                 text = inbox.recv() => match text {
-                    Some(text) => if sink.send(Message::Text(text.into())).await.is_err() { break },
-                    None => break,
+                    Some(text) => {
+                        let last = text == replaced;
+                        if sink.send(Message::Text(text.into())).await.is_err() { break "closed" }
+                        if last {
+                            let _ = sink.send(Message::Close(None)).await;
+                            break "replaced";
+                        }
+                    }
+                    None => break "closed",
                 },
-                _ = ping.tick() => if sink.send(Message::Ping(Default::default())).await.is_err() { break },
+                _ = ping.tick() => if sink.send(Message::Ping(Default::default())).await.is_err() { break "closed" },
                 update = updates.recv() => match update {
-                    Ok(text) => if sink.send(Message::Text(text.into())).await.is_err() { break },
+                    Ok(text) => if sink.send(Message::Text(text.into())).await.is_err() { break "closed" },
                     // A slow socket skips the broadcasts it missed instead of being disconnected.
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break "closed",
                 },
             }
         }
     });
     let reason = loop {
-        let message = match tokio::time::timeout(app.silence_limit, stream.next()).await {
-            Ok(Some(Ok(message))) => message,
-            Ok(_) => break "closed",
-            Err(_) => break "silent",
+        let message = tokio::select! {
+            // Once the writer has ended nothing more is heard either: what a replaced socket sent
+            // would count as coming from the device that replaced it.
+            ended = &mut writer => break ended.unwrap_or("closed"),
+            next = tokio::time::timeout(app.silence_limit, stream.next()) => match next {
+                Ok(Some(Ok(message))) => message,
+                Ok(_) => break "closed",
+                Err(_) => break "silent",
+            },
         };
         let Message::Text(text) = message else { continue };
         match serde_json::from_str::<ClientMessage>(&text) {
@@ -641,5 +656,29 @@ mod tests {
             welcome["devices"],
             json!([device("player", true), device("remote", true), device("late", true)])
         );
+    }
+
+    // Left open, the older socket heard nothing more, yet what it sent still counted as coming from
+    // the device: two live tabs with one id could both believe they were the one playing.
+    #[tokio::test]
+    async fn a_socket_replaced_by_a_newer_hello_of_the_same_device_is_told_and_closed() {
+        let relay = relay().await;
+        let (mut older, _) = join(&relay, "ana", "tab-1").await;
+        let (mut watcher, _) = join(&relay, "ana", "tab-2").await;
+        let (mut newer, welcome) = join(&relay, "ana", "tab-1").await;
+        assert_eq!(closed(&mut older).await.pop(), Some(json!({ "type": "replaced" })));
+        // The device itself never went away: nobody saw it leave, and it still works.
+        assert_eq!(
+            welcome["devices"],
+            json!([device("tab-1", true), device("tab-2", true)])
+        );
+        say(&mut newer, json!({ "type": "claim" })).await;
+        let seen = heard(&mut watcher).await;
+        assert!(
+            seen.iter()
+                .all(|message| message["devices"] != json!([device("tab-2", true)])),
+            "{seen:?}"
+        );
+        assert_eq!(seen.last().unwrap()["active"], "tab-1");
     }
 }
