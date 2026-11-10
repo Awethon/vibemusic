@@ -138,12 +138,31 @@ async fn main() {
         .with_state(app);
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
     tracing::info!(%listen, %navidrome_url, "relay listening");
-    axum::serve(listener, router)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await
-        .expect("serve");
+    // Stops at once, without waiting for connections to finish: they are WebSockets and radio
+    // streams, which never do, and the app reconnects by itself.
+    tokio::select! {
+        served = axum::serve(listener, router) => served.expect("serve"),
+        () = stop_signal() => tracing::info!("relay stopping"),
+    }
+}
+
+/// Ctrl-C, or the SIGTERM that `docker stop` sends. In a container the relay is process 1, which
+/// ignores SIGTERM unless it handles it, so Docker waited ten seconds and killed it.
+async fn stop_signal() {
+    let interrupt = tokio::signal::ctrl_c();
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => signal.recv().await,
+            Err(_) => std::future::pending().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<Option<()>>();
+    tokio::select! {
+        _ = interrupt => {}
+        _ = terminate => {}
+    }
 }
 
 async fn radio_stream(
